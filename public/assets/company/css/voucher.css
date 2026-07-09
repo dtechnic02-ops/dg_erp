@@ -1,0 +1,104 @@
+@page{
+
+size:A4 portrait;
+
+margin:10mm;
+
+}
+
+@media print{
+
+
+/* EVERYTHING HIDE */
+
+body *{
+
+visibility:hidden;
+
+}
+
+
+/* ONLY PRINT AREA SHOW */
+
+#printArea,
+#printArea *{
+
+visibility:visible;
+
+}
+
+
+/* POSITION PRINT AREA */
+
+#printArea{
+
+position:absolute;
+
+left:0;
+
+top:0;
+
+width:100%;
+
+margin:0;
+
+padding:0;
+
+background:#fff;
+
+}
+
+
+/* HIDE BUTTON */
+
+.no-print{
+
+display:none !important;
+
+}
+
+
+/* REMOVE LAYOUT */
+
+.wrapper,
+.content,
+.content-wrapper,
+.main-content,
+.container,
+.container-fluid,
+.card,
+.card-body{
+
+margin:0 !important;
+
+padding:0 !important;
+
+box-shadow:none !important;
+
+border:none !important;
+
+}
+
+
+/* TABLE */
+
+#printArea table{
+
+width:100%;
+
+border-collapse:collapse;
+
+font-size:11px;
+
+}
+
+#printArea th,
+#printArea td{
+
+padding:5px;
+
+border:1px solid #000;
+
+}
+
+}

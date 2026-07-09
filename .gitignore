@@ -22,3 +22,12 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+# Ignore uploaded files
+/public/companies
+
+# Ignore environment file
+.env
+
+# Ignore dependencies
+/vendor
+/node_modules
