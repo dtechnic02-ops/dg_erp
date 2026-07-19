@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\Unit;
 use App\Models\ProductCategory;
+use App\Models\Brand;
 use App\Services\ValidationService;
 use App\Services\StockService;
 use App\Models\StockMovement;
@@ -22,10 +23,8 @@ use Illuminate\Validation\Rule;
 class ProductController extends Controller
 {
     // 🔥 PRODUCT LIST
-// 🔥 PRODUCT LIST
 
-
-public function index(Request $request)
+private function filteredProductQuery(Request $request)
 {
 
 $query = Product::
@@ -41,7 +40,6 @@ auth()->user()->company_id
 'inactive'
 );
 
-    
 
 
     // 🔍 SEARCH
@@ -99,15 +97,106 @@ $q->where(
         );
     }
 
+    // 🏷️ BRAND FILTER
+
+    if ($request->filled('brand_id'))
+    {
+        $query->where(
+            'brand_id',
+            $request->brand_id
+        );
+    }
+
+    return $query;
+
+}
+
+/* =====================
+
+BRAND DROPDOWN
+
+Shared brand list used by index(), create(),
+and edit() so the dropdown source exists in
+one place only.
+
+===================== */
+
+private function companyBrands()
+{
+
+    return Brand::where(
+        'company_id',
+        auth()->user()->company_id
+    )
+    ->orderBy('name')
+    ->get();
+
+}
+
+/* =====================
+
+PRODUCT IMAGE FOLDER
+
+Shared upload path used by store()
+and update() so the folder logic
+exists in one place only.
+
+===================== */
+
+private function productImageFolder()
+{
+
+    return
+
+    'companies/'.
+
+    auth()->user()->company_id.
+
+    '/products';
+
+}
+
+public function index(Request $request)
+{
+
+    $totalProducts = $this->filteredProductQuery($request)->count();
+
+    $totalStockQuantity = $this->filteredProductQuery($request)->sum('current_stock');
+
+    $totalOutOfStock = $this->filteredProductQuery($request)->where('current_stock', '<=', 0)->count();
+
+    /* =====================
+
+    PER PAGE (MASTER PAGINATION)
+
+    Allowed values only.
+    Any other value falls back to 10.
+
+    ===================== */
+
+    $allowedPerPage = [10, 25, 50, 100, 200, 500];
+
+    $perPage = (int) $request->get('per_page', 10);
+
+    if (!in_array($perPage, $allowedPerPage)) {
+
+        $perPage = 10;
+
+    }
+
     // 🔥 FINAL PRODUCTS
 
-  $products = $query
-   ->latest() 
-   ->paginate(20) 
-   ->withQueryString(); 
-   return view( 'company.products.index', compact('products') );
+  $products = $this->filteredProductQuery($request)
+   ->with(['brand'])
+   ->latest()
+   ->paginate($perPage)
+   ->withQueryString();
+
+   $brands = $this->companyBrands();
+
+   return view( 'company.products.index', compact('products', 'totalProducts', 'totalStockQuantity', 'totalOutOfStock', 'brands', 'perPage') );
 }
-   
+
 
 
     // 🔥 CREATE FORM
@@ -124,12 +213,15 @@ $q->where(
             auth()->user()->company_id
         )->get();
 
+        $brands = $this->companyBrands();
+
         return view(
             'company.products.form',
             [
                 'product' => null,
                 'units' => $units,
-                'categories' => $categories
+                'categories' => $categories,
+                'brands' => $brands,
             ]
         );
     }
@@ -137,6 +229,8 @@ $q->where(
     // 🔥 STORE PRODUCT
 public function store(Request $request)
 {
+
+$companyId = auth()->user()->company_id;
 
 $request->validate([
 
@@ -146,18 +240,10 @@ $request->validate([
 
     'max:255',
 
-    Rule::unique(
+    ValidationService::uniquePerCompany(
         'products',
-        'name'
-    )->where(
-
-        fn ($q) =>
-
-        $q->where(
-            'company_id',
-            auth()->user()->company_id
-        )
-
+        'name',
+        $companyId
     ),
 
 ],
@@ -168,21 +254,28 @@ $request->validate([
 
     'max:100',
 
-    Rule::unique(
+    ValidationService::uniquePerCompany(
         'products',
-        'barcode'
-    )->where(
-        fn ($q) =>
-        $q->where(
-            'company_id',
-            auth()->user()->company_id
-        )
+        'barcode',
+        $companyId
     ),
 
 ],
-'category_id'=>'required',
 
-'unit_id'=>'required',
+'category_id'=>[
+    'required',
+    Rule::exists('product_categories', 'id')->where('company_id', $companyId),
+],
+
+'unit_id'=>[
+    'required',
+    Rule::exists('units', 'id')->where('company_id', $companyId),
+],
+
+'brand_id'=>[
+    'nullable',
+    Rule::exists('brands', 'id')->where('company_id', $companyId),
+],
 
 'cost_price' =>
 ValidationService::requiredAmount(),
@@ -194,41 +287,44 @@ ValidationService::requiredAmount(),
 ValidationService::amount(),
 
 'stock_alert' =>
-ValidationService::amount(),
+ValidationService::quantity(),
 
 'opening_stock' =>
 
 ValidationService::amount(),
 
+'batch_no' =>
+ValidationService::string(100),
+
+'manufacture_date' =>
+ValidationService::date(),
+
+'expiry_date' =>
+ValidationService::date(),
+
+'allow_online' =>
+ValidationService::boolean(),
+
 'image' =>
-ValidationService::document(),
+ValidationService::image(),
 
 ]);
 
 
-$imagePath = null;
-
-$folder =
-'companies/'.
-auth()->user()->company_id.
-'/products';
-
-if($request->hasFile('image')){
-
-    $imagePath =
-        FileUploadService::uploadImage(
-            $request->file('image'),
-            $folder,
-            800
-        );
-
-}
+$imagePath =
+    FileUploadService::replaceImage(
+        $request,
+        'image',
+        null,
+        $this->productImageFolder(),
+        800
+    );
 
 
 /* CREATE PRODUCT */
 $activeFinancialYear = FinancialYear::where(
     'company_id',
-    auth()->user()->company_id
+    $companyId
 )
 ->where(
     'is_active',
@@ -256,7 +352,7 @@ Product::create([
 
 'company_id'=>
 
-auth()->user()->company_id,
+$companyId,
 'name'=>
 
 $request->name,
@@ -265,11 +361,23 @@ $request->name,
 
 $request->category_id,
 
+'brand_id'=>
+
+$request->brand_id,
+
 'unit_id'=>
 
 $request->unit_id,
 
 'barcode' => $request->barcode,
+
+'batch_no' => $request->batch_no,
+
+'manufacture_date' => $request->manufacture_date,
+
+'expiry_date' => $request->expiry_date,
+
+'allow_online' => $request->boolean('allow_online'),
 
 'cost_price'=>
 
@@ -407,6 +515,9 @@ auth()->user()->company_id
 ->get();
 
 
+$brands = $this->companyBrands();
+
+
 return view(
 
 'company.products.form',
@@ -417,7 +528,9 @@ compact(
 
 'units',
 
-'categories'
+'categories',
+
+'brands'
 
 )
 
@@ -431,6 +544,8 @@ compact(
 Request $request,
 $id
 ){
+
+$companyId = auth()->user()->company_id;
 
 $product=
 
@@ -446,7 +561,7 @@ $id
 
 'company_id',
 
-auth()->user()->company_id
+$companyId
 
 )
 
@@ -461,24 +576,11 @@ $request->validate([
 
     'max:255',
 
-    Rule::unique(
+    ValidationService::uniquePerCompany(
         'products',
-        'name'
-    )
-
-    ->ignore(
+        'name',
+        $companyId,
         $product->id
-    )
-
-    ->where(
-
-        fn ($q) =>
-
-        $q->where(
-            'company_id',
-            auth()->user()->company_id
-        )
-
     ),
 
 ],
@@ -490,31 +592,29 @@ $request->validate([
 
     'max:100',
 
-    Rule::unique(
+    ValidationService::uniquePerCompany(
         'products',
-        'barcode'
-    )
-
-    ->ignore(
+        'barcode',
+        $companyId,
         $product->id
-    )
-
-    ->where(
-
-        fn ($q) =>
-
-        $q->where(
-            'company_id',
-            auth()->user()->company_id
-        )
-
     ),
 
 ],
 
-'category_id'=>'required',
+'category_id'=>[
+    'required',
+    Rule::exists('product_categories', 'id')->where('company_id', $companyId),
+],
 
-'unit_id'=>'required',
+'unit_id'=>[
+    'required',
+    Rule::exists('units', 'id')->where('company_id', $companyId),
+],
+
+'brand_id'=>[
+    'nullable',
+    Rule::exists('brands', 'id')->where('company_id', $companyId),
+],
 
 'cost_price' =>
 ValidationService::requiredAmount(),
@@ -526,9 +626,22 @@ ValidationService::requiredAmount(),
 ValidationService::amount(),
 
 'stock_alert' =>
-ValidationService::amount(),
+ValidationService::quantity(),
+
+'batch_no' =>
+ValidationService::string(100),
+
+'manufacture_date' =>
+ValidationService::date(),
+
+'expiry_date' =>
+ValidationService::date(),
+
+'allow_online' =>
+ValidationService::boolean(),
+
 'image' =>
-ValidationService::document(),
+ValidationService::image(),
 
 ]);
 
@@ -543,11 +656,23 @@ $request->name,
 
 $request->category_id,
 
+'brand_id'=>
+
+$request->brand_id,
+
 'unit_id'=>
 
 $request->unit_id,
 
 'barcode' => $request->barcode,
+
+'batch_no' => $request->batch_no,
+
+'manufacture_date' => $request->manufacture_date,
+
+'expiry_date' => $request->expiry_date,
+
+'allow_online' => $request->boolean('allow_online'),
 
 'cost_price'=>
 
@@ -573,29 +698,17 @@ $request->status,
 
 $request->description,
 
-'image'=>
-
-$product->image
-
 ];
 
 
-
-
-
 /* IMAGE UPDATE */
-
-$folder =
-'companies/'.
-auth()->user()->company_id.
-'/products';
 
 $data['image'] =
     FileUploadService::replaceImage(
         $request,
         'image',
         $product->image,
-        $folder,
+        $this->productImageFolder(),
         800
     );
 
@@ -622,6 +735,80 @@ return redirect()
 
 );
 
+}
+
+// 🔥 PRODUCT PROFILE
+
+public function show($id)
+{
+    $product = Product::where(
+        'company_id',
+        auth()->user()->company_id
+    )
+    ->with(['unit', 'category', 'brand'])
+    ->findOrFail($id);
+
+    return view(
+        'company.products.show',
+        compact('product')
+    );
+}
+
+/* =====================
+
+PRODUCT PROFILE PRINT
+
+===================== */
+
+public function printProfile($id)
+{
+    $product = Product::where(
+        'company_id',
+        auth()->user()->company_id
+    )
+    ->with(['unit', 'category', 'brand'])
+    ->findOrFail($id);
+
+    $print = true;
+
+    return view(
+        'company.products.show',
+        compact('product', 'print')
+    );
+}
+
+/* =====================
+
+PRODUCT LIST PRINT
+
+===================== */
+
+public function print(Request $request)
+{
+
+    $products = $this->filteredProductQuery($request)
+        ->with(['brand'])
+        ->latest()
+        ->get();
+
+    $totalProducts = $products->count();
+
+    $totalStockQuantity = $products->sum('current_stock');
+
+    $totalOutOfStock = $products->where('current_stock', '<=', 0)->count();
+
+    return view(
+
+        'company.products.print',
+
+        compact(
+            'products',
+            'totalProducts',
+            'totalStockQuantity',
+            'totalOutOfStock'
+        )
+
+    );
 }
 
 public function destroy($id)
@@ -740,7 +927,9 @@ throw $e;
 
             $request->search,
 
-            $request->stock_filter
+            $request->stock_filter,
+
+            $request->brand_id
 
         ),
 
@@ -752,75 +941,8 @@ throw $e;
 
     public function exportPdf(Request $request)
 {
-   $query = Product::
-
-where(
-'company_id',
-auth()->user()->company_id
-)
-
-->where(
-'status',
-'!=',
-'inactive'
-);
-
-    // SEARCH
-
-    if ($request->search)
-    {
-        $query->where(function ($q) use ($request) {
-
-            $q->where(
-                'name',
-                'like',
-                '%' . $request->search . '%'
-            )
-
-            ->orWhere(
-                'barcode',
-                'like',
-                '%' . $request->search . '%'
-            );
-
-        });
-    }
-
-    // STOCK FILTER
-
-    if ($request->stock_filter == 'out')
-    {
-        $query->where(
-            'current_stock',
-            '<=',
-            0
-        );
-    }
-
-    elseif ($request->stock_filter == 'low')
-    {
-        $query->whereColumn(
-            'current_stock',
-            '<=',
-            'stock_alert'
-        )
-        ->where(
-            'current_stock',
-            '>',
-            0
-        );
-    }
-
-    elseif ($request->stock_filter == 'available')
-    {
-        $query->where(
-            'current_stock',
-            '>',
-            0
-        );
-    }
-
-    $products = $query
+    $products = $this->filteredProductQuery($request)
+        ->with(['brand'])
         ->latest()
         ->get();
 

@@ -29,5 +29,10 @@ class ProductCategory extends Model
             auth()->user()->company_id
         );
     }
+
+    public function products()
+    {
+        return $this->hasMany(Product::class, 'category_id');
+    }
 }
 

@@ -184,7 +184,9 @@ public static function updateTransaction(
 public static function reverseTransaction(
     AccountTransaction $transaction,
     string $referenceType,
-    string $description
+    string $description,
+    ?string $transactionDate = null,
+    ?int $financialYearId = null
 )
 {
 
@@ -194,13 +196,13 @@ public static function reverseTransaction(
             $transaction->company_id,
 
         'financial_year_id' =>
-            $transaction->financial_year_id,
+            $financialYearId ?? $transaction->financial_year_id,
 
         'account_id' =>
             $transaction->account_id,
 
         'transaction_date' =>
-            now()->toDateString(),
+            $transactionDate ?? now()->toDateString(),
 
         'voucher_no' =>
             'REV-' .
@@ -224,7 +226,7 @@ public static function reverseTransaction(
         'created_by' =>
             auth()->id(),
 
-    ]);
+    ], false);
 }
 public static function recalculateLedger(
     int $accountId

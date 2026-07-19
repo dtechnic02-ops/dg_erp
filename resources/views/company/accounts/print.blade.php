@@ -1,151 +1,172 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 
-<title>Accounts Print</title>
+<meta charset="UTF-8">
+<title>Account List - Print</title>
 
-<meta charset="utf-8">
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 
 <style>
 
-body{
-font-family:Arial,sans-serif;
-font-size:12px;
-color:#222;
+@page {
+    size: A4;
+    margin: 10mm;
 }
 
-.print-table{
-width:100%;
-border-collapse:collapse;
-margin-top:15px;
+body {
+    font-size: 12px;
 }
 
-.print-table th,
-.print-table td{
-border:1px solid #ddd;
-padding:8px;
+.print-logo {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
 }
 
-.print-table th{
-background:#f3f4f6;
-}
-
-.text-right{
-text-align:right;
-}
-
-.no-print{
-margin-bottom:15px;
-}
-
-@media print{
-
-.no-print{
-display:none;
-}
-
+.print-thumb {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
 }
 
 </style>
 
 </head>
+<body onload="window.print()">
 
-<body>
+@php
+    $company = auth()->user()->company;
+@endphp
 
-@include('company.partials.print-header')
+<div class="container-fluid">
 
-<div class="no-print">
+    {{-- =========================================================
+    COMPANY HEADER
+    ========================================================= --}}
 
-<button onclick="window.print()">
+    <div class="row align-items-center border-bottom pb-2 mb-2">
 
-Print
+        <div class="col-2">
+            @if ($company && $company->logo_path)
+                <img
+                    src="{{ asset('companies/' . $company->id . '/' . $company->logo_path) }}"
+                    alt="Company Logo"
+                    class="print-logo">
+            @else
+                <img
+                    src="{{ asset('images/no-image.png') }}"
+                    alt="No logo available"
+                    class="print-logo">
+            @endif
+        </div>
 
-</button>
+        <div class="col-10">
+            <div class="fw-bold">{{ $company->company_name ?? '-' }}</div>
+            <div>{{ $company->address ?? '-' }}</div>
+            <div>Phone: {{ $company->mobile ?? '-' }} &nbsp; Email: {{ $company->email ?? '-' }}</div>
+        </div>
+
+    </div>
+
+    {{-- =========================================================
+    TITLE
+    ========================================================= --}}
+
+    <h5 class="text-center fw-bold mb-2">ACCOUNT LIST</h5>
+
+    {{-- =========================================================
+    ACTIVE FILTER (only shown when a filter was actually applied)
+    ========================================================= --}}
+
+    @if (request()->filled('search'))
+        <div class="mb-2">
+            <span class="fw-bold">Filtered by Search :</span>
+            {{ request('search') }}
+        </div>
+    @endif
+
+    {{-- =========================================================
+    ACCOUNT LIST TABLE
+    ========================================================= --}}
+
+    <table class="table table-sm table-bordered mb-2">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Image</th>
+                <th>Type</th>
+                <th>Bank</th>
+                <th>Name</th>
+                <th>Account No</th>
+                <th class="text-end">Balance</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            @forelse ($accounts as $a)
+                <tr>
+                    <td>{{ $loop->iteration }}</td>
+                    <td>
+                        @if ($a->image_path)
+                            <img
+                                src="{{ asset($a->image_path) }}"
+                                alt="{{ $a->account_name }}"
+                                class="print-thumb">
+                        @endif
+                    </td>
+                    <td>{{ $a->account_type ?: '-' }}</td>
+                    <td>{{ $a->bank_name ?: '-' }}</td>
+                    <td>{{ $a->account_name }}</td>
+                    <td>{{ $a->account_no ?: '-' }}</td>
+                    <td class="text-end">{{ number_format($a->current_balance, 2) }}</td>
+                    <td>{{ $a->status == 'active' ? 'Active' : 'Inactive' }}</td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="8" class="text-center">No Accounts Found</td>
+                </tr>
+            @endforelse
+
+        </tbody>
+    </table>
+
+    {{-- =========================================================
+    SUMMARY (filtered result only)
+    ========================================================= --}}
+
+    <table class="table table-sm table-bordered mb-2">
+        <tbody>
+            <tr>
+                <th class="w-25">Total Accounts</th>
+                <td>{{ $totalAccounts }}</td>
+            </tr>
+            <tr>
+                <th>Total Opening Balance</th>
+                <td>{{ number_format($totalOpeningBalance, 2) }}</td>
+            </tr>
+            <tr>
+                <th>Total Current Balance</th>
+                <td>{{ number_format($totalCurrentBalance, 2) }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    {{-- =========================================================
+    FOOTER
+    ========================================================= --}}
+
+    <div class="row border-top pt-2 mt-2 text-muted">
+        <div class="col-4">Generated Date: {{ now()->format('Y-m-d H:i') }}</div>
+        <div class="col-4">Printed By: {{ auth()->user()->name }}</div>
+        <div class="col-4 text-end">Total Records: {{ $accounts->count() }}</div>
+    </div>
 
 </div>
 
-<h2>
-
-Account List
-
-</h2>
-
-
-<table class="print-table">
-
-<thead>
-
-<tr>
-
-<th>Type</th>
-
-<th>Name</th>
-
-<th>Provider</th>
-
-<th>Account</th>
-
-<th>Currency</th>
-
-<th>Balance</th>
-
-<th>Status</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-@foreach($accounts as $a)
-
-<tr>
-
-<td>{{ ucfirst($a->account_type) }}</td>
-
-<td>{{ $a->account_name }}</td>
-
-<td>{{ $a->bank_name }}</td>
-
-<td>{{ $a->account_no }}</td>
-
-<td>{{ $a->currency }}</td>
-
-<td class="text-right">
-
-{{ number_format($a->current_balance,2) }}
-
-</td>
-
-<td>
-
-{{ ucfirst($a->status) }}
-
-</td>
-
-</tr>
-
-@endforeach
-
-</tbody>
-
-</table>
-
-
-@include('company.partials.print-footer')
-
-
-<script>
-
-window.onload=function(){
-
-window.print();
-
-}
-
-</script>
-
-
 </body>
-
 </html>

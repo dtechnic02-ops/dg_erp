@@ -1,71 +1,111 @@
+@php
+    $company = auth()->user()->company;
+@endphp
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-
-    <title>Service Categories</title>
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-          rel="stylesheet">
+    <meta charset="UTF-8">
+    <title>Service Category List Print</title>
 
     <style>
-
-        body {
-            font-size: 14px;
+        @page {
+            size: A4;
+            margin: 10mm;
         }
 
-        @media print {
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            color: #000;
+        }
 
-            .no-print {
-                display: none;
-            }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table, th, td {
+            border: 1px solid #000;
+        }
+
+        th, td {
+            padding: 4px 6px;
+            vertical-align: middle;
+        }
+
+        .no-print {
+            display: none;
         }
     </style>
 </head>
-<body>
+<body onload="window.print()">
 
-<div class="container py-4">
+    <div class="container-fluid">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="row align-items-center border-bottom pb-2 mb-2">
+            <div class="col-2">
+                @if ($company && $company->logo_path)
+                    <img
+                        src="{{ asset('companies/' . $company->id . '/' . $company->logo_path) }}"
+                        alt="Company Logo"
+                        width="70"
+                        height="70">
+                @endif
+            </div>
 
-        <div>
-            <h3>Service Categories Report</h3>
-            <small>
-                Print Date: {{ now()->format('d M Y h:i A') }}
-            </small>
+            <div class="col-10 text-center">
+                <h4 class="mb-0">{{ $company->company_name ?? '-' }}</h4>
+                <div>{{ $company->address ?? '-' }}</div>
+                <div>{{ $company->mobile ?? '-' }} {{ $company->email ? '| ' . $company->email : '' }}</div>
+            </div>
         </div>
 
-        <button onclick="window.print()"
-                class="btn btn-dark no-print">
-            Print
-        </button>
-    </div>
+        <div class="text-center mb-2">
+            <h5 class="mb-0">SERVICE CATEGORY LIST</h5>
+            @if (request('search'))
+                <div>Filtered by: "{{ request('search') }}"</div>
+            @endif
+        </div>
 
-    <table class="table table-bordered">
-
-        <thead class="table-dark">
-            <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Slug</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-
-        <tbody>
-
-            @foreach($categories as $key => $category)
-
+        <table>
+            <thead>
                 <tr>
-                    <td>{{ $key + 1 }}</td>
-                    <td>{{ $category->name }}</td>
-                    <td>{{ $category->slug }}</td>
-                    <td>{{ ucfirst($category->status) }}</td>
+                    <th width="40">#</th>
+                    <th>Category Name</th>
+                    <th width="80">Status</th>
                 </tr>
+            </thead>
 
-            @endforeach
-        </tbody>
-    </table>
-</div>
+            <tbody>
+                @forelse ($categories as $index => $cat)
+                    <tr>
+                        <td class="text-center">{{ $index + 1 }}</td>
+                        <td>{{ $cat->name }}</td>
+                        <td class="text-center">{{ $cat->status == 'active' ? 'Active' : 'Inactive' }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="3" class="text-center">No Service Categories Found</td>
+                    </tr>
+                @endforelse
+            </tbody>
+
+            <tfoot>
+                <tr>
+                    <td colspan="2" class="text-end"><strong>Total Service Categories</strong></td>
+                    <td class="text-center"><strong>{{ $totalServiceCategories }}</strong></td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <div class="row mt-3">
+            <div class="col-4">Generated: {{ now()->format('Y-m-d H:i') }}</div>
+            <div class="col-4 text-center">Printed By: {{ auth()->user()->name ?? '-' }}</div>
+            <div class="col-4 text-end">Page 1</div>
+        </div>
+
+    </div>
 
 </body>
 </html>

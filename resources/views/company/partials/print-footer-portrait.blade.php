@@ -1,89 +1,38 @@
+@php
 
-<style>
+$company = \App\Models\Company::find(
+auth()->user()->company_id
+);
 
-.print-footer{
+@endphp
 
-margin-top:40px;
+<div class="dg-print-footer dg-print-portrait">
+    @if (!empty($company->print_note))
+        <div class="dg-print-note">
+            {!! nl2br(e($company->print_note)) !!}
+        </div>
+    @endif
 
-padding-top:20px;
+    <table class="dg-print-signature-table">
+        <tr>
+            <td class="text-center">
+                <div class="dg-signature-line"></div>
+                <div class="dg-signature-label">Prepared By</div>
+            </td>
+            <td class="text-center">
+                <div class="dg-signature-line"></div>
+                <div class="dg-signature-label">Checked By</div>
+            </td>
+            <td class="text-center">
+                <div class="dg-signature-line"></div>
+                <div class="dg-signature-label">Authorized By</div>
+            </td>
+        </tr>
+    </table>
 
-border-top:1px solid #ddd;
-
-}
-
-.sign-row{
-
-display:flex;
-
-justify-content:space-between;
-
-margin-top:50px;
-
-}
-
-.sign-box{
-
-width:180px;
-
-text-align:center;
-
-font-size:12px;
-
-}
-
-.footer-note{
-
-text-align:center;
-
-margin-top:20px;
-
-font-size:11px;
-
-color:#666;
-
-}
-
-</style>
-
-
-<div class="print-footer">
-
-<div class="sign-row">
-
-<div class="sign-box">
-
-_________________
-
-Prepared By
-
+    <div class="dg-print-meta-footer text-end">
+        <span class="fw-semibold">Printed By:</span> {{ auth()->user()->name ?? '' }}
+        &nbsp;|&nbsp;
+        <span class="fw-semibold">Printed:</span> {{ now()->format('d M Y H:i') }}
+    </div>
 </div>
-
-
-<div class="sign-box">
-
-_________________
-
-Checked By
-
-</div>
-
-
-<div class="sign-box">
-
-_________________
-
-Authorized Signature
-
-</div>
-
-</div>
-
-
-<div class="footer-note">
-
-This is system generated document.
-
-</div>
-
-</div>
-

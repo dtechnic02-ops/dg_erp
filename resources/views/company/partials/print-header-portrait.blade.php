@@ -6,295 +6,65 @@ auth()->user()->company_id
 
 @endphp
 
-
-<style>
-
-@page{
-
-size:A4 portrait;
-
-margin:10mm;
-
-}
-
-
-
-
-/* HEADER */
-
-.print-header{
-
-width:100%;
-
-border-bottom:
-
-1px solid #d1d5db;
-
-padding-bottom:6px;
-
-margin-bottom:8px;
-
-}
-
-
-.header-table td{
-
-padding:2px;
-
-vertical-align:top;
-
-}
-
-
-/* LOGO */
-
-.logo-box{
-
-width:80px;
-
-}
-
-
-.logo{
-
-width:60px;
-
-height:60px;
-
-object-fit:contain;
-
-}
-
-
-/* COMPANY */
-
-
-.company-box{
-
-width:auto;
-
-text-align:center;
-
-padding-left:10px;
-
-}
-
-
-
-
-.company-name{
-
-font-size:18px;
-
-font-weight:700;
-
-margin-bottom:2px;
-
-text-align:center;
-
-}
-
-
-.company-address{
-
-font-size:11px;
-
-line-height:1.4;
-
-text-align:center;
-
-padding-right:10px;
-
-}
-
-
-/* CONTACT */
-
-
-.info-box{
-
-width:170px;
-
-font-size:11px;
-
-line-height:1.5;
-
-text-align:right;
-
-}
-
-
-
-
-/* PRINT BUTTON */
-
-.print-btn{
-
-position:fixed;
-
-top:10px;
-
-right:10px;
-
-z-index:999;
-
-}
-
-
-@media print{
-
-.print-btn{
-
-display:none;
-
-}
-
-}
-
-
-
-</style>
-
-
-
-<div class="print-header">
-
-<table class="header-table">
-
-<tr>
-
-
-<!-- LOGO -->
-
-<td class="logo-box">
-
-@if(
-$company &&
-$company->logo_path
-)
-
-<img
-
-src="{{ asset(
-
-'companies/' .
-
-$company->id .
-
-'/' .
-
-$company->logo_path
-
-) }}"
-
-class="logo">
-
-@endif
-
-</td>
-
-
-
-<!-- COMPANY -->
-
-<td class="company-box">
-
-<div class="company-name">
-
-{{ $company->company_name ?? '' }}
-
+<div class="dg-print-header dg-print-portrait">
+    <table class="dg-print-header-table">
+        <tr>
+            <td class="dg-print-logo-cell">
+                @if ($company && $company->logo_path)
+                    <img
+                        src="{{ asset('companies/' . $company->id . '/' . $company->logo_path) }}"
+                        alt="{{ $company->company_name ?? 'Company Logo' }}"
+                        class="dg-print-logo">
+                @endif
+            </td>
+
+            <td class="dg-print-company text-start">
+                <div class="dg-print-company-name">{{ $company->company_name ?? '' }}</div>
+                <div class="dg-print-company-meta">
+                    @if (!empty($company->address))
+                        {{ $company->address }}<br>
+                    @endif
+                    @if (!empty($company->telephone) || !empty($company->mobile))
+                        <span class="fw-semibold">Phone:</span>
+                        {{ $company->telephone ?? $company->mobile }}
+                        @if (!empty($company->telephone) && !empty($company->mobile) && $company->telephone !== $company->mobile)
+                            / {{ $company->mobile }}
+                        @endif
+                        <br>
+                    @endif
+                    @if (!empty($company->email))
+                        <span class="fw-semibold">Email:</span> {{ $company->email }}<br>
+                    @endif
+                    @if (!empty($company->vat_number) || !empty($company->pan_number))
+                        @if (!empty($company->vat_number))
+                            <span class="fw-semibold">VAT:</span> {{ $company->vat_number }}
+                        @endif
+                        @if (!empty($company->vat_number) && !empty($company->pan_number))
+                            &nbsp;|&nbsp;
+                        @endif
+                        @if (!empty($company->pan_number))
+                            <span class="fw-semibold">PAN:</span> {{ $company->pan_number }}
+                        @endif
+                        <br>
+                    @endif
+                    @if (!empty($company->website))
+                        <span class="fw-semibold">Website:</span> {{ $company->website }}
+                    @endif
+                </div>
+            </td>
+
+            <td class="dg-print-meta text-end">
+                <div><span class="fw-semibold">Print Date:</span> {{ now()->format('d M Y') }}</div>
+                <div><span class="fw-semibold">Print Time:</span> {{ now()->format('H:i') }}</div>
+            </td>
+        </tr>
+
+        @if (!empty($documentTitle ?? null))
+            <tr class="dg-print-title-row">
+                <td colspan="3" class="text-center">
+                    <div class="dg-print-title">{{ $documentTitle }}</div>
+                </td>
+            </tr>
+        @endif
+    </table>
 </div>
-
-
-<div class="company-address">
-
-{{ $company->address ?? '' }}
-
-<br>
-
-@if(
-!empty(
-$company->pan_number
-)
-)
-
-<b>
-
-PAN:
-
-</b>
-
-{{ $company->pan_number }}
-
-@endif
-
-</div>
-
-</td>
-
-
-
-<!-- CONTACT -->
-
-<td class="info-box">
-
-<div>
-
-<span class="label">
-
-Telephone:
-
-</span>
-
-{{ $company->telephone ?? '' }}
-
-</div>
-
-
-<div>
-
-<span class="label">
-
-Mobile:
-
-</span>
-
-{{ $company->mobile ?? '' }}
-
-</div>
-
-
-<div>
-
-<span class="label">
-
-Email:
-
-</span>
-
-{{ $company->email ?? '' }}
-
-</div>
-
-
-<div>
-
-<span class="label">
-
-Website:
-
-</span>
-
-{{ $company->website ?? '' }}
-
-</div>
-
-</td>
-
-
-</tr>
-
-</table>
-
-</div>
-

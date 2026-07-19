@@ -15,10 +15,12 @@ use App\Models\FinancialYear;
 use Illuminate\Support\Facades\DB;
 class SupplierController extends Controller
 {
-    // 🔥 LIST
-    public function index(Request $request)
+    // 🔥 SHARED FILTERED QUERY
+    // Used by index() and any other action (e.g. summary totals)
+    // so the filter logic is defined in exactly one place.
+    private function filteredSupplierQuery(Request $request)
     {
-       $query = Supplier::where(
+        $query = Supplier::where(
 
 'company_id',
 
@@ -47,14 +49,23 @@ auth()->user()->company_id
             });
         }
 
-      $suppliers = $query
-    ->latest()
-    ->paginate(20)
-    ->withQueryString();
+        return $query;
+    }
+
+    // 🔥 LIST
+    public function index(Request $request)
+    {
+        $totalCurrentBalance = $this->filteredSupplierQuery($request)
+            ->sum('current_balance');
+
+        $suppliers = $this->filteredSupplierQuery($request)
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
 
         return view(
             'company.suppliers.index',
-            compact('suppliers')
+            compact('suppliers', 'totalCurrentBalance')
         );
     }
 
@@ -375,6 +386,66 @@ public function show($id)
 
         )
 
+    );
+}
+
+
+/* =====================
+
+PRINT (LIST)
+
+Reuses the SAME filteredSupplierQuery() used by
+index(), so Print always reflects only the
+currently filtered suppliers (never the full table
+unless no filter is applied).
+
+===================== */
+
+public function print(Request $request)
+{
+    $suppliers = $this->filteredSupplierQuery($request)
+        ->latest()
+        ->get();
+
+    $totalSuppliers = $suppliers->count();
+
+    $totalOpeningBalance = $suppliers->sum('opening_balance');
+
+    $totalCurrentBalance = $suppliers->sum('current_balance');
+
+    return view(
+        'company.suppliers.print',
+        compact(
+            'suppliers',
+            'totalSuppliers',
+            'totalOpeningBalance',
+            'totalCurrentBalance'
+        )
+    );
+}
+
+
+/* =====================
+
+PRINT PROFILE
+
+Reuses the existing show.blade.php view with
+$print = true, exactly like the Customer module.
+
+===================== */
+
+public function printProfile($id)
+{
+    $companyId = auth()->user()->company_id;
+
+    $supplier = Supplier::where('company_id', $companyId)
+        ->findOrFail($id);
+
+    $print = true;
+
+    return view(
+        'company.suppliers.show',
+        compact('supplier', 'print')
     );
 }
 

@@ -5,177 +5,262 @@ namespace App\Http\Controllers\Company;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Unit;
+use App\Services\ValidationService;
 
 class UnitController extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | FILTERED QUERY (shared by index() and print())
+    |--------------------------------------------------------------------------
+    */
 
-    public function index()
+    private function filteredUnitQuery(Request $request)
     {
-
-        $units = Unit::
-
-        where(
+        $query = Unit::where(
             'company_id',
             auth()->user()->company_id
-        )
+        );
 
-        ->latest()
+        if ($request->filled('search')) {
 
-        ->paginate(20);
+            $search = trim($request->search);
+
+            $query->where(function ($q) use ($search) {
+
+                $q->where(
+                    'name',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhere(
+                    'short_name',
+                    'like',
+                    "%{$search}%"
+                );
+            });
+        }
+
+        return $query;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | UNIT LIST
+    |--------------------------------------------------------------------------
+    */
+
+    public function index(Request $request)
+    {
+        $totalUnits = $this->filteredUnitQuery($request)->count();
+
+        /* =====================
+
+        PER PAGE (MASTER PAGINATION)
+
+        Allowed values only.
+        Any other value falls back to 10.
+
+        ===================== */
+
+        $allowedPerPage = [10, 25, 50, 100, 200, 500];
+
+        $perPage = (int) $request->get('per_page', 10);
+
+        if (!in_array($perPage, $allowedPerPage)) {
+
+            $perPage = 10;
+
+        }
+
+        $units = $this->filteredUnitQuery($request)
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
 
         return view(
             'company.units.index',
-            compact('units')
+            compact('units', 'totalUnits', 'perPage')
         );
-
     }
 
-
+    /*
+    |--------------------------------------------------------------------------
+    | STORE
+    |--------------------------------------------------------------------------
+    */
 
     public function store(Request $request)
     {
+        $companyId = auth()->user()->company_id;
 
         $request->validate([
 
-            'name'=>
+            'name' => [
 
-            'required|max:100|unique:units,name,NULL,id,company_id,'.auth()->user()->company_id,
+                'required',
+                'max:100',
 
-            'short_name'=>
+                ValidationService::uniquePerCompany(
+                    'units',
+                    'name',
+                    $companyId
+                ),
 
-            'required|max:20|unique:units,short_name,NULL,id,company_id,'.auth()->user()->company_id,
+            ],
+
+            'short_name' => [
+
+                'required',
+                'max:20',
+
+                ValidationService::uniquePerCompany(
+                    'units',
+                    'short_name',
+                    $companyId
+                ),
+
+            ],
 
         ]);
-
 
         Unit::create([
 
-            'company_id'=>
+            'company_id' => $companyId,
 
-            auth()->user()->company_id,
-
-            'name'=>
-
-            trim(
+            'name' => trim(
                 $request->name
             ),
 
-            'short_name'=>
-
-            trim(
+            'short_name' => trim(
                 $request->short_name
             ),
 
         ]);
 
-
-        return back()
-
-        ->with(
+        return back()->with(
             'success',
             'Unit Added Successfully'
         );
-
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE
+    |--------------------------------------------------------------------------
+    */
 
-
-    public function edit($id)
+    public function update(Request $request, $id)
     {
+        $companyId = auth()->user()->company_id;
 
-        $unit = Unit::
-
-        where(
+        $unit = Unit::where(
             'company_id',
-            auth()->user()->company_id
+            $companyId
         )
-
         ->findOrFail($id);
-
-        return response()->json($unit);
-
-    }
-
-
-
-    public function update(Request $request,$id)
-    {
-
-        $unit = Unit::
-
-        where(
-            'company_id',
-            auth()->user()->company_id
-        )
-
-        ->findOrFail($id);
-
 
         $request->validate([
 
-            'name'=>
+            'name' => [
 
-            'required|max:100|unique:units,name,'.$unit->id.',id,company_id,'.auth()->user()->company_id,
+                'required',
+                'max:100',
 
-            'short_name'=>
+                ValidationService::uniquePerCompany(
+                    'units',
+                    'name',
+                    $companyId,
+                    $unit->id
+                ),
 
-            'required|max:20|unique:units,short_name,'.$unit->id.',id,company_id,'.auth()->user()->company_id,
+            ],
+
+            'short_name' => [
+
+                'required',
+                'max:20',
+
+                ValidationService::uniquePerCompany(
+                    'units',
+                    'short_name',
+                    $companyId,
+                    $unit->id
+                ),
+
+            ],
 
         ]);
 
-
         $unit->update([
 
-            'name'=>
-
-            trim(
+            'name' => trim(
                 $request->name
             ),
 
-            'short_name'=>
-
-            trim(
+            'short_name' => trim(
                 $request->short_name
             ),
 
         ]);
 
-
-        return back()
-
-        ->with(
+        return back()->with(
             'success',
             'Unit Updated Successfully'
         );
-
     }
 
-
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE (PROTECTED)
+    |--------------------------------------------------------------------------
+    */
 
     public function destroy($id)
     {
-
-        $unit = Unit::
-
-        where(
+        $unit = Unit::where(
             'company_id',
             auth()->user()->company_id
         )
-
         ->findOrFail($id);
 
+        if (
+            $unit
+                ->products()
+                ->exists()
+        ) {
+
+            return back()->with(
+                'error',
+                'Unit cannot be deleted because it is already used by one or more Products.'
+            );
+        }
 
         $unit->delete();
 
-
-        return back()
-
-        ->with(
+        return back()->with(
             'success',
             'Unit Deleted Successfully'
         );
-
     }
 
-}
+    /*
+    |--------------------------------------------------------------------------
+    | UNIT LIST PRINT
+    |--------------------------------------------------------------------------
+    */
 
+    public function print(Request $request)
+    {
+        $units = $this->filteredUnitQuery($request)
+            ->latest()
+            ->get();
+
+        $totalUnits = $units->count();
+
+        return view(
+            'company.units.print',
+            compact('units', 'totalUnits')
+        );
+    }
+}

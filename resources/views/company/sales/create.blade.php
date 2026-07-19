@@ -1,904 +1,368 @@
 @extends('company.layout')
 
-@section('title', 'Sales Invoice')
-
-@push('styles')
-
-<link rel="stylesheet"
-href="{{ asset('assets/company/css/common.css') }}">
-
-@endpush
-
 @section('content')
 
-<form
-id="salesForm"
-method="POST"
-action="{{ route('company.sales.store') }}">
-
-@csrf
-
-<div class="container-fluid">
-
-<!-- ==========================================
-TOP TOOLBAR
-========================================== -->
-
-<div class="card mb-3">
-
-<div class="card-body py-2">
-
-<div class="d-flex flex-wrap gap-2">
-
-<a
-href="{{ route('company.dashboard') }}"
-class="btn btn-outline-primary btn-sm">
-
-Dashboard
-
-</a>
-
-<a
-href="{{ route('company.sales.index') }}"
-class="btn btn-outline-secondary btn-sm">
-
-Sales List
-
-</a>
-
-<button
-type="button"
-onclick="location.reload()"
-class="btn btn-outline-success btn-sm">
-
-Refresh
-
-</button>
-
-<a
-href="{{ route('company.customers.index') }}"
-class="btn btn-outline-dark btn-sm">
-
-Customer
-
-</a>
-
-<a
-href="{{ route('company.products.index') }}"
-class="btn btn-outline-dark btn-sm">
-
-Product
-
-</a>
-
-<a
-href="{{ route('company.services.index') }}"
-class="btn btn-outline-dark btn-sm">
-
-Service
-
-</a>
-
-<a
-href="{{ route('company.units.index') }}"
-class="btn btn-outline-dark btn-sm">
-
-Unit
-
-</a>
-
-<a
-href="{{ route('company.categories.index') }}"
-class="btn btn-outline-dark btn-sm">
-
-Category
-
-</a>
-
-</div>
-
-</div>
-
-</div>
-
-<!-- ==========================================
-SALES INFORMATION
-========================================== -->
-
-<div class="card mb-3">
-
-<div class="card-header">
-
-<h5 class="mb-0">
-
-Sales Information
-
-</h5>
-
-</div>
-
-<div class="card-body">
-
-<div class="row g-3">
-
-<div class="col-xl-3 col-lg-4 col-md-6">
-
-<label class="form-label">
-
-Customer
-
-</label>
-
-<select
-name="customer_id"
-id="customer_id"
-class="form-select">
-
-<option value="">
-
-Select Customer
-
-</option>
-
-@foreach($customers as $customer)
-
-<option
-value="{{ $customer->id }}"
-data-mobile="{{ $customer->mobile }}"
-data-balance="{{ $customer->balance }}">
-
-{{ $customer->name }}
-
-</option>
-
-@endforeach
-
-</select>
-
-<small
-id="customer_balance"
-class="text-primary">
-
-Balance : 0.00
-
-</small>
-
-</div>
-
-<div class="col-xl-2 col-lg-4 col-md-6">
-
-<label class="form-label">
-
-Sale Date
-
-</label>
-
-<input
-type="date"
-name="sale_date"
-class="form-control"
-value="{{ date('Y-m-d') }}">
-
-</div>
-
-<div class="col-xl-2 col-lg-4 col-md-6">
-
-<label class="form-label">
-
-Invoice No
-
-</label>
-
-<input
-type="text"
-class="form-control"
-value="{{ $invoiceNo }}"
-readonly>
-
-</div>
-
-<div class="col-xl-2 col-lg-4 col-md-6">
-
-<label class="form-label">
-
-Price Type
-
-</label>
-
-<select
-id="price_type"
-name="price_type"
-class="form-select">
-
-<option value="retail">
-
-Retail
-
-</option>
-
-<option value="wholesale">
-
-Wholesale
-
-</option>
-
-</select>
-
-</div>
-
-<div class="col-xl-3 col-lg-4 col-md-6">
-
-<label class="form-label">
-
-Payment Account
-
-</label>
-
-<select
-id="account_id"
-name="account_id"
-class="form-select">
-
-<option value="">
-
-Select Account
-
-</option>
-
-@foreach($accounts as $account)
-
-<option
-value="{{ $account->id }}"
-data-balance="{{ $account->current_balance }}">
-
-{{ $account->account_name }}
-
-</option>
-
-@endforeach
-
-</select>
-
-<small
-id="account_balance"
-class="text-success">
-
-Balance : 0.00
-
-</small>
-
-</div>
-
-<div class="col-xl-2 col-lg-4 col-md-6">
-
-<label class="form-label">
-
-Paid Amount
-
-</label>
-
-<input
-type="number"
-id="paid_amount"
-name="paid_amount"
-class="form-control"
-value="0">
-
-</div>
-
-<div class="col-xl-3 col-lg-4 col-md-6">
-
-<label class="form-label">
-
-Reference No
-
-</label>
-
-<input
-type="text"
-name="reference_no"
-class="form-control">
-
-</div>
-
-<div class="col-xl-4 col-lg-12">
-
-<label class="form-label">
-
-Customer Mobile
-
-</label>
-
-<input
-type="text"
-id="customer_mobile"
-class="form-control"
-readonly>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-<!-- ==========================================
-SALES ITEMS
-========================================== -->
-
-<div class="card mb-3">
-
-    <div class="card-header d-flex justify-content-between align-items-center">
-
-        <h5 class="mb-0">
-
-            Sales Items
-
-        </h5>
-
-        <button
-            type="button"
-            id="addRow"
-            class="btn btn-primary btn-sm">
-
-            + Add Item
-
-        </button>
-
-    </div>
-
-    <div class="card-body p-0">
-
-        <div class="table-responsive">
-
-            <table
-                id="salesTable"
-                class="table table-bordered table-hover align-middle mb-0">
-
-                <thead class="table-light">
-
-                    <tr>
-
-                        <th width="50">#</th>
-
-                        <th width="120">
-
-                            Type
-
-                        </th>
-
-                        <th>
-
-                            Product / Service
-
-                        </th>
-
-                        <th width="80">
-
-                            Qty
-
-                        </th>
-
-                        <th width="90">
-
-                            Unit
-
-                        </th>
-
-                        <th width="120">
-
-                            Price
-
-                        </th>
-
-                        <th width="120">
-
-                            VAT
-
-                        </th>
-
-                        <th width="120">
-
-                            VAT Amount
-
-                        </th>
-
-                        <th width="140">
-
-                            Total
-
-                        </th>
-
-                        <th width="70">
-
-                            Delete
-
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody id="salesBody">
-
-                    <tr class="sales-row">
-
-                        <td class="row-number text-center">
-
-                            1
-
-                        </td>
-
-                        <td>
-
-                            <select
-                                name="item_type[]"
-                                class="form-select item-type">
-
-                                <option value="product">
-
-                                    Product
-
-                                </option>
-
-                                <option value="service">
-
-                                    Service
-
-                                </option>
-
-                            </select>
-
-                        </td>
-
-                        <td>
-
-                            <select
-                                name="product_id[]"
-                                class="form-select product-select">
-
-                                <option value="">
-
-                                    Select Product
-
-                                </option>
-
-                                @foreach($products as $product)
-
-                                <option
-                                    value="{{ $product->id }}"
-                                    data-retail="{{ $product->retail_price }}"
-                                    data-wholesale="{{ $product->wholesale_price }}"
-                                    data-stock="{{ $product->current_stock }}"
-                                    data-unit="{{ $product->unit->name ?? '' }}"
-                                    data-unit-id="{{ $product->unit_id }}"
-                                    data-vat-id="{{ $product->vat_id }}"
-                                    data-vat-rate="{{ $product->vat_rate ?? 0 }}">
-
-                                    {{ $product->name }}
-
-                                </option>
-
-                                @endforeach
-
-                            </select>
-
-                            <select
-                                name="service_id[]"
-                                class="form-select service-select d-none mt-2">
-
-                                <option value="">
-
-                                    Select Service
-
-                                </option>
-
-                                @foreach($services as $service)
-
-                                <option
-                                    value="{{ $service->id }}"
-                                    data-price="{{ $service->price }}"
-                                    data-vat="{{ $service->vat_rate ?? 0 }}">
-
-                                    {{ $service->name }}
-
-                                </option>
-
-                                @endforeach
-
-                            </select>
-
-                            <small
-                                class="text-primary product-stock">
-
-                                Stock : 0
-
-                            </small>
-
-                        </td>
-
-                        <td>
-
-                            <input
-                                type="number"
-                                name="quantity[]"
-                                class="form-control quantity text-center"
-                                value="1"
-                                min="1">
-
-                        </td>
-
-                        <td>
-
-                            <input
-                                type="text"
-                                name="unit_name[]"
-                                class="form-control unit-name text-center"
-                                readonly>
-
-                            <input
-                                type="hidden"
-                                name="unit_id[]"
-                                class="unit-id">
-
-                        </td>
-
-                        <td>
-
-                            <input
-                                type="number"
-                                name="unit_price[]"
-                                class="form-control unit-price text-end"
-                                value="0"
-                                step="0.01">
-
-                        </td>
-
-                        <td>
-
-                            <select
-                                name="vat_id[]"
-                                class="form-select vat-select">
-
-                                <option value="">
-
-                                    Select VAT
-
-                                </option>
-
-                                @foreach($vats as $vat)
-
-                                <option
-                                    value="{{ $vat->id }}"
-                                    data-rate="{{ $vat->rate }}">
-
-                                    {{ $vat->name }}
-                                    ({{ $vat->rate }}%)
-
-                                </option>
-
-                                @endforeach
-
-                            </select>
-
-                            <input
-                                type="hidden"
-                                name="vat_rate[]"
-                                class="vat-rate"
-                                value="0">
-
-                        </td>
-
-                        <td>
-
-                            <input
-                                type="text"
-                                name="vat_amount[]"
-                                class="form-control vat-amount text-end"
-                                value="0.00"
-                                readonly>
-
-                        </td>
-
-                        <td>
-
-                            <input
-                                type="text"
-                                name="total_price[]"
-                                class="form-control total-price text-end fw-bold"
-                                value="0.00"
-                                readonly>
-
-                        </td>
-
-                        <td class="text-center">
-
-                            <button
-                                type="button"
-                                class="btn btn-outline-danger btn-sm remove-row">
-
-                                🗑
-
-                            </button>
-
-                        </td>
-
-                    </tr>
-
-                </tbody>
-
-            </table>
+<div class="dg-page">
+
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="row align-items-center g-2">
+                <div class="col">
+                    <h1 class="h4 mb-0">Create Sales Invoice</h1>
+                </div>
+                <div class="col-auto">
+                    <nav class="btn-group" aria-label="Sales toolbar">
+                        <a href="{{ route('company.dashboard') }}" class="btn btn-outline-secondary dg-btn">Dashboard</a>
+                        <a href="{{ route('company.sales.index') }}" class="btn btn-outline-secondary dg-btn">Sales List</a>
+                        <a href="{{ route('company.sales.create') }}" class="btn btn-outline-secondary dg-btn">Refresh</a>
+                        <a href="{{ route('company.customers.index') }}" class="btn btn-outline-secondary dg-btn">Customer</a>
+                        <a href="{{ route('company.products.index') }}" class="btn btn-outline-secondary dg-btn">Product</a>
+                        <a href="{{ route('company.services.index') }}" class="btn btn-outline-secondary dg-btn">Service</a>
+                        <a href="{{ route('company.service-categories.index') }}" class="btn btn-outline-secondary dg-btn">Service Category</a>
+                        <a href="{{ route('company.units.index') }}" class="btn btn-outline-secondary dg-btn">Unit</a>
+                        <a href="{{ route('company.categories.index') }}" class="btn btn-outline-secondary dg-btn">Category</a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="dg-container">
+        <div class="container-fluid">
+
+            @if ($errors->any())
+                <div class="alert alert-danger dg-alert" role="alert">
+                    <ul class="mb-0">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if (session('error'))
+                <div class="alert alert-danger dg-alert" role="alert">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            @php
+                $selectedCustomerBalance = '0.00';
+
+                if (old('customer_id')) {
+                    $selectedCustomer = $customers->firstWhere('id', (int) old('customer_id'));
+
+                    if ($selectedCustomer) {
+                        $selectedCustomerBalance = number_format($selectedCustomer->current_balance, 2);
+                    }
+                }
+
+                $selectedAccountBalance = '0.00';
+
+                if (old('account_id')) {
+                    $selectedAccount = $accounts->firstWhere('id', (int) old('account_id'));
+
+                    if ($selectedAccount) {
+                        $selectedAccountBalance = number_format($selectedAccount->current_balance, 2);
+                    }
+                }
+            @endphp
+
+            <form id="dgForm" method="POST" action="{{ route('company.sales.store') }}">
+                @csrf
+
+                <section class="dg-section">
+                    <article class="card dg-card">
+                        <header class="card-header dg-card-header">
+                            <h2 class="h6 mb-0">Invoice Information</h2>
+                        </header>
+
+                        <div class="card-body dg-card-body">
+                            <div class="row g-3 align-items-start">
+
+                                <div class="col-md-2">
+                                    <label for="invoice_no" class="form-label">Invoice No</label>
+                                    <input type="text" id="invoice_no" class="form-control dg-input" value="{{ $invoiceNo }}" readonly>
+                                </div>
+
+                                <div class="col-md-2 d-none">
+                                    <label for="financial_year" class="form-label">Financial Year</label>
+                                    <input type="text" id="financial_year" class="form-control dg-input" value="{{ $activeFy->name ?? '' }}" readonly>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label for="sale_date" class="form-label">Sale Date</label>
+                                    <input type="date" name="sale_date" id="sale_date" class="form-control dg-input" value="{{ old('sale_date', date('Y-m-d')) }}" required>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label for="customer_id" class="form-label">Customer</label>
+                                    <select name="customer_id" id="customer_id" class="form-select dg-select" required>
+                                        <option value="">Select Customer</option>
+                                        @foreach ($customers as $customer)
+                                            <option value="{{ $customer->id }}" data-balance="{{ $customer->current_balance }}" @selected(old('customer_id') == $customer->id)>{{ $customer->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <small class="form-text text-muted dg-note">Customer Balance: {{ $selectedCustomerBalance }}</small>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label for="price_type" class="form-label">Price Type</label>
+                                    <select name="price_type" id="price_type" class="form-select dg-select">
+                                        <option value="retail" @selected(old('price_type', 'retail') == 'retail')>Retail</option>
+                                        <option value="wholesale" @selected(old('price_type') == 'wholesale')>Wholesale</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label for="barcode" class="form-label">Barcode</label>
+                                    <input type="text" name="barcode" id="barcode" class="form-control dg-input" placeholder="Scan or enter barcode">
+                                </div>
+
+                            </div>
+                        </div>
+                    </article>
+                </section>
+
+                <section class="dg-section">
+                    <article class="card dg-card">
+                        <header class="card-header dg-card-header">
+                            <h2 class="h6 mb-0">Items</h2>
+                        </header>
+
+                        <div class="card-body dg-card-body">
+                            <div class="table-responsive">
+                                <table class="table dg-table">
+                                    <thead class="dg-head">
+                                        <tr>
+                                            <th scope="col">#</th>
+                                            <th scope="col">Type</th>
+                                            <th scope="col" width="25%">Product / Service</th>
+                                            <th scope="col" width="8%">Quantity</th>
+                                            <th scope="col" width="8%">Unit</th>
+                                            <th scope="col">Unit Price</th>
+                                            <th scope="col">VAT Rate</th>
+                                            <th scope="col">VAT Amount</th>
+                                            <th scope="col">Total Price</th>
+                                            <th scope="col" class="dg-action-col-compact d-print-none">Delete</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody class="dg-body">
+                                        <tr class="dg-row">
+                                            <td>1</td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">Item Type</label>
+                                                <select name="item_type[]" class="form-select dg-select" aria-label="Item Type">
+                                                    <option value="">Select Type</option>
+                                                    <option value="product">Product</option>
+                                                    <option value="service">Service</option>
+                                                </select>
+                                            </td>
+
+                                            <td>
+                                                <div class="dg-product-picker" hidden>
+                                                    <label class="form-label visually-hidden">Product</label>
+                                                    <select class="form-select dg-select dg-product-select" aria-label="Product">
+                                                        <option value="">Select Product</option>
+                                                        @foreach ($products as $product)
+                                                            <option value="{{ $product->id }}" data-unit="{{ $product->unit?->short_name ?? $product->unit?->name }}" data-retail-price="{{ $product->retail_price }}" data-wholesale-price="{{ $product->wholesale_price }}" data-stock="{{ $product->current_stock }}" data-barcode="{{ $product->barcode }}" data-vat-rate="{{ $product->vat?->rate }}">{{ $product->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div class="dg-service-picker" hidden>
+                                                    <label class="form-label visually-hidden">Service</label>
+                                                    <select class="form-select dg-select dg-service-select" aria-label="Service">
+                                                        <option value="">Select Service</option>
+                                                        @foreach ($services as $service)
+                                                            <option value="{{ $service->id }}" data-price="{{ $service->price }}" data-vat-rate="{{ $service->vat?->rate }}">{{ $service->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <input type="hidden" name="product_id[]" class="dg-product-id" value="">
+                                                <input type="hidden" name="service_id[]" class="dg-service-id" value="">
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">Quantity</label>
+                                                <input type="number" name="quantity[]" class="form-control dg-input" min="1" step="1" aria-label="Quantity">
+                                                <div class="invalid-feedback">Quantity exceeds available stock.</div>
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">Unit</label>
+                                                <input type="text" class="form-control dg-input dg-unit-display" value="-" readonly aria-label="Unit">
+                                                <small class="form-text text-muted dg-note dg-stock-note"></small>
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">Unit Price</label>
+                                                <input type="number" name="unit_price[]" class="form-control dg-input" min="0" step="0.01" aria-label="Unit Price">
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">VAT Rate</label>
+                                                <select name="vat_rate[]" class="form-select dg-select" aria-label="VAT Rate">
+                                                    <option value="0">No VAT</option>
+                                                    @foreach ($vats as $vat)
+                                                        <option value="{{ $vat->rate }}">{{ $vat->name }} ({{ $vat->rate }}%)</option>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">VAT Amount</label>
+                                                <input type="number" name="vat_amount[]" class="form-control dg-input" min="0" step="0.01" value="0" aria-label="VAT Amount">
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">Total Price</label>
+                                                <input type="number" name="total_price[]" class="form-control dg-input" min="0" step="0.01" value="0" aria-label="Total Price">
+                                            </td>
+
+                                            <td class="dg-action-col-compact d-print-none">
+                                                <div class="dg-action-group" role="group" aria-label="Delete row 1">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger dg-action-btn" aria-label="Delete row 1">Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <button type="button" class="btn btn-outline-primary btn-sm dg-btn dg-add-item mt-2">+ Add Item</button>
+                        </div>
+                    </article>
+                </section>
+
+                <section class="dg-section">
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <article class="card dg-card dg-payment">
+                                <header class="card-header dg-card-header">
+                                    <h2 class="h6 mb-0">Payment Information</h2>
+                                </header>
+
+                                <div class="card-body dg-card-body">
+                                    <div class="row g-3">
+
+                                        <div class="col-md-6">
+                                            <label for="account_id" class="form-label">Payment Account</label>
+                                            <select name="account_id" id="account_id" class="form-select dg-select">
+                                                <option value="">Select Account</option>
+                                                @forelse ($accounts as $account)
+                                                    <option value="{{ $account->id }}" data-balance="{{ $account->current_balance }}" @selected(old('account_id') == $account->id)>{{ $account->account_name }}</option>
+                                                @empty
+                                                    <option value="" disabled>No active accounts found</option>
+                                                @endforelse
+                                            </select>
+                                            <small class="form-text text-muted dg-note">Account Balance: {{ $selectedAccountBalance }}</small>
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <label for="paid_amount" class="form-label">Paid Amount</label>
+                                            <input type="number" name="paid_amount" id="paid_amount" class="form-control dg-input" min="0" step="0.01" value="{{ old('paid_amount', 0) }}">
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <label for="discount_amount" class="form-label">Discount</label>
+                                            <input type="number" name="discount_amount" id="discount_amount" class="form-control dg-input" min="0" step="0.01" value="{{ number_format(old('discount_amount', 0), 2) }}">
+                                        </div>
+
+                                        <div class="col-md-12">
+                                            <label for="note" class="form-label">Note</label>
+                                            <textarea name="note" id="note" class="form-control dg-textarea" rows="3">{{ old('note') }}</textarea>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+
+                        <div class="col-md-6">
+                            <article class="card dg-card">
+                                <header class="card-header dg-card-header">
+                                    <h2 class="h6 mb-0">Summary</h2>
+                                </header>
+                                <div class="card-body dg-card-body dg-summary py-2">
+
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label for="subtotal" class="form-label mb-0 small">Subtotal</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" name="subtotal" id="subtotal" class="form-control form-control-sm dg-input text-end" min="0" step="0.01" value="{{ number_format(old('subtotal', 0), 2) }}" readonly>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label for="taxable_amount" class="form-label mb-0 small">Taxable Amount</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" id="taxable_amount" class="form-control form-control-sm dg-input text-end" min="0" step="0.01" value="0.00" readonly>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label for="total_vat" class="form-label mb-0 small">Total VAT</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" name="total_vat" id="total_vat" class="form-control form-control-sm dg-input text-end" min="0" step="0.01" value="{{ number_format(old('total_vat', 0), 2) }}" readonly>
+                                        </div>
+                                    </div>
+
+                                    <hr class="my-1">
+
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label for="grand_total" class="form-label mb-0 small fw-bold">Grand Total</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" name="grand_total" id="grand_total" class="form-control form-control-sm dg-input text-end fw-bold" min="0" step="0.01" value="{{ number_format(old('grand_total', 0), 2) }}" readonly>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label for="summary_paid_amount" class="form-label mb-0 small">Paid Amount</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" id="summary_paid_amount" class="form-control form-control-sm dg-input text-end" min="0" step="0.01" value="0.00" readonly>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label for="due_amount" class="form-label mb-0 small fw-bold">Due Amount</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" id="due_amount" class="form-control form-control-sm dg-input text-end fw-bold" min="0" step="0.01" value="0.00" readonly>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </article>
+                        </div>
+
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary dg-btn">Save Invoice</button>
+                        <a href="{{ route('company.sales.index') }}" class="btn btn-outline-secondary dg-btn">Cancel</a>
+                    </div>
+                </section>
+
+            </form>
 
         </div>
-
-    </div>
+    </main>
 
 </div>
-
-<input
-type="hidden"
-id="subtotal"
-name="subtotal"
-value="0">
-
-<input
-type="hidden"
-id="total_vat"
-name="total_vat"
-value="0">
-
-<input
-type="hidden"
-id="grand_total"
-name="grand_total"
-value="0">
-<!-- ==========================================
-NOTE & SUMMARY
-========================================== -->
-
-<div class="row g-3 mb-3">
-
-    <!-- Invoice Note -->
-
-    <div class="col-xl-8 col-lg-7">
-
-        <div class="card h-100">
-
-            <div class="card-header">
-
-                <h5 class="mb-0">
-
-                    Invoice Note
-
-                </h5>
-
-            </div>
-
-            <div class="card-body">
-
-                <textarea
-                    name="note"
-                    rows="7"
-                    class="form-control"
-                    placeholder="Write invoice note..."></textarea>
-
-            </div>
-
-        </div>
-
-    </div>
-
-    <!-- Invoice Summary -->
-
-    <div class="col-xl-4 col-lg-5">
-
-        <div class="card h-100">
-
-            <div class="card-header">
-
-                <h5 class="mb-0">
-
-                    Invoice Summary
-
-                </h5>
-
-            </div>
-
-            <div class="card-body">
-
-                <table class="table table-sm mb-0">
-
-                    <tr>
-
-                        <th>
-
-                            Subtotal
-
-                        </th>
-
-                        <td>
-
-                            <input
-                                id="subtotal_display"
-                                class="form-control text-end"
-                                value="0.00"
-                                readonly>
-
-                        </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <th>
-
-                            Discount
-
-                        </th>
-
-                        <td>
-
-                            <input
-                                id="discount_amount"
-                                name="discount_amount"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value="0"
-                                class="form-control text-end">
-
-                        </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <th>
-
-                            VAT
-
-                        </th>
-
-                        <td>
-
-                            <input
-                                id="vat_display"
-                                class="form-control text-end"
-                                value="0.00"
-                                readonly>
-
-                        </td>
-
-                    </tr>
-
-                    <tr class="table-light">
-
-                        <th>
-
-                            Grand Total
-
-                        </th>
-
-                        <td>
-
-                            <input
-                                id="grand_total_display"
-                                class="form-control text-end fw-bold"
-                                value="0.00"
-                                readonly>
-
-                        </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <th>
-
-                            Paid
-
-                        </th>
-
-                        <td>
-
-                            <input
-                                id="paid_display"
-                                class="form-control text-end"
-                                value="0.00"
-                                readonly>
-
-                        </td>
-
-                    </tr>
-
-                    <tr class="table-warning">
-
-                        <th>
-
-                            Due
-
-                        </th>
-
-                        <td>
-
-                            <input
-                                id="due_display"
-                                class="form-control text-end fw-bold text-danger"
-                                value="0.00"
-                                readonly>
-
-                        </td>
-
-                    </tr>
-
-                </table>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-<!-- ==========================================
-ACTION BUTTONS
-========================================== -->
-
-<div class="card">
-
-    <div class="card-body">
-
-        <div
-            class="d-flex justify-content-between flex-wrap gap-2">
-
-            <button
-                type="reset"
-                class="btn btn-warning">
-
-                Reset
-
-            </button>
-
-            <div>
-
-                <a
-                    href="{{ route('company.sales.index') }}"
-                    class="btn btn-secondary">
-
-                    Cancel
-
-                </a>
-
-                <button
-                    id="saveInvoice"
-                    type="submit"
-                    class="btn btn-primary">
-
-                    Save Sales Invoice
-
-                </button>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
-</div>
-
-</form>
-
-@endsection
-
-
 @push('scripts')
-
-<script
-src="{{ asset('assets/company/js/dg.js') }}">
-</script>
-
+<script src="{{ asset('assets/company/js/dg.js') }}"></script>
 @endpush
+@endsection

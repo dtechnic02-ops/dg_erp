@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Customer;
 use App\Models\FinancialYear;
 use App\Services\CustomerTransactionService;
+use App\Services\ValidationService;
 
 class CustomerController extends Controller
 {
@@ -17,7 +18,17 @@ INDEX
 
 ===================== */
 
-public function index(
+/* =====================
+
+SHARED FILTER QUERY
+
+Used by both index() and print() so the
+Print action always respects the same
+filters as the current list view.
+
+===================== */
+
+private function filteredCustomerQuery(
 Request $request
 ){
 
@@ -68,13 +79,47 @@ $q->where(
 }
 
 
+return $query;
+
+}
+
+
+public function index(
+Request $request
+){
+
+$totalCurrentBalance=
+
+$this->filteredCustomerQuery($request)->sum('current_balance');
+
+
+/* =====================
+
+PER PAGE (MASTER PAGINATION)
+
+Allowed values only.
+Any other value falls back to 10.
+
+===================== */
+
+$allowedPerPage = [10, 25, 50, 100, 200, 500];
+
+$perPage = (int) $request->get('per_page', 10);
+
+if (!in_array($perPage, $allowedPerPage)) {
+
+    $perPage = 10;
+
+}
+
+
 $customers=
 
-$query
+$this->filteredCustomerQuery($request)
 
 ->latest()
 
-->paginate(20)
+->paginate($perPage)
 
 ->withQueryString();
 
@@ -84,7 +129,9 @@ return view(
 'company.customers.index',
 
 compact(
-'customers'
+'customers',
+'totalCurrentBalance',
+'perPage'
 )
 
 );
@@ -101,6 +148,10 @@ STORE
 public function store(
 Request $request
 ){
+
+$request->validate([
+    'credit_days' => ValidationService::quantity(),
+]);
 
 $data=[
 
@@ -149,6 +200,10 @@ $request->tax_no,
 
 $request->opening_balance
 ?? 0,
+
+'credit_days'=>
+
+max(0, (int) ($request->credit_days ?? 0)),
 
 'current_balance'=>
 
@@ -393,6 +448,9 @@ auth()->user()->company_id
 
 ->firstOrFail();
 
+$request->validate([
+    'credit_days' => ValidationService::quantity(),
+]);
 
 $customer->update([
 
@@ -431,6 +489,10 @@ $request->address,
 'tax_no'=>
 
 $request->tax_no,
+
+'credit_days'=>
+
+max(0, (int) ($request->credit_days ?? 0)),
 
 'opening_balance' =>
 
@@ -714,26 +776,70 @@ public function show($id)
 
 /* =====================
 
+CUSTOMER PROFILE PRINT
+
+===================== */
+
+public function printProfile($id)
+{
+    $companyId =
+        auth()->user()->company_id;
+
+    $customer = Customer::where(
+        'company_id',
+        $companyId
+    )
+    ->findOrFail($id);
+
+    $print = true;
+
+    return view(
+
+        'company.customers.show',
+
+        compact(
+
+            'customer',
+
+            'print'
+
+        )
+
+    );
+}
+
+/* =====================
+
 PRINT
 
 ===================== */
 
-public function print()
-{
+public function print(
+Request $request
+){
 
 $customers=
 
-Customer::where(
-
-'company_id',
-
-auth()->user()->company_id
-
-)
+$this->filteredCustomerQuery($request)
 
 ->latest()
 
 ->get();
+
+
+$totalCustomers=
+
+$customers->count();
+
+
+$totalOpeningBalance=
+
+$customers->sum('opening_balance');
+
+
+$totalCurrentBalance=
+
+$customers->sum('current_balance');
 
 
 return view(
@@ -741,7 +847,10 @@ return view(
 'company.customers.print',
 
 compact(
-'customers'
+'customers',
+'totalCustomers',
+'totalOpeningBalance',
+'totalCurrentBalance'
 )
 
 );

@@ -9,69 +9,234 @@ Version : 1.0
 
 
 /*=========================================================
-ROOT
+01. ROOT VARIABLES
 =========================================================*/
 
 :root
 {
 
-    --erp-radius:10px;
+    --dg-radius:10px;
 
-    --erp-transition:.25s;
+    --dg-transition:.25s;
+
+    --dg-action-col-width:220px;
+
+    --dg-sidebar-width-expanded:260px;
+
+    --dg-sidebar-width-collapsed:72px;
+
+    --dg-sidebar-bg:#ffffff;
+
+    --dg-sidebar-border:#dee2e6;
+
+    --dg-sidebar-text:#495057;
+
+    --dg-sidebar-muted:#6c757d;
+
+    --dg-sidebar-active-bg:#0d6efd;
+
+    --dg-sidebar-active-text:#ffffff;
+
+    --dg-sidebar-hover-bg:#eef5ff;
+
+    --content:#f5f7fb;
+
+    --border:#dee2e6;
+
+    --primary:#0d6efd;
+
+    --danger:#dc3545;
+
+    --dark:#212529;
+
+    --muted:#6c757d;
+
+    --dg-header-height:60px;
+
+    --dg-footer-height:44px;
 
 }
 
 
 /*=========================================================
-BODY
+02. RESET
 =========================================================*/
+
+*
+{
+
+    margin:0;
+
+    padding:0;
+
+    box-sizing:border-box;
+
+}
+
+
+/*=========================================================
+03. TYPOGRAPHY
+=========================================================*/
+
+html
+{
+
+    scroll-behavior:smooth;
+
+}
+
 
 body
 {
 
-    font-size:14px;
-
     line-height:1.5;
 
+    background:var(--content);
+
+    font-family:Arial,Helvetica,sans-serif;
+
+    font-size:13px;
+
+    color:var(--dark);
+
+    overflow-x:hidden;
+
 }
 
 
-/*=========================================================
-PAGE
-=========================================================*/
-
-.container-fluid
+.dg-page-title
 {
 
-    padding:20px;
+    font-size:24px;
+
+    font-weight:600;
+
+    line-height:1.3;
+
+    letter-spacing:.2px;
+
+    margin:0;
 
 }
+
+
+.dg-page-subtitle
+{
+
+    color:#6c757d;
+
+    font-size:13px;
+
+    margin-top:2px;
+
+}
+
+
 /*=========================================================
-TOOLBAR
+04. LAYOUT — DG Framework
 =========================================================*/
 
-.erp-toolbar
+.dg-layout
+{
+    display:flex;
+    align-items:stretch;
+    width:100%;
+    min-height:100vh;
+}
+
+.dg-main
+{
+    display:flex;
+    flex:1 1 auto;
+    flex-direction:column;
+    min-width:0;
+    min-height:100vh;
+    background:var(--content);
+}
+
+.dg-main-content
+{
+    display:block;
+    flex:1 1 auto;
+    width:100%;
+    min-height:0;
+}
+
+.dg-container
+{
+
+    display:block;
+
+    margin-top:16px;
+
+}
+
+
+.dg-section
+{
+
+    margin-bottom:16px;
+
+}
+
+
+.dg-row
+{
+
+    transition:var(--dg-transition);
+
+}
+
+
+.dg-row:hover
+{
+
+    background:#f8f9fa;
+
+}
+
+
+/*=========================================================
+05. PAGE
+=========================================================*/
+
+.dg-page
+{
+    display:block;
+    flex:1 1 auto;
+    width:100%;
+    padding:20px;
+}
+
+
+/*=========================================================
+06. TOOLBAR
+=========================================================*/
+
+.dg-toolbar
 {
 
     background:#ffffff;
 
     border:1px solid #dee2e6;
 
-    border-radius:var(--erp-radius);
+    border-radius:var(--dg-radius);
 
     padding:12px;
 
 }
+
+
 /*=========================================================
-CARD
+07. CARDS
 =========================================================*/
 
-.erp-card
+.dg-card
 {
 
     border:1px solid #dee2e6;
 
-    border-radius:var(--erp-radius);
+    border-radius:var(--dg-radius);
 
     box-shadow:0 2px 8px rgba(0,0,0,.04);
 
@@ -80,7 +245,8 @@ CARD
 }
 
 
-.erp-card .card-header
+.dg-card .card-header,
+.dg-card-header
 {
 
     background:#f8f9fa;
@@ -92,39 +258,20 @@ CARD
 }
 
 
-.erp-card .card-body
+.dg-card .card-body,
+.dg-card-body
 {
 
     padding:16px;
 
 }
+
+
 /*=========================================================
-TITLE
+08. FORMS
 =========================================================*/
 
-.erp-page-title
-{
-
-    font-size:24px;
-
-    font-weight:600;
-
-    margin:0;
-
-}
-
-
-.erp-page-subtitle
-{
-
-    color:#6c757d;
-
-}
-/*=========================================================
-FORM
-=========================================================*/
-
-.erp-label
+.dg-label
 {
 
     font-weight:600;
@@ -136,10 +283,43 @@ FORM
 }
 
 
-.erp-input
+.dg-input,
+.dg-select
 {
 
     min-height:42px;
+
+    border:1px solid #dee2e6;
+
+    border-radius:var(--dg-radius);
+
+    padding:8px 12px;
+
+    background:#ffffff;
+
+    transition:var(--dg-transition);
+
+}
+
+
+.dg-input:hover,
+.dg-select:hover
+{
+
+    border-color:rgba(0,0,0,.2);
+
+}
+
+
+.dg-input:focus,
+.dg-select:focus
+{
+
+    border-color:rgba(0,0,0,.25);
+
+    box-shadow:0 0 0 3px rgba(0,0,0,.08);
+
+    outline:none;
 
 }
 
@@ -152,23 +332,250 @@ FORM
     color:red;
 
 }
+
+
 /*=========================================================
-BUTTON
+08b. FILTER GRID — List filter card layout
 =========================================================*/
 
-.erp-btn
+.dg-filter-card-body
+{
+    padding:18px 20px;
+}
+
+.dg-filter-grid
+{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    gap:12px 14px;
+}
+
+.dg-filter-field
+{
+    flex:0 1 auto;
+    min-width:0;
+}
+
+.dg-filter-label
+{
+    display:block;
+    margin-bottom:4px;
+    font-size:12px;
+    font-weight:600;
+    line-height:1.2;
+    color:#374151;
+    white-space:nowrap;
+    overflow:visible;
+    text-overflow:clip;
+}
+
+.dg-filter-label-action
+{
+    display:block;
+    min-height:18.4px;
+    margin-bottom:4px;
+}
+
+.dg-filter-grid .dg-filter-control,
+.dg-filter-grid .dg-input,
+.dg-filter-grid .dg-select
+{
+    width:100%;
+    min-width:100%;
+    min-height:38px;
+    height:38px;
+    padding:7px 12px;
+    line-height:1.25;
+}
+
+.dg-filter-grid input[type="date"].dg-filter-control
+{
+    min-width:100%;
+}
+
+.dg-filter-field-fy
+{
+    flex:0 1 180px;
+    min-width:180px;
+}
+
+.dg-filter-field-date
+{
+    flex:0 1 170px;
+    min-width:170px;
+}
+
+.dg-filter-field-customer
+{
+    flex:1 1 220px;
+    min-width:220px;
+}
+
+.dg-filter-field-invoice
+{
+    flex:0 1 180px;
+    min-width:180px;
+}
+
+.dg-filter-field-account
+{
+    flex:0 1 220px;
+    min-width:220px;
+}
+
+.dg-filter-field-status
+{
+    flex:0 1 150px;
+    min-width:150px;
+}
+
+.dg-filter-field-actions
+{
+    flex:0 1 220px;
+    min-width:220px;
+}
+
+.dg-filter-actions
+{
+    display:flex;
+    flex-wrap:nowrap;
+    align-items:center;
+    gap:8px;
+}
+
+.dg-filter-btn
+{
+    min-height:38px;
+    height:38px;
+    padding-top:0;
+    padding-bottom:0;
+    white-space:nowrap;
+}
+
+@media (max-width:767.98px)
+{
+    .dg-filter-grid .dg-filter-field
+    {
+        flex:1 1 100%;
+        min-width:100%;
+        max-width:100%;
+    }
+}
+
+
+/*=========================================================
+08a. PRODUCT IMAGE (REUSABLE - ERP / API / MOBILE / WEB)
+=========================================================*/
+
+.dg-product-image
+{
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    overflow:hidden;
+
+    width:100%;
+
+    max-width:336px;
+
+    margin:0 auto;
+
+    border:1px solid #dee2e6;
+
+    border-radius:var(--dg-radius);
+
+}
+
+
+.dg-product-image img
+{
+
+    display:block;
+
+    width:100%;
+
+    height:100%;
+
+    object-fit:contain;
+
+    object-position:center;
+
+}
+
+
+/*=========================================================
+08b. PRODUCT SHOW PAGE IMAGE (Product Show only)
+=========================================================*/
+
+@media screen
+{
+
+.product-show-page .dg-product-image
+{
+
+    width:180px;
+
+    height:180px;
+
+    min-width:180px;
+
+    min-height:180px;
+
+    max-width:180px;
+
+    max-height:180px;
+
+}
+
+}
+
+
+/*=========================================================
+09. BUTTONS
+=========================================================*/
+
+.dg-btn
 {
 
     min-width:120px;
 
     min-height:42px;
 
+    border-radius:var(--dg-radius);
+
+    transition:var(--dg-transition);
+
 }
+
+
+.dg-btn:hover
+{
+
+    box-shadow:0 2px 6px rgba(0,0,0,.08);
+
+}
+
+
+.dg-btn:focus
+{
+
+    box-shadow:0 0 0 3px rgba(0,0,0,.08);
+
+    outline:none;
+
+}
+
+
 /*=========================================================
-TABLE
+10. TABLES
 =========================================================*/
 
-.erp-table
+.dg-table
 {
 
     margin-bottom:0;
@@ -176,7 +583,7 @@ TABLE
 }
 
 
-.erp-table thead th
+.dg-table thead th
 {
 
     background:#f8f9fa;
@@ -190,17 +597,1280 @@ TABLE
 }
 
 
-.erp-table td
+.dg-table td
 {
 
     vertical-align:middle;
 
 }
+
+
+.dg-head
+{
+
+    background:#f8f9fa;
+
+}
+
+
+.dg-body
+{
+
+    vertical-align:middle;
+
+}
+
+
 /*=========================================================
-SUMMARY
+10a. ACTION COLUMN (REUSABLE LIST TABLES)
 =========================================================*/
 
-.erp-summary
+.dg-table th.dg-action-col,
+.dg-table td.dg-action-col
+{
+
+    width:var(--dg-action-col-width);
+
+    min-width:var(--dg-action-col-width);
+
+    max-width:var(--dg-action-col-width);
+
+    text-align:center;
+
+    vertical-align:middle;
+
+    white-space:nowrap;
+
+}
+
+
+.dg-table th.dg-action-col
+{
+
+    padding-left:8px;
+
+    padding-right:8px;
+
+}
+
+
+.dg-table th.dg-action-col-compact,
+.dg-table td.dg-action-col-compact
+{
+
+    width:var(--dg-action-col-compact-width);
+
+    min-width:var(--dg-action-col-compact-width);
+
+    max-width:var(--dg-action-col-compact-width);
+
+    text-align:center;
+
+    vertical-align:middle;
+
+    white-space:nowrap;
+
+}
+
+
+.dg-table th.dg-action-col-compact
+{
+
+    padding-left:8px;
+
+    padding-right:8px;
+
+}
+
+
+.dg-action-group
+{
+
+    display:inline-flex;
+
+    flex-wrap:nowrap;
+
+    align-items:center;
+
+    justify-content:center;
+
+    gap:6px;
+
+    max-width:100%;
+
+    white-space:nowrap;
+
+}
+
+
+.dg-action-btn
+{
+
+    min-width:auto;
+
+    width:auto;
+
+    min-height:28px;
+
+    padding:2px 8px;
+
+    font-size:12px;
+
+    line-height:1.4;
+
+    border-radius:6px;
+
+    white-space:nowrap;
+
+}
+
+
+.dg-action-btn:hover,
+.dg-action-btn:focus
+{
+
+    box-shadow:0 1px 4px rgba(0,0,0,.08);
+
+}
+
+
+/*=========================================================
+10b. LIST TABLE — Compact columns, badges, pagination
+=========================================================*/
+
+.dg-table-scroll
+{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+}
+
+.dg-table .dg-col-date,
+.dg-table .dg-col-num,
+.dg-table .dg-col-status
+{
+    font-size:12px;
+}
+
+.dg-table .dg-col-num
+{
+    text-align:right;
+    white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+    padding-left:8px;
+    padding-right:8px;
+}
+
+.dg-table thead .dg-col-num
+{
+    text-align:right;
+}
+
+.dg-badge
+{
+    display:inline-block;
+    vertical-align:middle;
+    border-radius:6px;
+    font-weight:600;
+    line-height:1.25;
+    white-space:nowrap;
+}
+
+.dg-badge-status
+{
+    padding:2px 8px;
+    font-size:11px;
+}
+
+.dg-badge-success
+{
+    background:#198754;
+    color:#ffffff;
+}
+
+.dg-badge-warning
+{
+    background:#ffc107;
+    color:#212529;
+}
+
+.dg-badge-danger
+{
+    background:#dc3545;
+    color:#ffffff;
+}
+
+.dg-badge-secondary
+{
+    background:#6c757d;
+    color:#ffffff;
+}
+
+.dg-list-footer
+{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:nowrap;
+    min-height:36px;
+    margin-top:10px;
+    padding-top:8px;
+    border-top:1px solid #eef2f6;
+}
+
+.dg-list-meta
+{
+    margin:0;
+    font-size:11px;
+    color:var(--muted);
+    white-space:nowrap;
+    flex-shrink:0;
+    line-height:1.3;
+}
+
+.dg-pagination
+{
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    flex:0 0 auto;
+    min-width:0;
+    overflow-x:auto;
+}
+
+.dg-pagination .pagination
+{
+    display:flex;
+    flex-wrap:nowrap;
+    align-items:center;
+    gap:2px;
+    margin-bottom:0;
+}
+
+.dg-pagination .page-item
+{
+    flex-shrink:0;
+}
+
+.dg-pagination .page-link
+{
+    padding:3px 9px;
+    font-size:12px;
+    line-height:1.25;
+    border-radius:4px;
+}
+
+.dg-pagination .page-item:first-child .page-link,
+.dg-pagination .page-item:last-child .page-link
+{
+    font-size:11px;
+    padding:3px 8px;
+}
+
+.dg-list-card-header
+{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:10px 14px;
+}
+
+.dg-list-card-title
+{
+    margin:0;
+    font-size:14px;
+    font-weight:600;
+    line-height:1.3;
+    color:var(--dark);
+}
+
+.dg-list-per-page
+{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin:0;
+    flex-shrink:0;
+}
+
+.dg-list-per-page-label
+{
+    margin:0;
+    font-size:12px;
+    font-weight:600;
+    color:var(--dark);
+    white-space:nowrap;
+}
+
+.dg-list-per-page-select
+{
+    width:70px;
+    min-width:70px;
+    min-height:30px;
+    padding:2px 8px;
+    font-size:12px;
+    line-height:1.3;
+}
+
+.dg-list-card-body
+{
+    padding:12px 14px;
+}
+
+
+/*=========================================================
+10c. COMPACT LIST TABLE — Dense row layout
+=========================================================*/
+
+.dg-table-compact thead th
+{
+    height:40px;
+    padding:6px 8px;
+    font-size:12px;
+    font-weight:600;
+    line-height:1.2;
+    vertical-align:middle;
+    background:#f8f9fa;
+    border-bottom:1px solid #dee2e6;
+    white-space:nowrap;
+}
+
+.dg-table-compact tbody td
+{
+    padding:4px 8px;
+    line-height:1.2;
+    vertical-align:middle;
+}
+
+.dg-table-compact tbody tr
+{
+    height:33px;
+}
+
+.dg-table-compact thead .dg-col-date,
+.dg-table-compact thead .dg-col-num,
+.dg-table-compact thead .dg-col-status
+{
+    font-size:12px;
+}
+
+.dg-table-compact tbody .dg-col-date,
+.dg-table-compact tbody .dg-col-num,
+.dg-table-compact tbody .dg-col-status
+{
+    font-size:11px;
+}
+
+.dg-table-compact .dg-col-date
+{
+    width:80px;
+    min-width:80px;
+    max-width:80px;
+}
+
+.dg-table-compact .dg-col-total
+{
+    width:110px;
+    min-width:110px;
+    max-width:110px;
+}
+
+.dg-table-compact .dg-col-paid
+{
+    width:90px;
+    min-width:90px;
+    max-width:90px;
+}
+
+.dg-table-compact .dg-col-due
+{
+    width:90px;
+    min-width:90px;
+    max-width:90px;
+}
+
+.dg-table-compact .dg-col-status
+{
+    width:70px;
+    min-width:70px;
+    max-width:70px;
+    text-align:center;
+}
+
+.dg-table-compact .dg-col-num
+{
+    padding-left:6px;
+    padding-right:6px;
+}
+
+.dg-table-compact .dg-badge-status
+{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    height:18px;
+    padding:0 6px;
+    font-size:10px;
+    line-height:1;
+    border-radius:4px;
+}
+
+.dg-table-compact .dg-action-group
+{
+    gap:4px;
+}
+
+.dg-table-compact .dg-action-btn
+{
+    min-height:22px;
+    height:22px;
+    padding:0 8px;
+    font-size:10px;
+    line-height:1;
+    border-radius:4px;
+}
+
+
+/*=========================================================
+10d. SALES INVOICE VIEW — Accounting document layout
+=========================================================*/
+
+.dg-invoice .dg-container
+{
+    margin-top:10px;
+}
+
+.dg-invoice-toolbar
+{
+    margin-bottom:0;
+}
+
+.dg-invoice-sheet
+{
+    background:#ffffff;
+    border:1px solid #c8d0da;
+    border-radius:var(--dg-radius);
+    padding:14px 16px 12px;
+}
+
+.dg-invoice-doc-title
+{
+    margin:0 0 10px;
+    padding-bottom:8px;
+    border-bottom:2px solid #1e3a5f;
+    font-size:22px;
+    font-weight:800;
+    letter-spacing:1px;
+    line-height:1;
+    text-align:center;
+    color:#1e3a5f;
+}
+
+.dg-invoice-parties
+{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:10px;
+}
+
+.dg-invoice-party
+{
+    border:1px solid #d8dee6;
+    border-radius:var(--dg-radius);
+    padding:8px 10px 10px;
+    background:#ffffff;
+    min-width:0;
+}
+
+.dg-invoice-company-block
+{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+}
+
+.dg-invoice-logo
+{
+    width:64px;
+    height:64px;
+    object-fit:contain;
+    border:1px solid #d8dee6;
+    border-radius:var(--dg-radius);
+    background:#ffffff;
+    flex-shrink:0;
+}
+
+.dg-invoice-company-name
+{
+    font-weight:700;
+    color:#1e3a5f;
+}
+
+.dg-invoice-party-title
+{
+    margin:0 0 6px;
+    padding-bottom:5px;
+    border-bottom:1px solid #e5eaf0;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+    color:#1e3a5f;
+}
+
+.dg-invoice-dl
+{
+    margin:0;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
+
+.dg-invoice-field-list
+{
+    margin:0;
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+}
+
+.dg-invoice-field-row
+{
+    display:grid;
+    grid-template-columns:120px 10px minmax(0, 1fr);
+    column-gap:4px;
+    align-items:baseline;
+    line-height:1.35;
+}
+
+.dg-invoice-field-label
+{
+    font-size:11px;
+    font-weight:600;
+    color:#6b7280;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.dg-invoice-field-sep
+{
+    font-size:11px;
+    font-weight:600;
+    color:#6b7280;
+    text-align:center;
+}
+
+.dg-invoice-field-value
+{
+    font-size:12px;
+    font-weight:500;
+    color:var(--dark);
+    min-width:0;
+    word-break:break-word;
+}
+
+.dg-invoice-dl-row
+{
+    display:grid;
+    grid-template-columns:108px 1fr;
+    gap:8px;
+    align-items:baseline;
+}
+
+.dg-invoice-dl-label
+{
+    margin:0;
+    font-size:11px;
+    font-weight:600;
+    color:#6b7280;
+    line-height:1.35;
+}
+
+.dg-invoice-dl-value
+{
+    margin:0;
+    font-size:13px;
+    font-weight:500;
+    color:var(--dark);
+    line-height:1.35;
+    word-break:break-word;
+}
+
+.dg-invoice-lines
+{
+    margin-top:10px;
+}
+
+.dg-invoice-lines-title
+{
+    margin:0 0 6px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+    color:#1e3a5f;
+}
+
+.dg-invoice-table
+{
+    margin-bottom:0;
+    border:1px solid #c8d0da;
+}
+
+.dg-invoice-table thead th
+{
+    background:#1e3a5f;
+    color:#ffffff;
+    border-bottom:none;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.25px;
+    text-transform:uppercase;
+    padding:8px 10px;
+    white-space:nowrap;
+}
+
+.dg-invoice-table tbody td
+{
+    font-size:12px;
+    padding:7px 10px;
+    vertical-align:middle;
+    border-bottom:1px solid #e8edf2;
+}
+
+.dg-invoice-table tbody tr:last-child td
+{
+    border-bottom:none;
+}
+
+.dg-invoice-table tbody tr:nth-child(even)
+{
+    background:#f8fafc;
+}
+
+.dg-invoice-table tbody tr:hover
+{
+    background:#eef4fa;
+}
+
+.dg-invoice-item-name
+{
+    font-weight:500;
+    color:var(--dark);
+}
+
+.dg-return-note
+{
+    display:block;
+    margin-top:2px;
+    font-size:10px;
+    font-weight:600;
+    color:#dc3545;
+    line-height:1.2;
+}
+
+.dg-invoice-footer
+{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-top:10px;
+}
+
+.dg-invoice-payment
+{
+    flex:1 1 auto;
+    min-width:0;
+    border:1px solid #d8dee6;
+    border-radius:var(--dg-radius);
+    padding:8px 10px 10px;
+    background:#ffffff;
+}
+
+.dg-invoice-note-block
+{
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px solid #e5eaf0;
+}
+
+.dg-invoice-note-title
+{
+    margin:0 0 4px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.3px;
+    text-transform:uppercase;
+    color:#1e3a5f;
+}
+
+.dg-invoice-note-body
+{
+    font-size:12px;
+    line-height:1.45;
+    color:#374151;
+}
+
+.dg-invoice-totals
+{
+    flex:0 0 280px;
+    width:280px;
+    max-width:280px;
+    border:1px solid #d8dee6;
+    border-radius:var(--dg-radius);
+    padding:8px 10px 10px;
+    background:#f8fafc;
+}
+
+.dg-invoice-totals-box
+{
+    padding:0;
+    border:none;
+    background:transparent;
+}
+
+.dg-invoice-totals-box .dg-summary-item
+{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding-bottom:5px;
+    border-bottom:none;
+}
+
+.dg-invoice-totals-box .dg-summary-label
+{
+    font-size:11px;
+    color:#6b7280;
+    font-weight:500;
+}
+
+.dg-invoice-totals-box .dg-summary-value
+{
+    font-size:12px;
+    font-variant-numeric:tabular-nums;
+    font-weight:600;
+    color:#374151;
+    white-space:nowrap;
+}
+
+.dg-invoice-totals-divider
+{
+    height:1px;
+    margin:4px 0 6px;
+    background:#d8dee6;
+}
+
+.dg-invoice-totals-box .dg-summary-total .dg-summary-label
+{
+    font-size:11px;
+    font-weight:700;
+    color:var(--dark);
+}
+
+.dg-invoice-totals-box .dg-summary-total .dg-summary-value
+{
+    font-size:15px;
+    font-weight:800;
+    color:#1e3a5f;
+}
+
+.dg-invoice-totals-box .dg-summary-paid
+{
+    color:#198754;
+}
+
+.dg-invoice-totals-box .dg-summary-due
+{
+    color:#dc3545;
+}
+
+.dg-invoice-amount-words
+{
+    margin-top:10px;
+    padding:10px 12px;
+    border:1px solid #d8dee6;
+    border-radius:var(--dg-radius);
+    background:#ffffff;
+}
+
+.dg-invoice-amount-words-title
+{
+    margin:0 0 4px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.3px;
+    text-transform:uppercase;
+    color:#1e3a5f;
+}
+
+.dg-invoice-amount-words-value
+{
+    margin:0;
+    font-size:13px;
+    font-weight:600;
+    line-height:1.45;
+    color:var(--dark);
+}
+
+.dg-invoice-print-footer
+{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    margin-top:10px;
+}
+
+.dg-invoice-print-footer .dg-invoice-payment
+{
+    flex:0 0 70%;
+    width:70%;
+    max-width:70%;
+}
+
+.dg-invoice-print-footer .dg-invoice-totals
+{
+    flex:0 0 30%;
+    width:30%;
+    max-width:30%;
+}
+
+.dg-invoice-payment .dg-invoice-amount-words,
+.dg-invoice-print-footer .dg-invoice-amount-words
+{
+    margin-top:8px;
+    padding:8px 0 0;
+    border:1px solid transparent;
+    border-top:1px solid #e5eaf0;
+    border-radius:0;
+    background:transparent;
+}
+
+.dg-invoice-signature-block
+{
+    display:flex;
+    justify-content:space-between;
+    gap:24px;
+    margin-top:14px;
+    padding-top:8px;
+}
+
+.dg-invoice-sign
+{
+    flex:0 0 42%;
+    text-align:center;
+}
+
+.dg-invoice-sign .dg-signature-line
+{
+    height:32px;
+    margin-bottom:4px;
+    border-bottom:1px solid #9aa5b1;
+}
+
+.dg-invoice-sign .dg-signature-label
+{
+    font-size:10px;
+    font-weight:600;
+    color:#374151;
+}
+
+.dg-invoice-signature-table
+{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+}
+
+.dg-invoice-signature-table td
+{
+    width:50%;
+    padding:0 12px;
+    vertical-align:top;
+}
+
+@media (max-width:1199px)
+{
+    .dg-invoice-parties
+    {
+        grid-template-columns:1fr;
+    }
+}
+
+@media (max-width:991px)
+{
+    .dg-invoice-footer
+    {
+        flex-direction:column;
+    }
+
+    .dg-invoice-totals
+    {
+        flex:1 1 auto;
+        width:100%;
+        max-width:100%;
+    }
+
+    .dg-invoice-company-block
+    {
+        flex-direction:column;
+    }
+}
+
+@media (max-width:575px)
+{
+    .dg-invoice-sheet
+    {
+        padding:10px;
+    }
+
+    .dg-invoice-dl-row
+    {
+        grid-template-columns:1fr;
+        gap:1px;
+    }
+
+    .dg-invoice-party .dg-invoice-field-row
+    {
+        grid-template-columns:100px 10px minmax(0, 1fr);
+    }
+}
+
+
+/*=========================================================
+10e. SALES INVOICE PRINT — Show blade layout (print route)
+=========================================================*/
+
+.dg-invoice-print .dg-layout > .dg-sidebar,
+body:has(.dg-invoice-print) .dg-layout > .dg-sidebar,
+.dg-invoice-print .dg-header,
+body:has(.dg-invoice-print) .dg-header,
+.dg-invoice-print .dg-footer,
+body:has(.dg-invoice-print) .dg-footer,
+.dg-invoice-print .dg-mobile-nav-backdrop,
+body:has(.dg-invoice-print) .dg-mobile-nav-backdrop,
+.dg-invoice-print .dg-alert,
+body:has(.dg-invoice-print) .dg-alert,
+.dg-invoice-print .alert,
+body:has(.dg-invoice-print) .alert
+{
+    display:none;
+}
+
+.dg-invoice-print .dg-main,
+body:has(.dg-invoice-print) .dg-main
+{
+    margin:0;
+    width:100%;
+    min-height:auto;
+}
+
+.dg-invoice-print .dg-main-content,
+body:has(.dg-invoice-print) .dg-main-content
+{
+    padding:0;
+}
+
+.dg-invoice-print .dg-page
+{
+    padding:8px;
+}
+
+.dg-invoice-print .dg-container
+{
+    margin-top:0;
+    padding:0;
+}
+
+/*=========================================================
+10f. SALES PAYMENT PRINT — portrait voucher
+Wrapper: .dg-payment-print (print.blade.php only)
+=========================================================*/
+
+body.dg-payment-print .dg-layout,
+body.dg-payment-print .dg-main
+{
+    margin:0;
+    width:100%;
+    min-height:auto;
+}
+
+body.dg-payment-print .dg-main-content
+{
+    padding:0;
+}
+
+body.dg-payment-print .dg-page
+{
+    padding:0;
+}
+
+body.dg-payment-print .dg-container
+{
+    margin-top:0;
+    padding:0;
+}
+
+/*=========================================================
+10g. PAYMENT VOUCHER — receipt field rows (dg-payment)
+=========================================================*/
+
+.dg-payment .dg-summary-bar-item
+{
+    display:grid;
+    grid-template-columns:100px 8px minmax(0, 1fr);
+    column-gap:2px;
+    align-items:baseline;
+    font-size:11px;
+    line-height:1.35;
+    margin-bottom:3px;
+}
+
+.dg-payment .row > .col-6 .dg-summary-bar-item
+{
+    grid-template-columns:92px 8px minmax(0, 1fr);
+}
+
+.dg-payment .dg-summary-bar-item:last-child
+{
+    margin-bottom:0;
+}
+
+.dg-payment .dg-summary-bar-label
+{
+    font-weight:600;
+}
+
+.dg-payment .dg-summary-bar-sep
+{
+    font-weight:600;
+    text-align:center;
+}
+
+.dg-payment .dg-summary-bar-value
+{
+    font-weight:600;
+    min-width:0;
+    word-break:break-word;
+}
+
+.dg-invoice-print .dg-invoice-sheet
+{
+    border:1px solid #c8d0da;
+    border-radius:var(--dg-radius);
+    padding:12px 14px 10px;
+    background:#fff;
+}
+
+.dg-invoice-print .dg-invoice-print-header
+{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:8px;
+    margin-bottom:0;
+}
+
+.dg-invoice-print .dg-invoice-print-header-col
+{
+    min-width:0;
+}
+
+.dg-invoice-print .dg-invoice-print-header-left
+{
+    flex:0 0 35%;
+    width:35%;
+    max-width:35%;
+    text-align:left;
+}
+
+.dg-invoice-print .dg-invoice-print-header-center
+{
+    flex:0 0 30%;
+    width:30%;
+    max-width:30%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding-top:2px;
+}
+
+.dg-invoice-print .dg-invoice-print-header-right
+{
+    flex:0 0 35%;
+    width:35%;
+    max-width:35%;
+    text-align:left;
+}
+
+.dg-invoice-print .dg-invoice-print-header-left .dg-invoice-party-title,
+.dg-invoice-print .dg-invoice-print-header-right .dg-invoice-party-title
+{
+    border-bottom:none;
+    padding-bottom:4px;
+    margin-bottom:4px;
+}
+
+.dg-invoice-print .dg-invoice-print-header-left .dg-invoice-field-row,
+.dg-invoice-print .dg-invoice-print-header-right .dg-invoice-field-row
+{
+    grid-template-columns:100px 10px minmax(0, 1fr);
+}
+
+.dg-invoice-print .dg-invoice-print-header-left .dg-invoice-field-label,
+.dg-invoice-print .dg-invoice-print-header-left .dg-invoice-field-value,
+.dg-invoice-print .dg-invoice-print-header-right .dg-invoice-field-label,
+.dg-invoice-print .dg-invoice-print-header-right .dg-invoice-field-value,
+.dg-invoice-print .dg-invoice-print-header-left .dg-invoice-field-sep,
+.dg-invoice-print .dg-invoice-print-header-right .dg-invoice-field-sep
+{
+    font-size:10px;
+    line-height:1.35;
+}
+
+.dg-invoice-print .dg-invoice-print-logo-center
+{
+    display:block;
+    width:75px;
+    height:75px;
+    object-fit:contain;
+    margin:0 auto 6px;
+}
+
+.dg-invoice-print .dg-invoice-print-title
+{
+    margin:0;
+    padding:0;
+    border:none;
+    font-size:20px;
+    font-weight:800;
+    letter-spacing:1px;
+    line-height:1.1;
+    text-transform:uppercase;
+    text-align:center;
+    color:#1e3a5f;
+}
+
+.dg-invoice-print .dg-invoice-print-header-rule
+{
+    height:0;
+    margin:8px 0 6px;
+    border:none;
+    border-top:2px solid #1e3a5f;
+}
+
+.dg-invoice-print .dg-invoice-print-meta
+{
+    display:flex;
+    align-items:stretch;
+    justify-content:space-between;
+    gap:8px;
+    flex-wrap:nowrap;
+    margin-bottom:8px;
+    padding:6px 8px;
+    border:1px solid #d8dee6;
+    border-radius:var(--dg-radius);
+    background:#f8fafc;
+}
+
+.dg-invoice-print .dg-invoice-print-meta .dg-invoice-field-row
+{
+    flex:1 1 0;
+    min-width:0;
+    grid-template-columns:minmax(0, auto) 10px minmax(0, 1fr);
+}
+
+.dg-invoice-print .dg-invoice-print-meta .dg-invoice-field-label,
+.dg-invoice-print .dg-invoice-print-meta .dg-invoice-field-sep,
+.dg-invoice-print .dg-invoice-print-meta .dg-invoice-field-value
+{
+    font-size:9px;
+}
+
+.dg-invoice-print .dg-invoice-print-meta .dg-invoice-field-value
+{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.dg-invoice-print .dg-invoice-print-footer
+{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+}
+
+.dg-invoice-print .dg-invoice-print-footer .dg-invoice-payment
+{
+    flex:0 0 70%;
+    width:70%;
+    max-width:70%;
+    border:1px solid #d8dee6;
+    border-radius:var(--dg-radius);
+    padding:8px 10px 10px;
+    background:#fff;
+}
+
+.dg-invoice-print .dg-invoice-print-footer .dg-invoice-totals
+{
+    flex:0 0 30%;
+    width:30%;
+    max-width:30%;
+    border:1px solid #d8dee6;
+    border-radius:var(--dg-radius);
+    padding:8px 10px 10px;
+    background:#f8fafc;
+}
+
+.dg-invoice-print .dg-invoice-print-footer .dg-invoice-amount-words
+{
+    margin-top:8px;
+    padding:8px 0 0;
+    border:1px solid transparent;
+    border-top:1px solid #e5eaf0;
+    border-radius:0;
+    background:transparent;
+}
+
+.dg-invoice-print .dg-invoice-signature-block
+{
+    margin-top:16px;
+}
+
+
+/*=========================================================
+11. ALERTS
+=========================================================*/
+
+.dg-alert
+{
+
+    border-radius:var(--dg-radius);
+
+    margin-bottom:16px;
+
+    padding:12px 16px;
+
+    box-shadow:0 2px 8px rgba(0,0,0,.04);
+
+    transition:var(--dg-transition);
+
+}
+
+
+/*=========================================================
+12. SUMMARY
+=========================================================*/
+
+.dg-summary
 {
 
     display:flex;
@@ -209,10 +1879,20 @@ SUMMARY
 
     gap:10px;
 
+    padding:16px;
+
+    border:1px solid #dee2e6;
+
+    border-radius:var(--dg-radius);
+
+    background:#ffffff;
+
+    transition:var(--dg-transition);
+
 }
 
 
-.erp-summary-item
+.dg-summary-item
 {
 
     display:flex;
@@ -223,30 +1903,1772 @@ SUMMARY
 
     gap:10px;
 
+    padding-bottom:8px;
+
+    border-bottom:1px solid #dee2e6;
+
 }
+
+
+.dg-summary-item:last-child
+{
+
+    padding-bottom:0;
+
+    border-bottom:none;
+
+}
+
+
 /*=========================================================
-RESPONSIVE
+12b. COMPACT SUMMARY BAR
+=========================================================*/
+
+.dg-summary-bar
+{
+
+    padding:8px 14px;
+
+    border-top:1px solid #dee2e6;
+
+    border-bottom:1px solid #dee2e6;
+
+    background:#f8f9fa;
+
+}
+
+
+.dg-summary-bar-row
+{
+
+    display:flex;
+
+    flex-wrap:wrap;
+
+    align-items:center;
+
+    gap:8px 20px;
+
+}
+
+
+.dg-summary-bar-item
+{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:4px;
+
+    font-size:12px;
+
+    line-height:1.4;
+
+}
+
+
+.dg-summary-bar-label
+{
+
+    font-weight:600;
+
+    color:var(--dark);
+
+}
+
+
+.dg-summary-bar-sep
+{
+
+    font-weight:600;
+
+    color:var(--dark);
+
+}
+
+
+.dg-summary-bar-value
+{
+
+    font-weight:700;
+
+    font-variant-numeric:tabular-nums;
+
+    color:var(--dark);
+
+}
+
+
+@media (max-width:767.98px)
+{
+
+    .dg-summary-bar-row
+    {
+
+        gap:8px 14px;
+
+    }
+
+}
+
+
+/*=========================================================
+13. PAGINATION
+=========================================================*/
+
+
+/*=========================================================
+14. UTILITY CLASSES
+=========================================================*/
+
+
+/*=========================================================
+15. RESPONSIVE
 =========================================================*/
 
 @media (max-width:991px)
 {
 
-    .erp-btn
+    .dg-btn
     {
 
         width:100%;
 
     }
 
+    .dg-action-btn
+    {
+
+        width:auto;
+
+    }
+
 }
+
+
 /*=========================================================
-PRINT
+16. PRINT
 =========================================================*/
+
+@page dg-landscape
+{
+    size:A4 landscape;
+    margin:8mm;
+}
+
+.dg-print-landscape
+{
+    page:dg-landscape;
+}
+
+.dg-print-header
+{
+    width:100%;
+    border-bottom:1px solid #d1d5db;
+    padding-bottom:5px;
+    margin-bottom:6px;
+}
+
+.dg-print-header-table
+{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.dg-print-header-table td
+{
+    padding:2px 4px;
+    vertical-align:top;
+}
+
+.dg-print-logo-cell
+{
+    width:72px;
+}
+
+.dg-print-logo
+{
+    width:56px;
+    height:56px;
+    object-fit:contain;
+    display:block;
+}
+
+.dg-print-company-name
+{
+    font-size:17px;
+    font-weight:700;
+    line-height:1.2;
+    margin-bottom:2px;
+}
+
+.dg-print-company-meta
+{
+    font-size:10px;
+    line-height:1.35;
+    color:#111;
+}
+
+.dg-print-meta
+{
+    width:150px;
+    font-size:10px;
+    line-height:1.4;
+    white-space:nowrap;
+}
+
+.dg-print-title-row td
+{
+    padding-top:4px;
+}
+
+.dg-print-title
+{
+    font-size:16px;
+    font-weight:700;
+    line-height:1.2;
+    margin:0;
+    text-transform:uppercase;
+    letter-spacing:.3px;
+}
+
+.dg-print-footer
+{
+    margin-top:8px;
+    padding-top:6px;
+    border-top:1px solid #d1d5db;
+    font-size:10px;
+    color:#111;
+}
+
+.dg-print-note
+{
+    font-size:10px;
+    line-height:1.35;
+    margin-bottom:6px;
+}
+
+.dg-print-signature-table
+{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+}
+
+.dg-print-signature-table td
+{
+    width:33.33%;
+    padding:0 8px;
+    vertical-align:top;
+}
+
+.dg-signature-line
+{
+    border-top:1px solid #555;
+    margin-bottom:3px;
+    height:28px;
+}
+
+.dg-signature-label
+{
+    font-size:10px;
+    font-weight:600;
+}
+
+.dg-print-meta-footer
+{
+    margin-top:6px;
+    font-size:9px;
+    line-height:1.3;
+    color:#333;
+}
+
+@page dg-portrait
+{
+    size:A4 portrait;
+    margin:10mm;
+}
+
+@page dg-invoice-print
+{
+    size:A4 portrait;
+    margin:8mm;
+}
+
+.dg-print-portrait
+{
+    page:dg-portrait;
+}
+
+
+/*=========================================================
+16b. PRINT LIST — Landscape
+=========================================================*/
+
+.dg-print-list-landscape .dg-container
+{
+    margin-top:0;
+    padding:0;
+}
+
+.dg-print-list-sheet
+{
+    background:#fff;
+}
+
+.dg-print-list-header
+{
+    display:flex;
+    align-items:stretch;
+    justify-content:space-between;
+    gap:10px;
+    padding-bottom:5px;
+    margin-bottom:3px;
+    border-bottom:1px solid #adb5bd;
+}
+
+.dg-print-list-header-col
+{
+    min-width:0;
+}
+
+.dg-print-list-header-left
+{
+    flex:0 0 34%;
+    width:34%;
+    max-width:34%;
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+}
+
+.dg-print-list-logo
+{
+    width:52px;
+    height:52px;
+    object-fit:contain;
+    flex-shrink:0;
+    display:block;
+}
+
+.dg-print-list-company
+{
+    min-width:0;
+    flex:1 1 auto;
+}
+
+.dg-print-list-company-name
+{
+    font-size:15px;
+    font-weight:700;
+    line-height:1.2;
+    margin-bottom:3px;
+    color:var(--dark);
+}
+
+.dg-print-list-company-meta
+{
+    font-size:10px;
+    line-height:1.35;
+}
+
+.dg-print-list-company-line
+{
+    display:flex;
+    align-items:baseline;
+    gap:3px;
+    margin-bottom:2px;
+}
+
+.dg-print-list-company-label
+{
+    flex:0 0 52px;
+    font-weight:600;
+}
+
+.dg-print-list-company-sep
+{
+    flex:0 0 auto;
+    font-weight:600;
+}
+
+.dg-print-list-company-value
+{
+    min-width:0;
+    flex:1 1 auto;
+}
+
+.dg-print-list-header-center
+{
+    flex:0 0 32%;
+    width:32%;
+    max-width:32%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+}
+
+.dg-print-list-title
+{
+    margin:0;
+    font-size:22px;
+    font-weight:700;
+    line-height:1.1;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    color:var(--dark);
+}
+
+.dg-print-list-header-right
+{
+    flex:0 0 34%;
+    width:34%;
+    max-width:34%;
+    display:flex;
+    justify-content:flex-end;
+    align-items:flex-start;
+}
+
+.dg-print-list-header-filters
+{
+    width:100%;
+    max-width:280px;
+}
+
+.dg-print-list-header-filter-row
+{
+    display:flex;
+    align-items:center;
+    gap:3px;
+    font-size:10px;
+    line-height:1.3;
+    margin-bottom:2px;
+    white-space:nowrap;
+}
+
+.dg-print-list-header-filter-label
+{
+    flex:0 0 102px;
+    font-weight:600;
+    color:var(--dark);
+    text-align:left;
+}
+
+.dg-print-list-header-filter-sep
+{
+    flex:0 0 auto;
+    font-weight:600;
+}
+
+.dg-print-list-header-filter-value
+{
+    flex:1 1 auto;
+    min-width:0;
+    font-weight:500;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.dg-print-list-summary
+{
+    margin-bottom:3px;
+    padding-top:3px;
+    padding-bottom:3px;
+}
+
+.dg-print-list-summary.dg-summary-bar
+{
+    padding:4px 10px;
+}
+
+.dg-print-list-summary .dg-summary-bar-row
+{
+    flex-wrap:nowrap;
+    justify-content:space-between;
+    gap:8px 12px;
+}
+
+.dg-print-list-summary .dg-summary-bar-item
+{
+    font-size:10px;
+    line-height:1.3;
+    white-space:nowrap;
+    gap:3px;
+}
+
+.dg-print-list-summary .dg-summary-bar-label
+{
+    font-weight:600;
+}
+
+.dg-print-list-summary .dg-summary-bar-value
+{
+    font-weight:700;
+}
+
+.dg-print-list-table-wrap
+{
+    overflow-x:visible;
+}
+
+.dg-print-list-table
+{
+    width:100%;
+    border-collapse:collapse;
+    font-size:10px;
+    line-height:1.15;
+}
+
+.dg-print-list-table thead th
+{
+    background:#e9ecef;
+    border:1px solid #adb5bd;
+    padding:3px 5px;
+    font-weight:700;
+    font-size:10px;
+    white-space:nowrap;
+    vertical-align:middle;
+}
+
+.dg-print-list-table tbody td
+{
+    border:1px solid #ced4da;
+    padding:2px 5px;
+    vertical-align:middle;
+}
+
+.dg-print-list-table .dg-col-num
+{
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+}
+
+.dg-print-list-table thead .dg-col-num
+{
+    text-align:right;
+}
+
+.dg-print-list-table .dg-col-date
+{
+    white-space:nowrap;
+}
+
+.dg-print-list-table .dg-col-status
+{
+    text-align:center;
+    white-space:nowrap;
+}
+
+.dg-print-list-table thead .dg-col-status
+{
+    text-align:center;
+}
+
+.dg-print-list-table .dg-badge-status
+{
+    display:inline-block;
+    font-size:9px;
+    font-weight:600;
+    line-height:1.2;
+    padding:1px 6px;
+    vertical-align:middle;
+}
+
+.dg-print-list-empty
+{
+    text-align:center;
+    padding:8px;
+}
+
+
+/*=========================================================
+17. SIDEBAR — DG ERP Navigation
+=========================================================*/
+
+.dg-sidebar
+{
+    flex:0 0 var(--dg-sidebar-width-expanded);
+    width:var(--dg-sidebar-width-expanded);
+    position:sticky;
+    top:0;
+    align-self:flex-start;
+    height:100vh;
+    overflow:hidden;
+    background:var(--dg-sidebar-bg);
+    border-right:1px solid var(--dg-sidebar-border);
+    box-shadow:2px 0 14px rgba(15,23,42,.06);
+    z-index:1040;
+    transition:width var(--dg-transition),flex-basis var(--dg-transition);
+}
+
+.dg-sidebar-inner
+{
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    min-height:100vh;
+    overflow:hidden;
+}
+
+.dg-sidebar-header
+{
+    flex-shrink:0;
+    padding:14px 12px;
+    border-bottom:1px solid var(--dg-sidebar-border);
+    background:#f8fafc;
+}
+
+.dg-sidebar-brand-card
+{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    padding:12px 10px;
+    border:1px solid var(--dg-sidebar-border);
+    border-radius:var(--dg-radius);
+    background:#ffffff;
+    box-shadow:0 1px 2px rgba(15,23,42,.04);
+    text-align:center;
+}
+
+.dg-sidebar-logo
+{
+    width:64px;
+    height:64px;
+    object-fit:contain;
+    display:block;
+    border-radius:8px;
+}
+
+.dg-sidebar-company
+{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    width:100%;
+    min-width:0;
+}
+
+.dg-sidebar-company-name
+{
+    font-size:16px;
+    font-weight:700;
+    line-height:1.3;
+    color:var(--dark);
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.dg-sidebar-company-meta
+{
+    font-size:13px;
+    font-weight:500;
+    line-height:1.3;
+    color:var(--dg-sidebar-muted);
+    padding:3px 10px;
+    border-radius:999px;
+    background:#eef2f6;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.dg-sidebar-scroll
+{
+    flex:1 1 auto;
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding:10px 10px 12px;
+    scrollbar-width:thin;
+    scrollbar-color:#cbd5e1 transparent;
+}
+
+.dg-sidebar-scroll::-webkit-scrollbar
+{
+    width:5px;
+}
+
+.dg-sidebar-scroll::-webkit-scrollbar-thumb
+{
+    background:#cbd5e1;
+    border-radius:999px;
+}
+
+.dg-sidebar-nav
+{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
+
+.dg-sidebar-section
+{
+    display:block;
+    margin-bottom:4px;
+}
+
+.dg-sidebar-item
+{
+    display:block;
+}
+
+.dg-sidebar-link
+{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-height:46px;
+    padding:0 14px;
+    border-radius:var(--dg-radius);
+    color:var(--dg-sidebar-text);
+    text-decoration:none;
+    font-size:15px;
+    font-weight:500;
+    line-height:1.3;
+    cursor:pointer;
+    transition:background var(--dg-transition),color var(--dg-transition),box-shadow var(--dg-transition);
+}
+
+.dg-sidebar-parent
+{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-height:44px;
+    padding:0 14px;
+    border-radius:var(--dg-radius);
+    color:var(--dg-sidebar-text);
+    text-decoration:none;
+    font-size:13px;
+    font-weight:600;
+    line-height:1.3;
+    cursor:pointer;
+    transition:background var(--dg-transition),color var(--dg-transition),box-shadow var(--dg-transition);
+}
+
+.dg-sidebar-link:hover,
+.dg-sidebar-link:focus-visible,
+.dg-sidebar-parent:hover,
+.dg-sidebar-parent:focus-visible
+{
+    background:var(--dg-sidebar-hover-bg);
+    color:var(--primary);
+    outline:none;
+    box-shadow:inset 0 0 0 1px rgba(13,110,253,.12);
+}
+
+.dg-sidebar-link.dg-sidebar-active
+{
+    background:var(--dg-sidebar-active-bg);
+    color:var(--dg-sidebar-active-text);
+    box-shadow:inset 4px 0 0 #0a58ca;
+    font-weight:600;
+}
+
+.dg-sidebar-icon
+{
+    flex:0 0 18px;
+    width:18px;
+    height:18px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+    font-weight:700;
+    color:inherit;
+    border-radius:5px;
+    background:rgba(13,110,253,.08);
+}
+
+.dg-sidebar-link.dg-sidebar-active .dg-sidebar-icon,
+.dg-sidebar-group-is-open > .dg-sidebar-parent .dg-sidebar-icon,
+.dg-sidebar-toggle:checked + .dg-sidebar-parent .dg-sidebar-icon
+{
+    background:rgba(255,255,255,.2);
+}
+
+.dg-sidebar-label
+{
+    flex:1 1 auto;
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.dg-sidebar-toggle
+{
+    position:absolute;
+    opacity:0;
+    width:0;
+    height:0;
+    pointer-events:none;
+}
+
+.dg-sidebar-group
+{
+    display:block;
+    position:relative;
+}
+
+.dg-sidebar-parent
+{
+    margin:0;
+    user-select:none;
+}
+
+.dg-sidebar-group-is-open > .dg-sidebar-parent,
+.dg-sidebar-toggle:checked + .dg-sidebar-parent
+{
+    background:var(--dg-sidebar-hover-bg);
+    color:var(--primary);
+    font-weight:600;
+}
+
+.dg-sidebar-chevron
+{
+    flex:0 0 14px;
+    width:14px;
+    height:14px;
+    margin-left:auto;
+    position:relative;
+}
+
+.dg-sidebar-chevron::before
+{
+    content:"";
+    position:absolute;
+    top:50%;
+    left:50%;
+    width:6px;
+    height:6px;
+    border-right:2px solid currentColor;
+    border-bottom:2px solid currentColor;
+    transform:translate(-50%,-65%) rotate(45deg);
+    transition:transform var(--dg-transition);
+}
+
+.dg-sidebar-toggle:checked + .dg-sidebar-parent .dg-sidebar-chevron::before
+{
+    transform:translate(-50%,-35%) rotate(-135deg);
+}
+
+.dg-sidebar-submenu
+{
+    max-height:0;
+    overflow:hidden;
+    transition:max-height var(--dg-transition) ease;
+    border-left:2px solid #d0d7de;
+    margin:4px 0 6px 24px;
+}
+
+.dg-sidebar-toggle:checked ~ .dg-sidebar-submenu
+{
+    max-height:720px;
+}
+
+.dg-sidebar-child
+{
+    display:block;
+}
+
+.dg-sidebar-child-link
+{
+    display:flex;
+    align-items:center;
+    min-height:42px;
+    padding:0 14px 0 32px;
+    border-radius:8px;
+    color:var(--dg-sidebar-text);
+    text-decoration:none;
+    font-size:15px;
+    font-weight:500;
+    line-height:1.3;
+    transition:background var(--dg-transition),color var(--dg-transition),box-shadow var(--dg-transition);
+}
+
+.dg-sidebar-child-link:hover,
+.dg-sidebar-child-link:focus-visible
+{
+    background:var(--dg-sidebar-hover-bg);
+    color:var(--primary);
+    outline:none;
+    box-shadow:inset 0 0 0 1px rgba(13,110,253,.12);
+}
+
+.dg-sidebar-child-link.dg-sidebar-active
+{
+    background:#dbeafe;
+    color:var(--primary);
+    box-shadow:inset 4px 0 0 var(--primary);
+    font-weight:700;
+}
+
+.dg-sidebar-divider
+{
+    height:1px;
+    margin:16px 10px;
+    background:var(--dg-sidebar-border);
+}
+
+.dg-sidebar-mobile-bar
+{
+    display:none;
+}
+
+.dg-sidebar-footer
+{
+    flex-shrink:0;
+    padding:12px;
+    border-top:1px solid var(--dg-sidebar-border);
+    background:#f8fafc;
+}
+
+.dg-sidebar-user-panel
+{
+    margin-bottom:10px;
+    padding:10px 12px;
+    border-radius:var(--dg-radius);
+    background:#ffffff;
+    border:1px solid var(--dg-sidebar-border);
+}
+
+.dg-sidebar-user
+{
+    font-size:13px;
+    font-weight:600;
+    color:var(--dark);
+    margin-bottom:2px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.dg-sidebar-role
+{
+    font-size:11px;
+    font-weight:500;
+    color:var(--dg-sidebar-muted);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.dg-sidebar-button
+{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    width:100%;
+    min-height:42px;
+    padding:0 14px;
+    border:1px solid transparent;
+    border-radius:var(--dg-radius);
+    font-size:13px;
+    font-weight:600;
+    line-height:1;
+    cursor:pointer;
+    transition:background var(--dg-transition),border-color var(--dg-transition),color var(--dg-transition);
+}
+
+.dg-sidebar-button-danger
+{
+    border-color:#f1aeb5;
+    background:linear-gradient(180deg,#fff5f5 0%,#ffe3e6 100%);
+    color:var(--danger);
+}
+
+.dg-sidebar-button-danger:hover,
+.dg-sidebar-button-danger:focus-visible
+{
+    background:var(--danger);
+    border-color:var(--danger);
+    color:#fff;
+    outline:none;
+}
+
+.dg-sidebar-button-icon
+{
+    font-size:14px;
+    line-height:1;
+}
+
+body.dg-sidebar-collapsed .dg-sidebar
+{
+    flex-basis:var(--dg-sidebar-width-collapsed);
+    width:var(--dg-sidebar-width-collapsed);
+}
+
+body.dg-sidebar-collapsed .dg-sidebar-label,
+body.dg-sidebar-collapsed .dg-sidebar-company,
+body.dg-sidebar-collapsed .dg-sidebar-company-name,
+body.dg-sidebar-collapsed .dg-sidebar-company-meta,
+body.dg-sidebar-collapsed .dg-sidebar-user,
+body.dg-sidebar-collapsed .dg-sidebar-role,
+body.dg-sidebar-collapsed .dg-sidebar-chevron,
+body.dg-sidebar-collapsed .dg-sidebar-button-text
+{
+    display:none;
+}
+
+body.dg-sidebar-collapsed .dg-sidebar-link,
+body.dg-sidebar-collapsed .dg-sidebar-parent
+{
+    justify-content:center;
+    padding-left:8px;
+    padding-right:8px;
+}
+
+body.dg-sidebar-collapsed .dg-sidebar-submenu
+{
+    display:none;
+}
+
+body.dg-sidebar-collapsed .dg-sidebar-user-panel
+{
+    padding:6px;
+    margin-bottom:8px;
+}
+
+body.dg-sidebar-collapsed .dg-sidebar-button
+{
+    min-height:36px;
+    padding:0;
+}
+
+@media (max-width:1199.98px)
+{
+    .dg-sidebar
+    {
+        flex-basis:var(--dg-sidebar-width-collapsed);
+        width:var(--dg-sidebar-width-collapsed);
+    }
+
+    .dg-sidebar-label,
+    .dg-sidebar-company,
+    .dg-sidebar-company-name,
+    .dg-sidebar-company-meta,
+    .dg-sidebar-user,
+    .dg-sidebar-role,
+    .dg-sidebar-chevron,
+    .dg-sidebar-button-text
+    {
+        display:none;
+    }
+
+    .dg-sidebar-link,
+    .dg-sidebar-parent
+    {
+        justify-content:center;
+    }
+
+    .dg-sidebar-submenu
+    {
+        display:none;
+    }
+
+    .dg-sidebar-user-panel
+    {
+        padding:6px;
+        margin-bottom:8px;
+    }
+}
+
+@media (max-width:991.98px)
+{
+    .dg-mobile-nav-toggle
+    {
+        position:absolute;
+        opacity:0;
+        width:0;
+        height:0;
+        pointer-events:none;
+    }
+
+    .dg-mobile-nav-backdrop
+    {
+        position:fixed;
+        inset:0;
+        background:rgba(15,23,42,.45);
+        opacity:0;
+        visibility:hidden;
+        pointer-events:none;
+        z-index:1045;
+        transition:opacity var(--dg-transition),visibility var(--dg-transition);
+        cursor:pointer;
+    }
+
+    .dg-mobile-nav-toggle:checked ~ .dg-mobile-nav-backdrop
+    {
+        opacity:1;
+        visibility:visible;
+        pointer-events:auto;
+    }
+
+    .dg-layout > .dg-sidebar
+    {
+        position:fixed;
+        top:0;
+        left:0;
+        display:block;
+        flex:none;
+        width:var(--dg-sidebar-width-expanded);
+        height:100vh;
+        z-index:1050;
+        transform:translateX(-100%);
+        transition:transform var(--dg-transition);
+    }
+
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar
+    {
+        transform:translateX(0);
+    }
+
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-label,
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-company,
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-company-name,
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-company-meta,
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-user,
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-role,
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-chevron,
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-button-text
+    {
+        display:block;
+    }
+
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-link,
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-parent
+    {
+        justify-content:flex-start;
+        padding-left:14px;
+        padding-right:14px;
+    }
+
+    .dg-mobile-nav-toggle:checked ~ .dg-layout .dg-sidebar .dg-sidebar-submenu
+    {
+        display:block;
+    }
+
+    .dg-header-toggle
+    {
+        display:inline-flex;
+    }
+
+    .dg-sidebar-mobile-bar
+    {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        padding:10px 12px;
+        border-bottom:1px solid var(--dg-sidebar-border);
+        background:#ffffff;
+    }
+
+    .dg-sidebar-mobile-title
+    {
+        font-size:14px;
+        font-weight:700;
+        color:var(--dark);
+    }
+
+    .dg-sidebar-mobile-close
+    {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:36px;
+        height:36px;
+        border:1px solid var(--dg-sidebar-border);
+        border-radius:var(--dg-radius);
+        background:#ffffff;
+        cursor:pointer;
+    }
+
+    .dg-sidebar-mobile-close-icon
+    {
+        font-size:22px;
+        line-height:1;
+        color:var(--dark);
+    }
+
+    .dg-page
+    {
+        padding:15px;
+        padding-bottom:90px;
+    }
+}
+
+@media (min-width:992px)
+{
+    .dg-mobile-nav-toggle,
+    .dg-mobile-nav-backdrop
+    {
+        display:none;
+    }
+
+    .dg-header-toggle
+    {
+        display:none;
+    }
+}
+
+/*=========================================================
+18. HEADER / FOOTER — DG ERP Layout Shell
+=========================================================*/
+
+.dg-header
+{
+    position:sticky;
+    top:0;
+    z-index:1030;
+    flex-shrink:0;
+    min-height:var(--dg-header-height);
+    background:#ffffff;
+    border-bottom:1px solid var(--border);
+    box-shadow:0 1px 2px rgba(15,23,42,.04);
+}
+
+.dg-header-inner
+{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    gap:16px;
+    min-height:var(--dg-header-height);
+    padding:0 20px;
+}
+
+.dg-header-start,
+.dg-header-end
+{
+    display:flex;
+    align-items:center;
+    min-width:0;
+}
+
+.dg-header-start
+{
+    gap:12px;
+}
+
+.dg-header-end
+{
+    justify-content:flex-end;
+    gap:10px;
+}
+
+.dg-header-toggle
+{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:40px;
+    height:40px;
+    margin:0;
+    border:1px solid var(--border);
+    border-radius:var(--dg-radius);
+    background:#ffffff;
+    color:var(--dark);
+    cursor:pointer;
+    transition:background var(--dg-transition),border-color var(--dg-transition);
+}
+
+.dg-header-toggle:hover,
+.dg-header-toggle:focus-visible
+{
+    background:var(--dg-sidebar-hover-bg);
+    border-color:#b6d4fe;
+    outline:none;
+}
+
+.dg-header-toggle-icon
+{
+    font-size:18px;
+    line-height:1;
+}
+
+.dg-breadcrumb
+{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    min-width:0;
+    font-size:12px;
+    color:var(--muted);
+}
+
+.dg-breadcrumb-link
+{
+    color:var(--primary);
+    text-decoration:none;
+    white-space:nowrap;
+}
+
+.dg-breadcrumb-link:hover,
+.dg-breadcrumb-link:focus-visible
+{
+    text-decoration:underline;
+    outline:none;
+}
+
+.dg-breadcrumb-sep
+{
+    color:#adb5bd;
+}
+
+.dg-breadcrumb-current
+{
+    color:var(--dark);
+    font-weight:600;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.dg-header-title
+{
+    margin:0;
+    font-size:18px;
+    font-weight:700;
+    line-height:1.3;
+    color:var(--dark);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.dg-header-actions
+{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+.dg-header-notify
+{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:36px;
+    height:36px;
+    border-radius:999px;
+    background:#f8f9fa;
+    border:1px solid var(--border);
+}
+
+.dg-header-notify-icon
+{
+    font-size:14px;
+    line-height:1;
+}
+
+.dg-header-user
+{
+    position:relative;
+}
+
+.dg-header-user-btn
+{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-height:40px;
+    padding:0 10px;
+    border:1px solid var(--border);
+    border-radius:var(--dg-radius);
+    background:#ffffff;
+    cursor:pointer;
+    list-style:none;
+    user-select:none;
+}
+
+.dg-header-user-btn::-webkit-details-marker
+{
+    display:none;
+}
+
+.dg-header-user-btn:hover,
+.dg-header-user-btn:focus-visible
+{
+    background:var(--dg-sidebar-hover-bg);
+    outline:none;
+}
+
+.dg-header-user-avatar
+{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:28px;
+    height:28px;
+    border-radius:999px;
+    background:var(--primary);
+    color:#ffffff;
+    font-size:12px;
+    font-weight:700;
+}
+
+.dg-header-user-name
+{
+    font-size:13px;
+    font-weight:600;
+    color:var(--dark);
+    max-width:120px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.dg-header-user-chevron
+{
+    width:8px;
+    height:8px;
+    border-right:2px solid var(--muted);
+    border-bottom:2px solid var(--muted);
+    transform:rotate(45deg);
+    margin-top:-2px;
+}
+
+.dg-header-user-menu
+{
+    position:absolute;
+    top:calc(100% + 6px);
+    right:0;
+    min-width:180px;
+    padding:6px;
+    border:1px solid var(--border);
+    border-radius:var(--dg-radius);
+    background:#ffffff;
+    box-shadow:0 8px 24px rgba(15,23,42,.12);
+}
+
+.dg-header-user:not([open]) .dg-header-user-menu
+{
+    display:none;
+}
+
+.dg-header-user-link
+{
+    display:block;
+    width:100%;
+    padding:8px 10px;
+    border:0;
+    border-radius:8px;
+    background:transparent;
+    color:var(--dark);
+    font-size:13px;
+    font-weight:500;
+    text-align:left;
+    text-decoration:none;
+    cursor:pointer;
+}
+
+.dg-header-user-link:hover,
+.dg-header-user-link:focus-visible
+{
+    background:var(--dg-sidebar-hover-bg);
+    color:var(--primary);
+    outline:none;
+}
+
+.dg-header-user-logout
+{
+    color:var(--danger);
+}
+
+.dg-header-user-form
+{
+    margin:0;
+}
+
+.dg-footer
+{
+    flex-shrink:0;
+    min-height:var(--dg-footer-height);
+    border-top:1px solid var(--border);
+    background:#ffffff;
+}
+
+.dg-footer-inner
+{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    min-height:var(--dg-footer-height);
+    padding:0 20px;
+    font-size:12px;
+    color:var(--muted);
+}
+
+.dg-footer-text,
+.dg-footer-meta
+{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+@media (max-width:1199.98px)
+{
+    .dg-header-inner
+    {
+        gap:12px;
+    }
+}
+
+@media (max-width:767.98px)
+{
+    .dg-header-inner
+    {
+        grid-template-columns:1fr;
+        padding:10px 12px;
+    }
+
+    .dg-header-end
+    {
+        justify-content:space-between;
+        width:100%;
+    }
+
+    .dg-breadcrumb
+    {
+        display:none;
+    }
+
+    .dg-header-notify
+    {
+        display:none;
+    }
+}
 
 @media print
 {
 
-    .erp-toolbar,
+    .dg-print-footer
+    {
+
+        break-inside:avoid;
+
+        page-break-inside:avoid;
+
+    }
+
+
+    #printArea .dg-print-portrait
+    {
+
+        page:auto;
+
+    }
+
+
+    #printArea .dg-print-landscape
+    {
+
+        page:auto;
+
+    }
+
+
+    body:has(.dg-print-list-landscape) #printArea
+    {
+
+        position:static;
+
+        left:auto;
+
+        top:auto;
+
+        width:100%;
+
+        padding:2px 4px;
+
+    }
+
+
+    body:has(.dg-print-list-landscape)
+    {
+
+        page:dg-landscape;
+
+    }
+
+
+    body:has(.dg-print-list-landscape) .dg-layout > .dg-sidebar,
+    body:has(.dg-print-list-landscape) .dg-header,
+    body:has(.dg-print-list-landscape) .dg-footer,
+    body:has(.dg-print-list-landscape) .dg-mobile-nav-backdrop,
+    body:has(.dg-print-list-landscape) .dg-alert,
+    body:has(.dg-print-list-landscape) .alert
+    {
+
+        display:none !important;
+
+    }
+
+
+    body:has(.dg-print-list-landscape) .dg-main,
+    body:has(.dg-print-list-landscape) .dg-main-content
+    {
+
+        margin:0 !important;
+
+        padding:0 !important;
+
+    }
+
+
+    .dg-print-list-table thead
+    {
+
+        display:table-header-group;
+
+    }
+
+
+    .dg-print-list-table tbody tr
+    {
+
+        break-inside:avoid;
+
+        page-break-inside:avoid;
+
+    }
+
+
+    .dg-print-list-header
+    {
+
+        break-inside:avoid;
+
+        page-break-inside:avoid;
+
+    }
+
+
+    .dg-print-list-summary
+    {
+
+        break-inside:avoid;
+
+        page-break-inside:avoid;
+
+    }
+
+
+    body:has(.dg-invoice-print) #printArea
+    {
+
+        position:static;
+
+        left:auto;
+
+        top:auto;
+
+        width:100%;
+
+    }
+
+
+    html,
+    body
+    {
+
+        background:#fff !important;
+
+        color:#000 !important;
+
+    }
+
+
+    body *
+    {
+
+        visibility:hidden !important;
+
+    }
+
+
+    #printArea,
+    #printArea *
+    {
+
+        visibility:visible !important;
+
+    }
+
+
+    #printArea
+    {
+
+        position:absolute;
+
+        left:0;
+
+        top:0;
+
+        width:100%;
+
+        padding:10px;
+
+        background:#fff;
+
+    }
+
+
+    .dg-layout > .dg-sidebar,
+    .dg-header,
+    .dg-footer,
+    .dg-mobile-nav-backdrop,
+    .navbar,
+    nav[aria-label="ERP navigation"]
+    {
+        display:none !important;
+    }
+
+
+    #printArea table
+    {
+
+        width:100%;
+
+        border-collapse:collapse;
+
+    }
+
+
+    #printArea table th,
+    #printArea table td
+    {
+
+        border:1px solid #000;
+
+        padding:8px;
+
+    }
+
+
+    .dg-print-hide,
+    .print-hide
+    {
+
+        display:none !important;
+
+    }
+
+
+    .dg-toolbar,
 
     .btn,
 
@@ -254,6 +3676,800 @@ PRINT
     {
 
         display:none !important;
+
+    }
+
+
+    /* =====================================================
+    Master Profile Show pages - compact print layout
+
+    Scope : .customer-show-page / .supplier-show-page /
+    .account-show-page / .product-show-page /
+    .service-show-page are added only
+    on the respective Show Blades, so none of the rules
+    below reach Sales, Employee, or any other module.
+    Supplier, Account, and Product reuse the EXACT same
+    rules as Customer (same reference implementation)
+    instead of duplicating the block.
+    ===================================================== */
+
+    body:has(.customer-show-page),
+    body:has(.supplier-show-page),
+    body:has(.account-show-page),
+    body:has(.product-show-page),
+    body:has(.service-show-page)
+    {
+
+        background:#fff;
+
+        overflow:visible;
+
+    }
+
+    body:has(.customer-show-page) .dg-main,
+    body:has(.supplier-show-page) .dg-main,
+    body:has(.account-show-page) .dg-main,
+    body:has(.product-show-page) .dg-main,
+    body:has(.service-show-page) .dg-main
+    {
+        margin:0;
+        padding:0;
+        min-height:auto;
+        height:auto;
+    }
+
+    body:has(.customer-show-page) .dg-page,
+    body:has(.supplier-show-page) .dg-page,
+    body:has(.account-show-page) .dg-page,
+    body:has(.product-show-page) .dg-page,
+    body:has(.service-show-page) .dg-page
+    {
+        padding:0;
+    }
+
+
+    .customer-show-page .dg-container,
+    .supplier-show-page .dg-container,
+    .account-show-page .dg-container,
+    .product-show-page .dg-container,
+    .service-show-page .dg-container
+    {
+
+        margin-top:0;
+
+    }
+
+
+    .customer-show-page .dg-section,
+    .supplier-show-page .dg-section,
+    .account-show-page .dg-section,
+    .product-show-page .dg-section,
+    .service-show-page .dg-section
+    {
+
+        margin-bottom:6px;
+
+    }
+
+
+    .customer-show-page .dg-card,
+    .supplier-show-page .dg-card,
+    .account-show-page .dg-card,
+    .product-show-page .dg-card,
+    .service-show-page .dg-card
+    {
+
+        box-shadow:none;
+
+        margin-bottom:6px;
+
+    }
+
+
+    /* Disable Bootstrap equal-height cards for print */
+
+    .customer-show-page .h-100,
+    .supplier-show-page .h-100,
+    .account-show-page .h-100,
+    .product-show-page .h-100,
+    .service-show-page .h-100
+    {
+
+        height:auto !important;
+
+    }
+
+
+    /* Disable Bootstrap row stretch behaviour for print */
+
+    .customer-show-page .row,
+    .supplier-show-page .row,
+    .account-show-page .row,
+    .product-show-page .row,
+    .service-show-page .row
+    {
+
+        align-items:flex-start !important;
+
+    }
+
+
+    /* Keep page-break protection ONLY for the first row
+    (Company Information + Profile). Financial Information,
+    Basic Information, Address, and Note may flow naturally
+    across the page break. */
+
+    .customer-show-page .dg-container > .dg-section:first-of-type .dg-card,
+    .supplier-show-page .dg-container > .dg-section:first-of-type .dg-card,
+    .account-show-page .dg-container > .dg-section:first-of-type .dg-card,
+    .product-show-page .dg-container > .dg-section:first-of-type .dg-card,
+    .service-show-page .dg-container > .dg-section:first-of-type .dg-card
+    {
+
+        break-inside:avoid;
+
+        page-break-inside:avoid;
+
+    }
+
+
+    .customer-show-page .dg-card-header,
+    .supplier-show-page .dg-card-header,
+    .account-show-page .dg-card-header,
+    .product-show-page .dg-card-header,
+    .service-show-page .dg-card-header
+    {
+
+        padding:4px 10px;
+
+    }
+
+
+    .customer-show-page .dg-card-body,
+    .supplier-show-page .dg-card-body,
+    .account-show-page .dg-card-body,
+    .product-show-page .dg-card-body,
+    .service-show-page .dg-card-body
+    {
+
+        padding:8px;
+
+    }
+
+
+    .customer-show-page .dg-card h6,
+    .supplier-show-page .dg-card h6,
+    .account-show-page .dg-card h6,
+    .product-show-page .dg-card h6,
+    .service-show-page .dg-card h6
+    {
+
+        font-size:13px;
+
+        margin-bottom:4px;
+
+    }
+
+
+    .customer-show-page .dg-row,
+    .supplier-show-page .dg-row,
+    .account-show-page .dg-row,
+    .product-show-page .dg-row,
+    .service-show-page .dg-row
+    {
+
+        padding-bottom:2px;
+
+        margin-bottom:2px;
+
+    }
+
+
+    .customer-show-page .mb-2,
+    .supplier-show-page .mb-2,
+    .account-show-page .mb-2,
+    .product-show-page .mb-2,
+    .service-show-page .mb-2
+    {
+
+        margin-bottom:4px !important;
+
+    }
+
+
+    .customer-show-page .gap-3,
+    .supplier-show-page .gap-3,
+    .account-show-page .gap-3,
+    .product-show-page .gap-3,
+    .service-show-page .gap-3
+    {
+
+        gap:8px !important;
+
+    }
+
+
+    /* Keep the outer profile-card pairs two-column (Company Info /
+    Profile, Financial Info / Basic Info, Address / Note) */
+
+    .customer-show-page .row.g-2 > .col-12.col-md-6,
+    .supplier-show-page .row.g-2 > .col-12.col-md-6,
+    .account-show-page .row.g-2 > .col-12.col-md-6,
+    .product-show-page .row.g-2 > .col-12.col-md-6,
+    .service-show-page .row.g-2 > .col-12.col-md-6
+    {
+
+        flex:0 0 50% !important;
+
+        max-width:50% !important;
+
+        width:50% !important;
+
+    }
+
+
+    /* Keep the inner Field : Value grid (Financial Information,
+    Basic Information) two-column instead of collapsing to one */
+
+    .customer-show-page .row > .col-md-6,
+    .supplier-show-page .row > .col-md-6,
+    .account-show-page .row > .col-md-6,
+    .product-show-page .row > .col-md-6,
+    .service-show-page .row > .col-md-6
+    {
+
+        flex:0 0 50% !important;
+
+        max-width:50% !important;
+
+        width:50% !important;
+
+    }
+
+
+    .customer-show-page .dg-card img,
+    .supplier-show-page .dg-card img,
+    .account-show-page .dg-card img,
+    .service-show-page .dg-card img
+    {
+
+        width:80px !important;
+
+        height:80px !important;
+
+    }
+
+
+    /* Sales Invoice View — print same screen layout (show blade) */
+
+    body:has(.dg-invoice) .dg-invoice
+    {
+        page:dg-invoice-print;
+    }
+
+    body:has(.dg-invoice) *,
+    body:has(.dg-invoice) .dg-invoice,
+    body:has(.dg-invoice) .dg-invoice *
+    {
+        visibility:visible !important;
+    }
+
+    body:has(.dg-invoice)
+    {
+        background:#fff !important;
+        overflow:visible !important;
+    }
+
+    body:has(.dg-invoice) .dg-layout > .dg-sidebar,
+    body:has(.dg-invoice) .dg-header,
+    body:has(.dg-invoice) .dg-footer,
+    body:has(.dg-invoice) .dg-mobile-nav-backdrop,
+    body:has(.dg-invoice) .dg-toolbar,
+    body:has(.dg-invoice) .dg-alert,
+    body:has(.dg-invoice) .alert,
+    body:has(.dg-invoice) .d-print-none,
+    body:has(.dg-invoice) .btn,
+    body:has(.dg-invoice) nav[aria-label="ERP navigation"]
+    {
+        display:none !important;
+    }
+
+    body:has(.dg-invoice) .dg-main
+    {
+        margin:0 !important;
+        padding:0 !important;
+        min-height:auto !important;
+        height:auto !important;
+        width:100% !important;
+    }
+
+    body:has(.dg-invoice) .dg-main-content
+    {
+        margin:0 !important;
+        padding:0 !important;
+    }
+
+    body:has(.dg-invoice) .dg-page
+    {
+        padding:0 !important;
+        margin:0 !important;
+    }
+
+    body:has(.dg-invoice) .dg-container,
+    body:has(.dg-invoice) .container-fluid
+    {
+        margin:0 !important;
+        padding:0 !important;
+        max-width:100% !important;
+        width:100% !important;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-sheet
+    {
+        border:1px solid #c8d0da;
+        border-radius:0;
+        padding:8px 10px 6px;
+        margin:0;
+        background:#fff !important;
+        box-shadow:none !important;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-doc-title
+    {
+        margin:0 0 6px;
+        padding-bottom:5px;
+        font-size:18px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-parties
+    {
+        display:grid !important;
+        grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+        gap:6px;
+        margin-bottom:6px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-party
+    {
+        background:#fff !important;
+        box-shadow:none !important;
+        padding:6px 8px 7px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-company-block
+    {
+        flex-direction:row !important;
+        gap:8px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-logo
+    {
+        width:52px;
+        height:52px;
+        box-shadow:none !important;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-party-title
+    {
+        margin-bottom:4px;
+        padding-bottom:3px;
+        font-size:10px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-dl
+    {
+        gap:2px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-dl-row
+    {
+        display:grid !important;
+        grid-template-columns:96px 1fr !important;
+        gap:6px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-party .dg-invoice-field-list
+    {
+        gap:4px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-party .dg-invoice-field-row
+    {
+        grid-template-columns:100px 10px minmax(0, 1fr) !important;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-party .dg-invoice-field-label,
+    body:has(.dg-invoice) .dg-invoice-party .dg-invoice-field-sep,
+    body:has(.dg-invoice) .dg-invoice-party .dg-invoice-field-value
+    {
+        font-size:10px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-dl-label
+    {
+        font-size:10px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-dl-value
+    {
+        font-size:11px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-lines
+    {
+        margin-top:6px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-lines-title
+    {
+        margin-bottom:4px;
+        font-size:10px;
+    }
+
+    body:has(.dg-invoice) .dg-table-scroll
+    {
+        overflow:visible !important;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-table thead
+    {
+        display:table-header-group;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-table thead th
+    {
+        background:#1e3a5f !important;
+        color:#fff !important;
+        padding:5px 6px;
+        font-size:9px;
+        -webkit-print-color-adjust:exact;
+        print-color-adjust:exact;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-table tbody td
+    {
+        padding:4px 6px;
+        font-size:10px;
+        background:#fff !important;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-table tbody tr:nth-child(even)
+    {
+        background:#fff !important;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-table tbody tr:hover
+    {
+        background:#fff !important;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-footer
+    {
+        display:flex !important;
+        flex-direction:row !important;
+        align-items:flex-start !important;
+        justify-content:space-between !important;
+        gap:8px;
+        margin-top:6px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-payment
+    {
+        background:#fff !important;
+        box-shadow:none !important;
+        padding:6px 8px 7px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-totals
+    {
+        flex:0 0 240px !important;
+        width:240px !important;
+        max-width:240px !important;
+        background:#fff !important;
+        box-shadow:none !important;
+        padding:6px 8px 7px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-totals-box .dg-summary-item
+    {
+        padding-bottom:3px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-totals-box .dg-summary-label
+    {
+        font-size:10px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-totals-box .dg-summary-value
+    {
+        font-size:11px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-totals-box .dg-summary-total .dg-summary-value
+    {
+        font-size:13px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-note-block
+    {
+        margin-top:5px;
+        padding-top:5px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-note-body
+    {
+        font-size:10px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-amount-words
+    {
+        margin-top:6px;
+        padding-top:0;
+        background:#fff !important;
+        box-shadow:none !important;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-amount-words-title
+    {
+        margin-bottom:3px;
+        font-size:10px;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-amount-words-value
+    {
+        font-size:12px;
+        font-weight:700;
+    }
+
+    body:has(.dg-invoice) .dg-badge
+    {
+        box-shadow:none !important;
+        -webkit-print-color-adjust:exact;
+        print-color-adjust:exact;
+    }
+
+    body:has(.dg-invoice) .dg-company-card,
+    body:has(.dg-invoice) .dg-customer-card,
+    body:has(.dg-invoice) .dg-invoice-card,
+    body:has(.dg-invoice) .dg-payment-card,
+    body:has(.dg-invoice) .dg-summary-card,
+    body:has(.dg-invoice) .dg-amount-words,
+    body:has(.dg-invoice) .dg-signature,
+    body:has(.dg-invoice) .dg-invoice-party-company,
+    body:has(.dg-invoice) .dg-invoice-party-customer,
+    body:has(.dg-invoice) .dg-invoice-party-details,
+    body:has(.dg-invoice) .dg-invoice-payment,
+    body:has(.dg-invoice) .dg-invoice-totals,
+    body:has(.dg-invoice) .dg-invoice-amount-words
+    {
+        break-inside:avoid;
+        page-break-inside:avoid;
+    }
+
+    body:has(.dg-invoice) .dg-invoice-table tbody tr
+    {
+        break-inside:avoid;
+        page-break-inside:avoid;
+    }
+
+    body:has(.dg-invoice-print) .dg-layout > .dg-sidebar,
+    body:has(.dg-invoice-print) .dg-header,
+    body:has(.dg-invoice-print) .dg-footer,
+    body:has(.dg-invoice-print) .dg-alert,
+    body:has(.dg-invoice-print) .alert
+    {
+        display:none !important;
+    }
+
+    body:has(.dg-invoice-print) .dg-main,
+    body:has(.dg-invoice-print) .dg-main-content
+    {
+        margin:0 !important;
+        padding:0 !important;
+    }
+
+    .dg-invoice-print .dg-invoice-print-footer
+    {
+        display:flex !important;
+        flex-direction:row !important;
+        align-items:flex-start !important;
+        justify-content:space-between !important;
+        break-inside:avoid;
+        page-break-inside:avoid;
+    }
+
+    .dg-invoice-print .dg-invoice-print-footer .dg-invoice-payment
+    {
+        flex:0 0 70% !important;
+        width:70% !important;
+        max-width:70% !important;
+    }
+
+    .dg-invoice-print .dg-invoice-print-footer .dg-invoice-totals
+    {
+        flex:0 0 30% !important;
+        width:30% !important;
+        max-width:30% !important;
+        background:#fff !important;
+    }
+
+    .dg-invoice-print .dg-invoice-print-header,
+    .dg-invoice-print .dg-invoice-print-meta
+    {
+        display:flex !important;
+        break-inside:avoid;
+        page-break-inside:avoid;
+    }
+
+    .dg-invoice-print .dg-invoice-print-header-left,
+    .dg-invoice-print .dg-invoice-print-header-center,
+    .dg-invoice-print .dg-invoice-print-header-right
+    {
+        flex-shrink:0;
+    }
+
+    .dg-invoice-print .dg-invoice-print-header-left
+    {
+        flex:0 0 35% !important;
+        width:35% !important;
+        max-width:35% !important;
+    }
+
+    .dg-invoice-print .dg-invoice-print-header-center
+    {
+        flex:0 0 30% !important;
+        width:30% !important;
+        max-width:30% !important;
+    }
+
+    .dg-invoice-print .dg-invoice-print-header-right
+    {
+        flex:0 0 35% !important;
+        width:35% !important;
+        max-width:35% !important;
+    }
+
+    .dg-invoice-print .dg-invoice-print-meta
+    {
+        flex-wrap:nowrap !important;
+    }
+
+    .dg-invoice-print .dg-invoice-signature-block
+    {
+        break-inside:avoid;
+        page-break-inside:avoid;
+    }
+
+    .dg-invoice-print .dg-page,
+    .dg-invoice-print .dg-container,
+    #printArea
+    {
+        padding:0;
+        margin:0;
+    }
+
+    #printArea
+    {
+        padding:4px;
+        background:#fff;
+    }
+
+    .dg-payment-print #printArea
+    {
+        position:static !important;
+        left:auto !important;
+        top:auto !important;
+        padding:4px;
+        background:#fff;
+    }
+
+    .dg-payment-print #printArea .dg-card
+    {
+        box-shadow:none;
+        break-inside:avoid;
+        page-break-inside:avoid;
+    }
+
+    .dg-payment-print #printArea .dg-card .dg-card
+    {
+        box-shadow:none;
+    }
+
+    .dg-payment-print #printArea .dg-card-header
+    {
+        padding:5px 10px;
+    }
+
+    .dg-payment-print #printArea .dg-card-body
+    {
+        padding:6px 10px;
+    }
+
+    .dg-payment-print #printArea .dg-print-title
+    {
+        font-size:14px;
+    }
+
+    .dg-payment-print #printArea .dg-print-logo
+    {
+        width:40px;
+        height:40px;
+    }
+
+    .dg-payment-print #printArea .dg-signature-line
+    {
+        height:24px;
+    }
+
+    .dg-payment-print #printArea table,
+    .dg-payment-print #printArea .table
+    {
+        border:none !important;
+    }
+
+    .dg-payment-print #printArea table th,
+    .dg-payment-print #printArea table td
+    {
+        border:none !important;
+        padding:0 !important;
+    }
+
+    .product-show-page .row.g-2
+    {
+
+        display:flex !important;
+
+        flex-direction:row !important;
+
+        flex-wrap:nowrap !important;
+
+        align-items:flex-start !important;
+
+    }
+
+    .product-show-page .row.g-2 > .col-5
+    {
+
+        flex:0 0 10.5cm !important;
+
+        max-width:10.5cm !important;
+
+    }
+
+    .product-show-page .row.g-2 > .col-7
+    {
+
+        flex:1 1 auto !important;
+
+        max-width:none !important;
+
+    }
+
+    .product-show-page .dg-product-image
+    {
+
+        width:10cm !important;
+
+        height:10cm !important;
+
+        min-width:10cm !important;
+
+        min-height:10cm !important;
+
+        max-width:10cm !important;
+
+        max-height:10cm !important;
+
+    }
+
+    .product-show-page .dg-product-image img
+    {
+
+        width:100% !important;
+
+        height:100% !important;
+
+        object-fit:contain !important;
 
     }
 

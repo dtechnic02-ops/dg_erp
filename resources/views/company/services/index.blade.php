@@ -1,837 +1,147 @@
 @extends('company.layout')
 
+@section('title', 'Service Management')
+
 @section('content')
 
-<div class="container-fluid py-3">
+<div class="dg-page">
 
-    <!-- PAGE HEADER -->
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center gap-2">
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-
-        <div>
-            <h4 class="mb-0">🔧 Services</h4>
-
-            <small class="text-muted">
-                Manage service list
-            </small>
-        </div>
-
-        <button type="button"
-                class="btn btn-primary"
-                data-bs-toggle="modal"
-                data-bs-target="#addModal">
-
-            ➕ Add Service
-
-        </button>
-
-    </div>
-
-
-    <!-- SUCCESS -->
-
-    @if(session('success'))
-
-        <div class="alert alert-success">
-
-            {{ session('success') }}
-
-        </div>
-
-    @endif
-
-
-    <!-- FILTER -->
-
-    <div class="card border-0 shadow-sm mb-3">
-
-        <div class="card-body">
-
-            <form method="GET"
-                  action="{{ route('company.services.index') }}">
-
-                <div class="row g-2">
-
-
-                    <!-- SEARCH -->
-
-                    <div class="col-md-4">
-
-                        <input type="text"
-                               name="search"
-                               class="form-control"
-                               placeholder="Search service..."
-                               value="{{ request('search') }}">
-
-                    </div>
-
-
-                    <!-- CATEGORY -->
-
-                    <div class="col-md-3">
-
-                        <select name="category_id"
-                                class="form-select">
-
-                            <option value="">
-                                All Categories
-                            </option>
-
-                            @foreach($categories as $category)
-
-                                <option value="{{ $category->id }}"
-                                    {{ request('category_id') == $category->id ? 'selected' : '' }}>
-
-                                    {{ $category->name }}
-
-                                </option>
-
-                            @endforeach
-
-                        </select>
-
-                    </div>
-
-
-                    <!-- STATUS -->
-
-                    <div class="col-md-2">
-
-                        <select name="status"
-                                class="form-select">
-
-                            <option value="">
-                                All Status
-                            </option>
-
-                            <option value="active"
-                                {{ request('status') == 'active' ? 'selected' : '' }}>
-
-                                Active
-
-                            </option>
-
-                            <option value="inactive"
-                                {{ request('status') == 'inactive' ? 'selected' : '' }}>
-
-                                Inactive
-
-                            </option>
-
-                        </select>
-
-                    </div>
-
-
-                    <!-- BUTTON -->
-
-                    <div class="col-md-3 text-end">
-
-                        <button class="btn btn-dark">
-
-                            🔍 Search
-
-                        </button>
-
-                        <a href="{{ route('company.services.index') }}"
-                           class="btn btn-secondary">
-
-                            Reset
-
-                        </a>
-
-                    </div>
-
+                <div class="flex-fill">
+                    <h1 class="h4 mb-0">Service Management</h1>
                 </div>
 
-            </form>
-
-        </div>
-
-    </div>
-
-
-    <!-- TABLE -->
-
-    <div class="card border-0 shadow-sm">
-
-        <div class="table-responsive">
-
-            <table class="table table-bordered align-middle mb-0">
-
-                <thead class="table-dark">
-
-                    <tr>
-
-                        <th width="60">#</th>
-
-                        <th width="90">Image</th>
-
-                        <th>Service</th>
-
-                        <th>Code</th>
-
-                        <th>Category</th>
-
-                        <th>Price</th>
-
-                        <th>VAT</th>
-
-                        <th>Status</th>
-
-                        <th width="180">Action</th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    @forelse($services as $key => $service)
-
-                        <tr>
-
-
-                            <!-- SERIAL -->
-
-                            <td>
-
-                                {{ $services->firstItem() + $key }}
-
-                            </td>
-
-
-                            <!-- IMAGE -->
-
-                            <td>
-
-                                @if($service->upload_path)
-
-                                    <img src="{{ asset($service->upload_path) }}"
-                                         width="60"
-                                         class="rounded border">
-
-                                @else
-
-                                    <span class="text-muted">
-
-                                        No Image
-
-                                    </span>
-
-                                @endif
-
-                            </td>
-
-
-                            <!-- NAME -->
-
-                            <td>
-
-                                <strong>
-
-                                    {{ $service->name }}
-
-                                </strong>
-
-                                @if($service->description)
-
-                                    <br>
-
-                                    <small class="text-muted">
-
-                                        {{ Str::limit($service->description, 50) }}
-
-                                    </small>
-
-                                @endif
-
-                            </td>
-
-
-                            <!-- CODE -->
-
-                            <td>
-
-                                {{ $service->service_code }}
-
-                            </td>
-
-
-                            <!-- CATEGORY -->
-
-                            <td>
-
-                                {{ $service->category->name ?? '-' }}
-
-                            </td>
-
-
-                            <!-- PRICE -->
-
-                            <td>
-
-                                {{ number_format($service->price, 2) }}
-
-                            </td>
-
-
-                            <!-- VAT -->
-
-                            <td>
-
-                                @if($service->vat)
-
-                                    {{ $service->vat->name }}
-
-                                @else
-
-                                    -
-
-                                @endif
-
-                            </td>
-
-
-                            <!-- STATUS -->
-
-                            <td>
-
-                                @if($service->status == 'active')
-
-                                    <span class="badge bg-success">
-
-                                        Active
-
-                                    </span>
-
-                                @else
-
-                                    <span class="badge bg-danger">
-
-                                        Inactive
-
-                                    </span>
-
-                                @endif
-
-                            </td>
-
-
-                            <!-- ACTION -->
-
-                            <td>
-
-                                <button type="button"
-                                        class="btn btn-sm btn-warning"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#editModal{{ $service->id }}">
-
-                                    Edit
-
-                                </button>
-
-
-                                <form action="{{ route('company.services.delete', $service->id) }}"
-                                      method="POST"
-                                      class="d-inline">
-
-                                    @csrf
-
-                                    <button type="submit"
-                                            class="btn btn-sm btn-danger"
-                                            onclick="return confirm('Delete service?')">
-
-                                        Delete
-
-                                    </button>
-
-                                </form>
-
-                            </td>
-
-                        </tr>
-
-                    @empty
-
-                        <tr>
-
-                            <td colspan="9"
-                                class="text-center py-4">
-
-                                No services found.
-
-                            </td>
-
-                        </tr>
-
-                    @endforelse
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-
-        <!-- PAGINATION -->
-
-        <div class="card-footer">
-
-            {{ $services->links() }}
-
-        </div>
-
-    </div>
-
-</div>
-
-
-
-<!-- EDIT MODALS -->
-
-@foreach($services as $service)
-
-<div class="modal fade"
-     id="editModal{{ $service->id }}"
-     tabindex="-1"
-     data-bs-backdrop="static"
-     data-bs-keyboard="false">
-
-    <div class="modal-dialog modal-lg">
-
-        <form action="{{ route('company.services.update', $service->id) }}"
-              method="POST"
-              enctype="multipart/form-data"
-              class="modal-content">
-
-            @csrf
-
-            <div class="modal-header">
-
-                <h5 class="modal-title">
-
-                    Edit Service
-
-                </h5>
-
-                <button type="button"
-                        class="btn-close"
-                        data-bs-dismiss="modal">
-                </button>
-
-            </div>
-
-
-            <div class="modal-body">
-
-                <div class="row">
-
-
-                    <!-- NAME -->
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            Service Name
-                        </label>
-
-                        <input type="text"
-                               name="name"
-                               class="form-control"
-                               value="{{ $service->name }}"
-                               required>
-
+                <div class="flex-shrink-0">
+                    <div class="dg-summary mb-0">
+                        <div class="dg-summary-item mb-0">
+                            <span>Total Services</span>
+                            <span class="fw-bold">{{ $totalServices }}</span>
+                        </div>
                     </div>
+                </div>
 
-
-                    <!-- CODE -->
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            Service Code
-                        </label>
-
-                        <input type="text"
-                               name="service_code"
-                               class="form-control"
-                               value="{{ $service->service_code }}">
-
-                    </div>
-
-
-                    <!-- CATEGORY -->
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            Category
-                        </label>
-
-                        <select name="service_category_id"
-                                class="form-select">
-
-                            <option value="">
-                                Select Category
-                            </option>
-
-                            @foreach($categories as $category)
-
-                                <option value="{{ $category->id }}"
-                                    {{ $service->service_category_id == $category->id ? 'selected' : '' }}>
-
+                <div class="flex-fill d-flex justify-content-end align-items-center gap-2">
+                    <form method="GET" class="d-flex gap-2">
+                        <label for="category_id" class="visually-hidden">Category</label>
+                        <select name="category_id" id="category_id" class="form-select dg-select w-auto">
+                            <option value="">All Categories</option>
+                            @foreach ($categories as $category)
+                                <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
                                     {{ $category->name }}
-
                                 </option>
-
                             @endforeach
-
                         </select>
 
-                    </div>
+                        <label for="search" class="visually-hidden">Search Service</label>
+                        <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Search Service" class="form-control dg-input">
+                        <button type="submit" class="btn btn-primary dg-btn">Search</button>
+                    </form>
 
+                    <a href="{{ route('company.services.print', request()->query()) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
 
-                    <!-- PRICE -->
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            Price
-                        </label>
-
-                        <input type="number"
-                               step="0.01"
-                               name="price"
-                               class="form-control"
-                               value="{{ $service->price }}"
-                               required>
-
-                    </div>
-
-
-                    <!-- VAT -->
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            VAT
-                        </label>
-
-                        <select name="vat_id"
-                                class="form-select">
-
-                            <option value="">
-                                Select VAT
-                            </option>
-
-                            @foreach($vats as $vat)
-
-                                <option value="{{ $vat->id }}"
-                                    {{ $service->vat_id == $vat->id ? 'selected' : '' }}>
-
-                                    {{ $vat->name }}
-
-                                </option>
-
-                            @endforeach
-
-                        </select>
-
-                    </div>
-
-
-                    <!-- STATUS -->
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            Status
-                        </label>
-
-                        <select name="status"
-                                class="form-select">
-
-                            <option value="active"
-                                {{ $service->status == 'active' ? 'selected' : '' }}>
-
-                                Active
-
-                            </option>
-
-                            <option value="inactive"
-                                {{ $service->status == 'inactive' ? 'selected' : '' }}>
-
-                                Inactive
-
-                            </option>
-
-                        </select>
-
-                    </div>
-
-
-                    <!-- DESCRIPTION -->
-
-                    <div class="col-md-12 mb-3">
-
-                        <label class="form-label">
-                            Description
-                        </label>
-
-                        <textarea name="description"
-                                  class="form-control"
-                                  rows="3">{{ $service->description }}</textarea>
-
-                    </div>
-
-
-                    <!-- IMAGE -->
-
-                    <div class="col-md-12 mb-3">
-
-                        <label class="form-label">
-                            Image
-                        </label>
-
-                        <input type="file"
-                               name="image"
-                               class="form-control">
-
-                    </div>
-
+                    <a href="{{ route('company.services.create') }}" class="btn btn-success dg-btn">Add Service</a>
                 </div>
 
             </div>
+        </div>
+    </header>
 
+    <main class="dg-container">
+        <div class="container-fluid">
 
-            <div class="modal-footer">
+            <section class="dg-section">
+                <article class="card dg-card">
+                    <header class="card-header dg-card-header">
+                        <h2 class="h6 mb-0">Service List</h2>
+                    </header>
 
-                <button type="submit"
-                        class="btn btn-primary">
+                    <div class="card-body dg-card-body">
+                        <form method="GET" class="d-flex justify-content-end align-items-center gap-2 mb-2">
+                            <input type="hidden" name="search" value="{{ request('search') }}">
+                            <input type="hidden" name="category_id" value="{{ request('category_id') }}">
 
-                    Update Service
+                            <label for="per_page" class="mb-0 fw-bold">Show</label>
+                            <select name="per_page" id="per_page" class="form-select form-select-sm dg-select w-auto" onchange="this.form.submit()">
+                                <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
+                                <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
+                                <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
+                                <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
+                                <option value="200" {{ $perPage == 200 ? 'selected' : '' }}>200</option>
+                                <option value="500" {{ $perPage == 500 ? 'selected' : '' }}>500</option>
+                            </select>
+                        </form>
 
-                </button>
+                        <div class="table-responsive">
+                            <table class="table dg-table">
+                                <thead class="dg-head">
+                                    <tr>
+                                        <th scope="col">Image</th>
+                                        <th scope="col">Service Name</th>
+                                        <th scope="col">Category</th>
+                                        <th scope="col">Price</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col" width="220">Action</th>
+                                    </tr>
+                                </thead>
 
-            </div>
+                                <tbody class="dg-body">
+                                    @forelse ($services as $service)
+                                        <tr class="dg-row">
+                                            <td>
+                                                @if ($service->upload_path)
+                                                    <img src="{{ asset($service->upload_path) }}" alt="{{ $service->name }}" width="40" height="40" class="dg-image">
+                                                @endif
+                                            </td>
+                                            <td>{{ $service->name }}</td>
+                                            <td>{{ $service->category->name ?? '-' }}</td>
+                                            <td>{{ number_format($service->price, 2) }}</td>
+                                            <td>
+                                                @if ($service->status == 'active')
+                                                    <span class="badge bg-success">Active</span>
+                                                @else
+                                                    <span class="badge bg-secondary">Inactive</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group" aria-label="Service actions">
+                                                    <a href="{{ route('company.services.edit', $service->id) }}" class="btn btn-sm btn-outline-success dg-btn">Edit</a>
 
-        </form>
+                                                    <a href="{{ route('company.services.show', $service->id) }}" class="btn btn-sm btn-outline-info dg-btn">View</a>
 
-    </div>
+                                                    <form method="POST" action="{{ route('company.services.delete', $service->id) }}" class="d-inline">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger dg-btn" onclick="return confirm('Delete this service?')">Delete</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr class="dg-row">
+                                            <td colspan="6" class="text-center">No Services Found</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
 
-</div>
+                        <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+                            <p class="mb-0 text-muted">
+                                Showing {{ $services->firstItem() ?? 0 }} to {{ $services->lastItem() ?? 0 }} of {{ $services->total() }} records
+                            </p>
 
-@endforeach
-
-
-
-<!-- ADD MODAL -->
-
-<div class="modal fade"
-     id="addModal"
-     tabindex="-1"
-     data-bs-backdrop="static"
-     data-bs-keyboard="false">
-
-    <div class="modal-dialog modal-lg">
-
-        <form action="{{ route('company.services.store') }}"
-              method="POST"
-              enctype="multipart/form-data"
-              class="modal-content">
-
-            @csrf
-
-            <div class="modal-header">
-
-                <h5 class="modal-title">
-
-                    Add Service
-
-                </h5>
-
-                <button type="button"
-                        class="btn-close"
-                        data-bs-dismiss="modal">
-                </button>
-
-            </div>
-
-
-            <div class="modal-body">
-
-                <div class="row">
-
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            Service Name
-                        </label>
-
-                        <input type="text"
-                               name="name"
-                               class="form-control"
-                               required>
-
+                            <nav aria-label="Service list pagination">
+                                {{ $services->links() }}
+                            </nav>
+                        </div>
                     </div>
-
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            Service Code
-                        </label>
-
-                        <input type="text"
-                               name="service_code"
-                               class="form-control">
-
-                    </div>
-
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            Category
-                        </label>
-
-                        <select name="service_category_id"
-                                class="form-select">
-
-                            <option value="">
-                                Select Category
-                            </option>
-
-                            @foreach($categories as $category)
-
-                                <option value="{{ $category->id }}">
-
-                                    {{ $category->name }}
-
-                                </option>
-
-                            @endforeach
-
-                        </select>
-
-                    </div>
-
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            Price
-                        </label>
-
-                        <input type="number"
-                               step="0.01"
-                               name="price"
-                               class="form-control"
-                               required>
-
-                    </div>
-
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            VAT
-                        </label>
-
-                        <select name="vat_id"
-                                class="form-select">
-
-                            <option value="">
-                                Select VAT
-                            </option>
-
-                            @foreach($vats as $vat)
-
-                                <option value="{{ $vat->id }}">
-
-                                    {{ $vat->name }}
-
-                                </option>
-
-                            @endforeach
-
-                        </select>
-
-                    </div>
-
-
-                    <div class="col-md-6 mb-3">
-
-                        <label class="form-label">
-                            Status
-                        </label>
-
-                        <select name="status"
-                                class="form-select">
-
-                            <option value="active">
-
-                                Active
-
-                            </option>
-
-                            <option value="inactive">
-
-                                Inactive
-
-                            </option>
-
-                        </select>
-
-                    </div>
-
-
-                    <div class="col-md-12 mb-3">
-
-                        <label class="form-label">
-                            Description
-                        </label>
-
-                        <textarea name="description"
-                                  class="form-control"
-                                  rows="3"></textarea>
-
-                    </div>
-
-
-                    <div class="col-md-12 mb-3">
-
-                        <label class="form-label">
-                            Image
-                        </label>
-
-                        <input type="file"
-                               name="image"
-                               class="form-control">
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div class="modal-footer">
-
-                <button type="submit"
-                        class="btn btn-primary">
-
-                    Save Service
-
-                </button>
-
-            </div>
-
-        </form>
-
-    </div>
+                </article>
+            </section>
+
+        </div>
+    </main>
 
 </div>
 

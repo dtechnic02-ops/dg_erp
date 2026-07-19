@@ -2,602 +2,189 @@
 
 @section('content')
 
-@if(session('error'))
-    <div class="alert alert-danger">
-        {{ session('error') }}
-    </div>
-@endif
-<div class="container-fluid py-3">
+<div class="dg-page">
 
-    <form action="{{ route('company.sales-return.store') }}"
-          method="POST"
-          enctype="multipart/form-data">
-
-        @csrf
-
-        {{-- 🔥 HIDDEN --}}
-        
-        <input type="hidden"
-               name="sales_invoice_id"
-               value="{{ $invoice->id }}">
-
-        <input type="hidden"
-               name="customer_id"
-               value="{{ $invoice->customer_id }}">
-
-        {{-- PAGE HEADER --}}
-
-        <div class="d-flex justify-content-between align-items-center mb-3">
-
-            <h4 class="text-white mb-0">
-
-                ↩️ Sales Return
-
-            </h4>
-
-            <button type="submit"
-                    class="btn btn-danger">
-
-                Save Return
-
-            </button>
-
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="row align-items-center g-2">
+                <div class="col">
+                    <h1 class="h4 mb-0">Sales Return</h1>
+                    <p class="text-muted small mb-0">Return products and services against sales invoice</p>
+                </div>
+                <div class="col-auto">
+                    <nav class="btn-group" aria-label="Sales return create toolbar">
+                        <a href="{{ route('company.sales.show', $invoice->id) }}" class="btn btn-outline-secondary dg-btn">Back to Invoice</a>
+                        <a href="{{ route('company.sales-return.index') }}" class="btn btn-outline-secondary dg-btn">Return List</a>
+                    </nav>
+                </div>
+            </div>
         </div>
+    </header>
 
-        {{-- HEADER CARD --}}
+    <main class="dg-container">
+        <div class="container-fluid">
 
-        <div class="card shadow-sm border-0 rounded-3 mb-4">
+            @if ($errors->any())
+                <div class="alert alert-danger dg-alert" role="alert">
+                    <ul class="mb-0">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
-            <div class="card-body">
+            @if (session('error'))
+                <div class="alert alert-danger dg-alert" role="alert">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            <form method="POST" action="{{ route('company.sales-return.store') }}" enctype="multipart/form-data" id="dgSalesReturnForm">
+                @csrf
+
+                <input type="hidden" name="sales_invoice_id" value="{{ $invoice->id }}">
+                <input type="hidden" name="customer_id" value="{{ $invoice->customer_id }}">
 
                 <div class="row g-3">
+                    <div class="col-lg-8">
+                        <section class="dg-section">
+                            <article class="card dg-card mb-3">
+                                <header class="card-header dg-card-header">
+                                    <h2 class="h6 mb-0">Return Details</h2>
+                                </header>
+                                <div class="card-body dg-card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="return_no_display" class="form-label">Return No</label>
+                                            <input type="text" id="return_no_display" class="form-control dg-input" value="{{ $returnNo }}" readonly>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="return_date" class="form-label">Return Date</label>
+                                            <input type="date" name="return_date" id="return_date" class="form-control dg-input" value="{{ date('Y-m-d') }}">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="invoice_display" class="form-label">Invoice No</label>
+                                            <input type="text" id="invoice_display" class="form-control dg-input" value="{{ $invoice->invoice_no }}" readonly>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="customer_display" class="form-label">Customer</label>
+                                            <input type="text" id="customer_display" class="form-control dg-input" value="{{ $invoice->customer->name ?? '-' }}" readonly>
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="damage_photo" class="form-label">Damage Photo</label>
+                                            <input type="file" name="damage_photo" id="damage_photo" class="form-control dg-input" accept=".jpg,.jpeg,.png">
+                                            <small class="text-muted">Optional proof image for damaged items.</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </article>
 
-                    <div class="col-md-3">
-
-                        <label class="form-label fw-bold">
-
-                            Return No
-
-                        </label>
-
-                        <input type="text"
-                               name="return_no"
-                               value="{{ $returnNo }}"
-                               class="form-control"
-                               readonly>
-
+                            <article class="card dg-card">
+                                <header class="card-header dg-card-header">
+                                    <h2 class="h6 mb-0">Return Items</h2>
+                                </header>
+                                <div class="card-body dg-card-body">
+                                    <div class="table-responsive">
+                                        <table class="table dg-table" id="dgSalesReturnItems">
+                                            <thead class="dg-head">
+                                                <tr>
+                                                    <th scope="col">Item</th>
+                                                    <th scope="col" class="text-end">Available Qty</th>
+                                                    <th scope="col" class="text-end">Return Qty</th>
+                                                    <th scope="col" class="text-end">Unit Price</th>
+                                                    <th scope="col" class="text-end">VAT %</th>
+                                                    <th scope="col" class="text-end">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="dg-body">
+                                                @foreach ($invoice->items as $item)
+                                                    @php
+                                                        $availableQty = $availableQuantities[$item->id] ?? 0;
+                                                        $itemName = $item->item_type === 'service'
+                                                            ? ($item->service->name ?? '-')
+                                                            : ($item->product->name ?? '-');
+                                                    @endphp
+                                                    <tr class="dg-row dg-return-item-row">
+                                                        <td>
+                                                            <strong>{{ $itemName }}</strong>
+                                                            @if ($item->item_type === 'service')
+                                                                <span class="badge bg-secondary ms-1">Service</span>
+                                                            @endif
+                                                            <input type="hidden" name="sales_item_id[]" value="{{ $item->id }}">
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <span class="badge bg-primary">{{ number_format($availableQty, 2) }}</span>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <input type="number"
+                                                                   name="quantity[]"
+                                                                   class="form-control dg-input return-qty text-end"
+                                                                   min="0"
+                                                                   max="{{ $availableQty }}"
+                                                                   step="0.01"
+                                                                   value="{{ old('quantity.' . $loop->index, 0) }}"
+                                                                   data-available="{{ $availableQty }}">
+                                                        </td>
+                                                        <td class="text-end">
+                                                            {{ number_format($item->unit_price, 2) }}
+                                                            <input type="hidden" class="unit-price" value="{{ $item->unit_price }}">
+                                                        </td>
+                                                        <td class="text-end">
+                                                            {{ number_format($item->vat_rate, 2) }}%
+                                                            <input type="hidden" class="vat-rate" value="{{ $item->vat_rate }}">
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <input type="text" class="form-control dg-input row-total text-end" value="0.00" readonly>
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </article>
+                        </section>
                     </div>
 
-                    <div class="col-md-3">
-
-                        <label class="form-label fw-bold">
-
-                            Invoice No
-
-                        </label>
-
-                        <input type="text"
-                               value="{{ $invoice->invoice_no }}"
-                               class="form-control"
-                               readonly>
-
+                    <div class="col-lg-4">
+                        <section class="dg-section dg-summary">
+                            <article class="card dg-card">
+                                <header class="card-header dg-card-header">
+                                    <h2 class="h6 mb-0">Return Summary</h2>
+                                </header>
+                                <div class="card-body dg-card-body">
+                                    <div class="mb-3">
+                                        <label for="subtotal" class="form-label">Subtotal</label>
+                                        <input type="text" id="subtotal" class="form-control dg-input text-end" value="0.00" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="totalVat" class="form-label">VAT</label>
+                                        <input type="text" id="totalVat" class="form-control dg-input text-end" value="0.00" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="grandTotal" class="form-label">Grand Total</label>
+                                        <input type="text" id="grandTotal" class="form-control dg-input text-end fw-bold" value="0.00" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="note" class="form-label">Note</label>
+                                        <textarea name="note" id="note" class="form-control dg-input" rows="4" placeholder="Return reason or notes...">{{ old('note') }}</textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-danger dg-btn w-100">Save Return</button>
+                                </div>
+                            </article>
+                        </section>
                     </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label fw-bold">
-
-                            Customer
-
-                        </label>
-
-                        <input type="text"
-                               value="{{ $invoice->customer->name ?? '' }}"
-                               class="form-control"
-                               readonly>
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label fw-bold">
-
-                            Return Date
-
-                        </label>
-
-                        <input type="date"
-                               name="return_date"
-                               value="{{ now()->format('Y-m-d') }}"
-                               class="form-control"
-                               readonly>
-
-                    </div>
-
                 </div>
-
-            </div>
-
-        </div>
-
-        {{-- DAMAGE PHOTO --}}
-
-        <div class="card shadow-sm border-0 rounded-3 mb-4">
-
-            <div class="card-header bg-white border-0">
-
-                <h5 class="mb-0">
-
-                    📸 Damage Photo
-
-                </h5>
-
-            </div>
-
-            <div class="card-body">
-
-                <input type="file"
-                       name="damage_photo"
-                       class="form-control">
-
-                <small class="text-muted">
-
-                    Upload damaged item proof image if available.
-
-                </small>
-
-            </div>
+            </form>
 
         </div>
-
-        {{-- RETURN ITEMS --}}
-
-        <div class="card shadow-sm border-0 rounded-3 mb-4">
-
-            <div class="card-header bg-white border-0">
-
-                <h5 class="mb-0">
-
-                    📦 Return Items
-
-                </h5>
-
-            </div>
-
-            <div class="card-body table-responsive">
-
-                <table class="table table-bordered align-middle">
-
-                    <thead class="table-dark">
-
-                        <tr>
-
-                            <th>Item</th>
-
-                            <th width="120">
-
-                                Sold Qty
-
-                            </th>
-
-                            <th width="140">
-
-                                Return Qty
-
-                            </th>
-
-                            <th width="140">
-
-                                Unit Price
-
-                            </th>
-
-                            <th width="100">
-
-                                VAT %
-
-                            </th>
-
-                            <th width="160">
-
-                                Total
-
-                            </th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                        @foreach($invoice->items as $item)
-
-                        {{-- 🔥 PRODUCT ONLY --}}
-
-                        @if($item->item_type == 'product')
-
-                            <tr>
-
-                                {{-- PRODUCT --}}
-
-                                <td>
-
-                                    <strong>
-
-                                        {{ $item->product->name ?? '' }}
-
-                                    </strong>
-
-                                    <input type="hidden"
-                                           name="product_id[]"
-                                           value="{{ $item->product_id }}">
-
-                                    <input type="hidden"
-                                           name="sales_item_id[]"
-                                           value="{{ $item->id }}">
-
-                                </td>
-
-                                {{-- SOLD QTY --}}
-
-                                <td>
-
-                                    <span class="badge bg-primary fs-6">
-
-                                        {{
-
-                                            $item->quantity
-
-                                            -
-
-                                            $item->returned_qty
-
-                                        }}
-
-                                    </span>
-
-                                </td>
-
-                                {{-- RETURN QTY --}}
-
-                                <td>
-
-                                    <input type="number"
-                                           name="quantity[]"
-                                           class="form-control return-qty"
-                                           min="0"
-
-                                           max="{{
-                                                $item->quantity
-                                                -
-                                                $item->returned_qty
-                                           }}"
-
-                                           value="0">
-
-                                </td>
-
-                                {{-- UNIT PRICE --}}
-
-                                <td>
-
-                                    {{ number_format(
-                                        $item->unit_price,
-                                        2
-                                    ) }}
-
-                                    <input type="hidden"
-                                           name="unit_price[]"
-                                           class="unit-price"
-                                           value="{{ $item->unit_price }}">
-
-                                </td>
-
-                                {{-- VAT --}}
-
-                                <td>
-
-                                    {{ $item->vat_rate }}%
-
-                                    <input type="hidden"
-                                           name="vat_rate[]"
-                                           class="vat-rate"
-                                           value="{{ $item->vat_rate }}">
-
-                                </td>
-
-                                {{-- TOTAL --}}
-
-                                <td>
-
-                                    <input type="text"
-                                           class="form-control row-total bg-light"
-                                           value="0.00"
-                                           readonly>
-
-                                </td>
-
-                            </tr>
-
-                        @endif
-
-                        @endforeach
-
-                    </tbody>
-
-                </table>
-
-            </div>
-
-        </div>
-
-        {{-- FOOTER --}}
-
-        <div class="card shadow-sm border-0 rounded-3">
-
-            <div class="card-body">
-
-                <div class="row">
-
-                    {{-- NOTE --}}
-
-                    <div class="col-md-7">
-
-                        <label class="form-label fw-bold">
-
-                            Note
-
-                        </label>
-
-                        <textarea
-                            name="note"
-                            class="form-control"
-                            rows="5"
-                            placeholder="
-                                Return reason or notes...
-                            "></textarea>
-
-                    </div>
-
-                    {{-- TOTAL --}}
-
-                    <div class="col-md-5">
-
-                        <div class="border rounded-3 p-4 bg-light">
-
-                          <h5 class="mb-3">
-
-    💰 Return Summary
-
-</h5>
-
-<div class="mb-3">
-
-    <label class="form-label fw-bold">
-
-        Subtotal
-
-    </label>
-
-    <input type="text"
-           id="subtotal"
-           class="form-control"
-           value="0.00"
-           readonly>
+    </main>
 
 </div>
 
-<div class="mb-3">
-
-    <label class="form-label fw-bold">
-
-        VAT
-
-    </label>
-
-    <input type="text"
-           id="totalVat"
-           class="form-control"
-           value="0.00"
-           readonly>
-
-</div>
-
-<div class="mb-3">
-
-    <label class="form-label fw-bold">
-
-        Grand Total
-
-    </label>
-
-    <input type="text"
-           name="grand_total"
-           id="grandTotal"
-           class="
-                form-control
-                form-control-lg
-                fw-bold
-           "
-           value="0.00"
-           readonly>
-
-</div>
-
-                            <button type="submit"
-                                    class="btn btn-danger w-100">
-
-                                Save Return
-
-                            </button>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-
-    </form>
-
-</div>
-
-<script>
-
-document.addEventListener(
-    'DOMContentLoaded',
-    function ()
-{
-
-    /**
-     * 🔥 TOTAL CALCULATION
-     */
-
-    function calculateTotals()
-{
-    let subtotalTotal = 0;
-
-    let vatTotal = 0;
-
-    let grandTotal = 0;
-
-    document.querySelectorAll(
-        'tbody tr'
-    )
-    .forEach(function (row)
-    {
-
-        let qty = parseFloat(
-
-            row.querySelector(
-                '.return-qty'
-            ).value
-
-        ) || 0;
-
-        let maxQty = parseFloat(
-
-            row.querySelector(
-                '.return-qty'
-            ).max
-
-        ) || 0;
-
-        if (qty < 0)
-        {
-            qty = 0;
-
-            row.querySelector(
-                '.return-qty'
-            ).value = 0;
-        }
-
-        if (qty > maxQty)
-        {
-            qty = maxQty;
-
-            row.querySelector(
-                '.return-qty'
-            ).value = maxQty;
-        }
-
-        let price = parseFloat(
-
-            row.querySelector(
-                '.unit-price'
-            ).value
-
-        ) || 0;
-
-        let vatRate = parseFloat(
-
-            row.querySelector(
-                '.vat-rate'
-            ).value
-
-        ) || 0;
-
-        /**
-         * SUBTOTAL
-         */
-
-        let subtotal =
-            qty * price;
-
-        /**
-         * VAT
-         */
-
-        let vatAmount =
-
-            (subtotal * vatRate)
-
-            / 100;
-
-        /**
-         * TOTAL
-         */
-
-        let total =
-
-            subtotal + vatAmount;
-
-        row.querySelector(
-            '.row-total'
-        ).value = total.toFixed(2);
-
-        subtotalTotal += subtotal;
-
-        vatTotal += vatAmount;
-
-        grandTotal += total;
-    });
-
-    /**
-     * SUMMARY
-     */
-
-    document.getElementById(
-        'subtotal'
-    ).value =
-        subtotalTotal.toFixed(2);
-
-    document.getElementById(
-        'totalVat'
-    ).value =
-        vatTotal.toFixed(2);
-
-    document.getElementById(
-        'grandTotal'
-    ).value =
-        grandTotal.toFixed(2);
-}
-
-    /**
-     * 🔥 LIVE EVENT
-     */
-
-    document.addEventListener(
-        'input',
-        function (e)
-    {
-
-        if (
-            e.target.classList.contains(
-                'return-qty'
-            )
-        ) {
-
-            calculateTotals();
-        }
-
-    });
-
-});
-
-</script>
+@push('scripts')
+    <script src="{{ asset('assets/company/js/dg.js') }}"></script>
+@endpush
 
 @endsection

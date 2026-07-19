@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Company;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Models\FinancialYear;
 use App\Models\Product;
 use App\Models\Service;
@@ -13,11 +14,17 @@ use App\Models\Account;
 use App\Models\SalesPayment;
 use App\Models\SalesInvoice;
 use App\Models\SalesItem;
+use App\Models\SalesReturn;
+use App\Models\SalesReturnRefund;
+use App\Models\SalesReturnRefundAdjustment;
 use App\Services\InvoiceNumberService;
 use App\Services\StockService;
 use App\Services\AccountBalanceService;
 use App\Services\CustomerTransactionService;
 use App\Models\AccountTransaction;
+use App\Models\CustomerTransaction;
+use App\Models\StockMovement;
+use App\Services\ValidationService;
 class SalesController extends Controller
 
 {
@@ -52,9 +59,10 @@ public function index(Request $request)
     ->first();
 
 
-    $query = SalesInvoice::with(
-        'customer'
-    )
+    $query = SalesInvoice::with([
+        'customer',
+        'items',
+    ])
     ->where(
         'company_id',
         $companyId
@@ -75,9 +83,13 @@ public function index(Request $request)
 
             ->orWhereHas(
                 'customer',
-                function ($customer) use ($search) {
+                function ($customer) use ($search, $companyId) {
 
                     $customer->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->where(
                         'name',
                         'like',
                         "%{$search}%"
@@ -97,6 +109,35 @@ public function index(Request $request)
         $query->where(
             'customer_id',
             $request->customer_id
+        );
+    }
+
+    /**
+     * STATUS FILTER
+     */
+    if (!$request->has('status'))
+    {
+        $query->where(
+            'status',
+            1
+        );
+    }
+    elseif ($request->filled('status'))
+    {
+        $query->where(
+            'status',
+            $request->status
+        );
+    }
+
+    /**
+     * PAYMENT STATUS FILTER
+     */
+    if ($request->filled('payment_status'))
+    {
+        $query->where(
+            'payment_status',
+            $request->payment_status
         );
     }
 
@@ -160,10 +201,32 @@ public function index(Request $request)
         );
     }
 
+    /**
+     * SUMMARY TOTALS
+     * (Cloned from the fully filtered query, before pagination)
+     */
+    $summaryQuery = clone $query;
+
+    $totalAmount = $summaryQuery->sum('grand_total');
+    $totalPaid   = $summaryQuery->sum('paid_amount');
+    $totalDue    = $summaryQuery->sum('due_amount');
+
+    $allowedPerPage = [10, 20, 100, 200];
+
+    $perPage = (int) $request->get('per_page', 10);
+
+    if (!in_array($perPage, $allowedPerPage, true))
+    {
+        $perPage = 10;
+    }
+
     $invoices = $query
         ->latest()
-        ->paginate(20)
+        ->paginate($perPage)
         ->withQueryString();
+
+    app(SalesReturnController::class)
+        ->attachReturnableQuantityToInvoices($invoices, $companyId);
 
     return view(
         'company.sales.index',
@@ -171,8 +234,192 @@ public function index(Request $request)
             'invoices',
             'customers',
             'financialYears',
+            'activeFy',
             'startDate',
-            'endDate'
+            'endDate',
+            'totalAmount',
+            'totalPaid',
+            'totalDue',
+            'perPage'
+        )
+    );
+}
+
+
+public function printList(Request $request)
+{
+    $companyId = auth()->user()->company_id;
+
+    $customers = Customer::where(
+        'company_id',
+        $companyId
+    )->get();
+
+    $financialYears = FinancialYear::where(
+        'company_id',
+        $companyId
+    )
+    ->latest('id')
+    ->get();
+
+    $activeFy = FinancialYear::where(
+        'company_id',
+        $companyId
+    )
+    ->where(
+        'is_active',
+        1
+    )
+    ->first();
+
+    $query = SalesInvoice::with([
+        'customer',
+        'creator',
+    ])
+    ->where(
+        'company_id',
+        $companyId
+    );
+
+    if ($request->search)
+    {
+        $search = $request->search;
+
+        $query->where(function ($q) use ($search) {
+
+            $q->where(
+                'invoice_no',
+                'like',
+                "%{$search}%"
+            )
+
+            ->orWhereHas(
+                'customer',
+                function ($customer) use ($search, $companyId) {
+
+                    $customer->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->where(
+                        'name',
+                        'like',
+                        "%{$search}%"
+                    );
+
+                }
+            );
+
+        });
+    }
+
+    if ($request->customer_id)
+    {
+        $query->where(
+            'customer_id',
+            $request->customer_id
+        );
+    }
+
+    if (!$request->has('status'))
+    {
+        $query->where(
+            'status',
+            1
+        );
+    }
+    elseif ($request->filled('status'))
+    {
+        $query->where(
+            'status',
+            $request->status
+        );
+    }
+
+    if ($request->filled('payment_status'))
+    {
+        $query->where(
+            'payment_status',
+            $request->payment_status
+        );
+    }
+
+    if (!$request->has('financial_year_id'))
+    {
+        if ($activeFy)
+        {
+            $query->where(
+                'financial_year_id',
+                $activeFy->id
+            );
+
+            $startDate = $activeFy->start_date;
+            $endDate   = $activeFy->end_date;
+        }
+        else
+        {
+            $startDate = null;
+            $endDate   = null;
+        }
+    }
+    else
+    {
+        if ($request->financial_year_id)
+        {
+            $query->where(
+                'financial_year_id',
+                $request->financial_year_id
+            );
+        }
+
+        $startDate = $request->start_date;
+        $endDate   = $request->end_date;
+    }
+
+    if ($startDate)
+    {
+        $query->whereDate(
+            'sale_date',
+            '>=',
+            $startDate
+        );
+    }
+
+    if ($endDate)
+    {
+        $query->whereDate(
+            'sale_date',
+            '<=',
+            $endDate
+        );
+    }
+
+    $totalAmount    = (clone $query)->sum('grand_total');
+    $totalPaid      = (clone $query)->sum('paid_amount');
+    $totalDue       = (clone $query)->sum('due_amount');
+    $totalCount     = (clone $query)->count();
+    $activeCount    = (clone $query)->where('status', 1)->count();
+    $cancelledCount = (clone $query)->where('status', 0)->count();
+
+    $invoices = $query
+        ->latest()
+        ->get();
+
+    return view(
+        'company.sales.print-list',
+        compact(
+            'invoices',
+            'customers',
+            'financialYears',
+            'activeFy',
+            'startDate',
+            'endDate',
+            'totalAmount',
+            'totalPaid',
+            'totalDue',
+            'totalCount',
+            'activeCount',
+            'cancelledCount'
         )
     );
 }
@@ -301,13 +548,16 @@ $request->validate([
         'nullable|numeric|min:0',
 
     'product_id.*' =>
-        'nullable|exists:products,id',
+        'nullable|exists:products,id,company_id,' .
+        $companyId,
 
     'service_id.*' =>
-        'nullable|exists:services,id',
+        'nullable|exists:services,id,company_id,' .
+        $companyId,
 
     'account_id' =>
-        'nullable|exists:accounts,id',
+        'nullable|exists:accounts,id,company_id,' .
+        $companyId,
 
 ]);
 
@@ -323,27 +573,19 @@ if (
 
     ]);
 }
+
 try {
-if (
-    $request->paid_amount > 0
-    &&
-    $request->account_id
-)
-{
-    
-    $account = Account::where(
-        'company_id',
-        $companyId
-    )->findOrFail(
-        $request->account_id
-    );
 
-   
-}
+    $amounts = $this->calculateStoreAmounts($request);
 
+    $paidAmount = round((float) ($request->paid_amount ?? 0), 2);
+
+    if ($paidAmount > $amounts['grandTotal']) {
+        throw new \Exception('Paid amount cannot exceed the invoice grand total.');
+    }
 
     $invoice = DB::transaction(function ()
-    use ($request, $companyId) {
+    use ($request, $companyId, $amounts) {
 
         $activeFy =
             FinancialYear::where(
@@ -381,8 +623,7 @@ if (
             );
         }
 
-        $grandTotal =
-            $request->grand_total;
+        $grandTotal = $amounts['grandTotal'];
 
         $paidAmount =
             $request->paid_amount ?? 0;
@@ -419,6 +660,14 @@ if (
                 'invoice_no'
             );
 
+        $customer = Customer::where('company_id', $companyId)
+            ->findOrFail($request->customer_id);
+
+        $dueDate = $this->calculateInvoiceDueDate(
+            $request->sale_date,
+            $customer
+        );
+
         $invoice =
             SalesInvoice::create([
 
@@ -440,14 +689,17 @@ if (
                 'sale_date' =>
                     $request->sale_date,
 
+                'due_date' =>
+                    $dueDate,
+
                 'subtotal' =>
-                    $request->subtotal,
+                    $amounts['subtotal'],
 
                 'discount' =>
-                    $request->discount_amount ?? 0,
+                    $amounts['discount'],
 
                 'total_vat' =>
-                    $request->total_vat,
+                    $amounts['totalVat'],
 
                 'grand_total' =>
                     $grandTotal,
@@ -640,33 +892,23 @@ if (
         |--------------------------------------------------------------------------
         */
 
-        foreach (
-            $request->item_type
-            as $key => $type
-        ) {
+        foreach ($amounts['lineItems'] as $lineItem) {
 
-            $qty =
-                $request->quantity[$key];
+            $qty = $lineItem['quantity'];
 
-            $price =
-                $request->unit_price[$key];
+            $price = $lineItem['unit_price'];
 
-            $vatRate =
-                $request->vat_rate[$key] ?? 0;
+            $vatRate = $lineItem['vat_rate'];
 
-            $vatAmount =
-                $request->vat_amount[$key] ?? 0;
+            $vatAmount = $lineItem['vat_amount'];
 
-            $totalPrice =
-                $request->total_price[$key] ?? 0;
+            $totalPrice = $lineItem['total_price'];
 
-            $productId =
-                $request->product_id[$key]
-                ?? null;
+            $type = $lineItem['item_type'];
 
-            $serviceId =
-                $request->service_id[$key]
-                ?? null;
+            $productId = $lineItem['product_id'];
+
+            $serviceId = $lineItem['service_id'];
 
             SalesItem::create([
 
@@ -721,6 +963,7 @@ if (
                         'company_id',
                         $companyId
                     )
+                    ->lockForUpdate()
                     ->findOrFail(
                         $productId
                     );
@@ -768,239 +1011,252 @@ if (
             'Sales invoice created successfully.'
         );
 
-} catch (\Exception $e) {
+} catch (\Throwable $e) {
+        $safeMessages = [
+            'Paid amount cannot exceed the invoice grand total.',
+            'No active financial year found for selected sale date.',
+            'Quantity cannot be negative.',
+            'Unit price cannot be negative.',
+            'VAT rate cannot be negative.',
+            'VAT amount cannot be negative.',
+            'Discount cannot be negative.',
+            'Discount cannot exceed subtotal.',
+            'Grand total must be greater than zero.',
+            'Insufficient stock.',
+            'Invalid quantity',
+            'Financial Year is required for stock transaction.',
+            'Insufficient account balance.',
+            'Product is required for product lines.',
+            'Service is required for service lines.',
+        ];
 
-    return back()
-        ->withInput()
-        ->with(
-            'error',
-            $e->getMessage()
+        $this->logSaleException('Sales invoice store failed.', $e, [
+            'customer_id' => $request->customer_id,
+            'sale_date'     => $request->sale_date,
+        ]);
+
+        $error = $this->resolveSafeExceptionMessage(
+            $e,
+            $safeMessages,
+            'Unable to save sales invoice. Please try again.'
         );
+
+        return back()
+            ->withInput()
+            ->with('error', $error);
 }
 
 
 }
 
-public function cancel($id)
+protected function calculateStoreAmounts(Request $request): array
 {
-    DB::beginTransaction();
+    $lineItems = [];
+    $subtotal = 0;
+    $totalVat = 0;
+
+    foreach ($request->item_type as $key => $type) {
+        $qty = (float) $request->quantity[$key];
+        $price = (float) $request->unit_price[$key];
+        $vatRate = (float) ($request->vat_rate[$key] ?? 0);
+
+        if ($qty < 0) {
+            throw new \Exception('Quantity cannot be negative.');
+        }
+
+        if ($price < 0) {
+            throw new \Exception('Unit price cannot be negative.');
+        }
+
+        if ($vatRate < 0) {
+            throw new \Exception('VAT rate cannot be negative.');
+        }
+
+        $lineAmount = round($qty * $price, 2);
+        $vatAmount = round($lineAmount * ($vatRate / 100), 2);
+        $lineTotal = round($lineAmount + $vatAmount, 2);
+
+        if ($vatAmount < 0) {
+            throw new \Exception('VAT amount cannot be negative.');
+        }
+
+        $productId = $request->product_id[$key] ?? null;
+        $serviceId = $request->service_id[$key] ?? null;
+
+        if ($type === 'product' && empty($productId)) {
+            throw new \Exception('Product is required for product lines.');
+        }
+
+        if ($type === 'service' && empty($serviceId)) {
+            throw new \Exception('Service is required for service lines.');
+        }
+
+        $subtotal = round($subtotal + $lineAmount, 2);
+        $totalVat = round($totalVat + $vatAmount, 2);
+
+        $lineItems[] = [
+            'item_type'   => $type,
+            'quantity'    => $qty,
+            'unit_price'  => $price,
+            'vat_rate'    => $vatRate,
+            'vat_amount'  => $vatAmount,
+            'total_price' => $lineTotal,
+            'product_id'  => $productId,
+            'service_id'  => $serviceId,
+        ];
+    }
+
+    $discount = round((float) ($request->discount_amount ?? 0), 2);
+
+    if ($discount < 0) {
+        throw new \Exception('Discount cannot be negative.');
+    }
+
+    if ($discount > $subtotal) {
+        throw new \Exception('Discount cannot exceed subtotal.');
+    }
+
+    $taxableAmount = round(max(0, $subtotal - $discount), 2);
+    $grandTotal = round($taxableAmount + $totalVat, 2);
+
+    if ($grandTotal <= 0) {
+        throw new \Exception('Grand total must be greater than zero.');
+    }
+
+    return [
+        'lineItems'      => $lineItems,
+        'subtotal'       => $subtotal,
+        'discount'       => $discount,
+        'taxableAmount'  => $taxableAmount,
+        'totalVat'       => $totalVat,
+        'grandTotal'     => $grandTotal,
+    ];
+}
+
+public function cancel(Request $request, $id)
+{
+    $companyId = auth()->user()->company_id;
+
+    $request->validate([
+        'cancel_date' =>
+            ValidationService::requiredDate(),
+        'cancel_reason' =>
+            ValidationService::requiredString(500),
+    ]);
 
     try {
+        DB::transaction(function () use ($request, $id, $companyId) {
 
-        $invoice = SalesInvoice::where(
-            'company_id',
-            auth()->user()->company_id
-        )
-        ->with(
-            'items.product'
-        )
-        ->findOrFail($id);
+            $activeFy = FinancialYear::where('company_id', $companyId)
+                ->where('is_active', 1)
+                ->firstOrFail();
 
-        if ($invoice->status == 0)
-        {
-            throw new \Exception(
-                'Sales Already Cancelled.'
-            );
-        }
+            $cancelDate = \Carbon\Carbon::parse($request->cancel_date);
+            $startDate  = \Carbon\Carbon::parse($activeFy->start_date);
+            $endDate    = \Carbon\Carbon::parse($activeFy->end_date);
 
-        /*
-        |--------------------------------------------------------------------------
-        | GET PAYMENTS
-        |--------------------------------------------------------------------------
-        */
-
-        $payments = SalesPayment::where(
-            'company_id',
-            auth()->user()->company_id
-        )
-        ->where(
-            'sales_invoice_id',
-            $invoice->id
-        )
-        ->where(
-            'status',
-            1
-        )
-        ->get();
-
-        /*
-        |--------------------------------------------------------------------------
-        | REVERSE ACCOUNT TRANSACTION
-        |--------------------------------------------------------------------------
-        */
-
-        foreach ($payments as $payment)
-        {
-            $accountTransaction =
-                AccountTransaction::where(
-                    'company_id',
-                    auth()->user()->company_id
-                )
-                ->where(
-                    'reference_type',
-                    'sales_payment'
-                )
-                ->where(
-                    'reference_id',
-                    $payment->id
-                )
-                ->first();
-
-            if ($accountTransaction)
+            if ($cancelDate->lt($startDate) || $cancelDate->gt($endDate))
             {
-                AccountBalanceService::reverseTransaction(
-
-                    $accountTransaction,
-
-                    'sales_payment_cancel',
-
-                    'Sales Payment Cancel'
-
+                throw new \Exception(
+                    'Cancel date must belong to the active financial year.'
                 );
             }
-        }
 
-        /*
-        |--------------------------------------------------------------------------
-        | STOCK REVERSE
-        |--------------------------------------------------------------------------
-        */
+            $cancelBusinessDate = $cancelDate->toDateString();
+            $cancelReason = trim($request->cancel_reason);
 
-        foreach ($invoice->items as $item)
-        {
-            if (
-                $item->item_type != 'product'
-            )
+            $invoice = SalesInvoice::where('company_id', $companyId)
+                ->with('items.product')
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($invoice->status == 0)
             {
-                continue;
+                throw new \Exception('Sales Already Cancelled.');
             }
 
-            StockService::increase(
+            $activePaymentsExist = SalesPayment::where('company_id', $companyId)
+                ->where('sales_invoice_id', $invoice->id)
+                ->where('status', 1)
+                ->exists();
 
-                $item->product,
+            if ($activePaymentsExist)
+            {
+                throw new \Exception(
+                    'Invoice cannot be cancelled because one or more active payments exist.'
+                );
+            }
 
-                $item->quantity,
+            $activeReturnsExist = SalesReturn::where('company_id', $companyId)
+                ->where('sales_invoice_id', $invoice->id)
+                ->where('status', 1)
+                ->exists();
 
-                'sales_cancel',
+            if ($activeReturnsExist)
+            {
+                throw new \Exception(
+                    'This invoice cannot be cancelled because one or more active sales returns exist.'
+                );
+            }
 
-                $invoice->invoice_no,
+            foreach ($invoice->items as $item)
+            {
+                if ($item->item_type != 'product')
+                {
+                    continue;
+                }
 
-                $invoice->financial_year_id,
+                StockService::increase(
+                    $item->product,
+                    $item->quantity,
+                    'sales_cancel',
+                    $invoice->invoice_no,
+                    $activeFy->id,
+                    $cancelBusinessDate,
+                    $item->unit_price,
+                    'Sales Cancel: ' . $cancelReason
+                );
+            }
 
-                $invoice->sale_date,
-
-                $item->unit_price,
-
-                'Sales Cancel'
-
-            );
-        }
-                /*
-        |--------------------------------------------------------------------------
-        | CUSTOMER TRANSACTION DELETE
-        |--------------------------------------------------------------------------
-        */
-
-        CustomerTransactionService::deleteByReference(
-
-            auth()->user()->company_id,
-
-            'sales_invoice',
-
-            $invoice->id
-
-        );
-
-        foreach ($payments as $payment)
-        {
             CustomerTransactionService::deleteByReference(
-
-                auth()->user()->company_id,
-
-                'sales_payment',
-
-                $payment->id
-
+                $companyId,
+                'sales_invoice',
+                $invoice->id,
+                $cancelBusinessDate,
+                $activeFy->id,
+                $cancelReason
             );
-        }
 
-        /*
-        |--------------------------------------------------------------------------
-        | PAYMENT CANCEL
-        |--------------------------------------------------------------------------
-        */
+            $invoice->update([
+                'status' => 0,
+                'note' => trim(($invoice->note ?? '') . ' [Cancelled: ' . $cancelReason . ']'),
+            ]);
+        });
 
-        SalesPayment::where(
-            'company_id',
-            auth()->user()->company_id
-        )
-        ->where(
-            'sales_invoice_id',
-            $invoice->id
-        )
-        ->update([
-
-            'status' => 0
-
-        ]);
-
-        
-
-        /*
-        |--------------------------------------------------------------------------
-        | SALES CANCEL
-        |--------------------------------------------------------------------------
-        */
-
-        $invoice->update([
-
-            'status' => 0,
-
-            'payment_status' => 'cancelled',
-
-            'note' => trim(
-
-                ($invoice->note ?? '') .
-                ' [Cancelled]'
-
-            ),
-
-        ]);
-
-        DB::commit();
-
-        return back()->with(
-
-            'success',
-
-            'Sales Cancelled Successfully'
-
-        );
-
+        return back()->with('success', 'Sales cancelled successfully.');
     }
-    catch (\Exception $e)
+    catch (\Throwable $e)
     {
-        DB::rollBack();
+        $safeMessages = [
+            'Sales Already Cancelled.',
+            'Invoice cannot be cancelled because one or more active payments exist.',
+            'This invoice cannot be cancelled because one or more active sales returns exist.',
+            'Cancel date must belong to the active financial year.',
+        ];
 
-        return back()->with(
+        $this->logSaleException('Sales invoice cancel failed.', $e, [
+            'invoice_id' => $id,
+        ]);
 
-            'error',
-
-            $e->getMessage()
-
+        $error = $this->resolveSafeExceptionMessage(
+            $e,
+            $safeMessages,
+            'Unable to cancel invoice. Please try again.'
         );
+
+        return back()->with('error', $error);
     }
 }
-
-
-
-
-
-
-
-
-
-
 
 /**
  * PRINT
@@ -1034,6 +1290,8 @@ public function print($id)
      */
  public function show($id)
 {
+    $companyId = auth()->user()->company_id;
+
     $invoice = SalesInvoice::with([
 
         'customer',
@@ -1047,25 +1305,243 @@ public function print($id)
     ])
     ->where(
         'company_id',
-        auth()->user()->company_id
+        $companyId
     )
     ->findOrFail($id);
 
-    $accounts = Account::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->where(
-        'status',
-        'active'
-    )
-    ->get();
-return view(
-'company.sales.show',
-compact(
-'invoice',
-'accounts'
-)
-);
+    return view(
+        'company.sales.show',
+        compact(
+            'invoice'
+        )
+    );
 }
+
+public function edit($id)
+{
+    $companyId = auth()->user()->company_id;
+
+    $invoice = SalesInvoice::with([
+            'customer',
+            'items.product',
+            'items.service',
+            'financialYear',
+            'payments.account',
+        ])
+        ->where('company_id', $companyId)
+        ->findOrFail($id);
+
+    if ($invoice->status == 0)
+    {
+        return redirect()
+            ->route('company.sales.index')
+            ->with('error', 'Cancelled invoice cannot be edited.');
+    }
+
+    $activeFy = FinancialYear::where('company_id', $companyId)
+        ->where('is_active', 1)
+        ->first();
+
+    if (!$activeFy) {
+        return redirect()
+            ->route('company.sales.index')
+            ->with('error', 'Please activate financial year first.');
+    }
+
+    if ((int) $invoice->financial_year_id !== (int) $activeFy->id) {
+        return redirect()
+            ->route('company.sales.index')
+            ->with('error', 'Sales Invoice belongs to another Financial Year.');
+    }
+
+    return view(
+        'company.sales.edit',
+        compact('invoice')
+    );
+}
+
+public function update(Request $request, $id)
+{
+    $companyId = auth()->user()->company_id;
+
+    $request->validate([
+        'sale_date' => 'required|date',
+        'note' => 'nullable|string',
+    ]);
+
+    try {
+        DB::transaction(function () use ($request, $id, $companyId) {
+
+            $invoice = SalesInvoice::where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($invoice->status == 0)
+            {
+                throw new \Exception('Cancelled invoice cannot be edited.');
+            }
+
+            $activeFy = FinancialYear::where('company_id', $companyId)
+                ->where('is_active', 1)
+                ->first();
+
+            if (!$activeFy) {
+                throw new \Exception('Please activate financial year first.');
+            }
+
+            if ((int) $invoice->financial_year_id !== (int) $activeFy->id) {
+                throw new \Exception(
+                    'Sales Invoice belongs to another Financial Year.'
+                );
+            }
+
+            $saleDateLocked = $this->invoiceSaleDateIsLocked(
+                $invoice,
+                $companyId
+            );
+
+            if ($saleDateLocked) {
+                $requestedSaleDate = \Carbon\Carbon::parse($request->sale_date)
+                    ->format('Y-m-d');
+
+                $currentSaleDate = $invoice->sale_date?->format('Y-m-d');
+
+                if ($requestedSaleDate !== $currentSaleDate) {
+                    throw new \Exception(
+                        'Sale date cannot be changed because this invoice has linked payment, return, or refund activity.'
+                    );
+                }
+
+                $invoice->update([
+                    'note' => $request->note,
+                ]);
+
+                return;
+            }
+
+            $saleDate = \Carbon\Carbon::parse($request->sale_date);
+            $startDate = \Carbon\Carbon::parse($activeFy->start_date);
+            $endDate = \Carbon\Carbon::parse($activeFy->end_date);
+
+            if ($saleDate->lt($startDate) || $saleDate->gt($endDate)) {
+                throw new \Exception('No active financial year found for selected sale date.');
+            }
+
+            $customer = Customer::where('company_id', $companyId)
+                ->findOrFail($invoice->customer_id);
+
+            $invoice->update([
+                'sale_date' => $request->sale_date,
+                'due_date' => $this->calculateInvoiceDueDate(
+                    $request->sale_date,
+                    $customer
+                ),
+                'note' => $request->note,
+            ]);
+        });
+    } catch (\Throwable $e) {
+        return back()->with(
+            'error',
+            $this->resolveSafeExceptionMessage(
+                $e,
+                [
+                    'Cancelled invoice cannot be edited.',
+                    'Sale date cannot be changed because this invoice has linked payment, return, or refund activity.',
+                    'Please activate financial year first.',
+                    'Sales Invoice belongs to another Financial Year.',
+                    'No active financial year found for selected sale date.',
+                ],
+                'Unable to update sales invoice.'
+            )
+        );
+    }
+
+    return redirect()
+        ->route('company.sales.index')
+        ->with('success', 'Sales invoice updated successfully.');
+}
+
+    protected function invoiceSaleDateIsLocked(
+        SalesInvoice $invoice,
+        int $companyId
+    ): bool {
+        if ((int) $invoice->status === 0) {
+            return true;
+        }
+
+        if (SalesPayment::where('company_id', $companyId)
+            ->where('sales_invoice_id', $invoice->id)
+            ->where('status', SalesPayment::STATUS_ACTIVE)
+            ->exists()) {
+            return true;
+        }
+
+        if (SalesReturn::where('company_id', $companyId)
+            ->where('sales_invoice_id', $invoice->id)
+            ->where('status', 1)
+            ->exists()) {
+            return true;
+        }
+
+        $returnIds = SalesReturn::where('company_id', $companyId)
+            ->where('sales_invoice_id', $invoice->id)
+            ->pluck('id');
+
+        if ($returnIds->isNotEmpty()
+            && SalesReturnRefund::where('company_id', $companyId)
+                ->whereIn('sales_return_id', $returnIds)
+                ->active()
+                ->exists()) {
+            return true;
+        }
+
+        if (SalesReturnRefundAdjustment::where('company_id', $companyId)
+            ->where('sales_invoice_id', $invoice->id)
+            ->where('status', 1)
+            ->exists()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    protected function calculateInvoiceDueDate(
+        string $saleDate,
+        Customer $customer
+    ): string {
+        return \Carbon\Carbon::parse($saleDate)
+            ->addDays(max(0, (int) $customer->credit_days))
+            ->toDateString();
+    }
+
+    protected function resolveSafeExceptionMessage(
+        \Throwable $e,
+        array $safeMessages,
+        string $fallback
+    ): string {
+        $message = $e->getMessage();
+
+        if (in_array($message, $safeMessages, true)) {
+            return $message;
+        }
+
+        if (str_ends_with($message, ' insufficient stock.')) {
+            return 'Insufficient stock available.';
+        }
+
+        return $fallback;
+    }
+
+    protected function logSaleException(
+        string $context,
+        \Throwable $e,
+        array $extra = []
+    ): void {
+        Log::error($context, array_merge([
+            'company_id' => auth()->user()->company_id ?? null,
+            'user_id'    => auth()->id(),
+            'exception'  => get_class($e),
+            'message'    => $e->getMessage(),
+        ], $extra));
+    }
 }

@@ -17,73 +17,46 @@ use App\Models\AccountTransaction;
 class AccountController extends Controller
 {
 
+    // 🔥 SHARED FILTERED QUERY
+    // Used by index(), print(), and any other action
+    // (e.g. summary totals) so the filter logic is
+    // defined in exactly one place.
+    private function filteredAccountQuery(Request $request)
+    {
+        $query = Account::where(
+            'company_id',
+            auth()->user()->company_id
+        )
+        ->where(
+            'status',
+            '!=',
+            'inactive'
+        );
+
+        if ($request->filled('search'))
+        {
+            $search = trim($request->search);
+
+            $query->where(function ($q) use ($search) {
+
+                $q->where('bank_name', 'like', "%{$search}%")
+                  ->orWhere('account_name', 'like', "%{$search}%")
+                  ->orWhere('account_no', 'like', "%{$search}%")
+                  ->orWhere('iban', 'like', "%{$search}%");
+            });
+        }
+
+        return $query;
+    }
+
 
 public function index(Request $request)
 {
 
-   $query = Account::where(
+    $totalCurrentBalance = $this->filteredAccountQuery($request)
+        ->sum('current_balance');
 
-'company_id',
-
-auth()->user()->company_id
-
-)
-
-->where(
-
-'status',
-
-'!=',
-
-'inactive'
-
-);
-
-
-    if($request->filled('search'))
-    {
-
-        $search = trim(
-            $request->search
-        );
-
-        $query->where(
-
-            function($q)
-            use($search){
-
-                $q->where(
-                    'bank_name',
-                    'like',
-                    "%{$search}%"
-                )
-
-                ->orWhere(
-                    'account_name',
-                    'like',
-                    "%{$search}%"
-                )
-
-                ->orWhere(
-                    'account_no',
-                    'like',
-                    "%{$search}%"
-                )
-
-                ->orWhere(
-                    'iban',
-                    'like',
-                    "%{$search}%"
-                );
-
-            }
-
-        );
-
-    }
-
-
-    $accounts = $query
+    $accounts = $this->filteredAccountQuery($request)
 
         ->latest()
 
@@ -97,7 +70,8 @@ auth()->user()->company_id
         'company.accounts.index',
 
         compact(
-            'accounts'
+            'accounts',
+            'totalCurrentBalance'
         )
 
     );
@@ -552,39 +526,63 @@ public function show($id)
 
 
 
-                  public function print()
-               {
+/* =====================
 
-                $accounts = Account::where(
+PRINT (LIST)
 
-'company_id',
+Reuses the SAME filteredAccountQuery() used by
+index(), so Print always reflects only the
+currently filtered accounts.
 
-auth()->user()->company_id
+===================== */
 
-)
+public function print(Request $request)
+{
+    $accounts = $this->filteredAccountQuery($request)
+        ->latest()
+        ->get();
 
-->where(
+    $totalAccounts = $accounts->count();
 
-'status',
+    $totalOpeningBalance = $accounts->sum('opening_balance');
 
-'!=',
+    $totalCurrentBalance = $accounts->sum('current_balance');
 
-'inactive'
+    return view(
+        'company.accounts.print',
+        compact(
+            'accounts',
+            'totalAccounts',
+            'totalOpeningBalance',
+            'totalCurrentBalance'
+        )
+    );
+}
 
-)
 
-->latest()
+/* =====================
 
-->get();
+PRINT PROFILE
 
+Reuses the existing show.blade.php view with
+$print = true, exactly like the Customer and
+Supplier modules.
 
-                            return view(
+===================== */
 
-                          'company.accounts.print',
+public function printProfile($id)
+{
+    $companyId = auth()->user()->company_id;
 
-                            compact('accounts')
-                          );
+    $account = Account::where('company_id', $companyId)
+        ->findOrFail($id);
 
-             }
+    $print = true;
+
+    return view(
+        'company.accounts.show',
+        compact('account', 'print')
+    );
+}
 
 }

@@ -19,6 +19,7 @@ class Customer extends Model
         'address',
         'tax_no',
         'opening_balance',
+        'credit_days',
         'current_balance',
         'bank_name',
         'bank_account_no',

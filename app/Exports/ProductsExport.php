@@ -13,10 +13,13 @@ class ProductsExport implements FromCollection
 
     protected $stockFilter;
 
+    protected $brandId;
+
     public function __construct(
         $companyId,
         $search = null,
-        $stockFilter = null
+        $stockFilter = null,
+        $brandId = null
     ) {
 
         $this->companyId =
@@ -27,6 +30,9 @@ class ProductsExport implements FromCollection
 
         $this->stockFilter =
             $stockFilter;
+
+        $this->brandId =
+            $brandId;
     }
 
     public function collection()
@@ -97,6 +103,16 @@ $q->where(
                 'current_stock',
                 '>',
                 0
+            );
+        }
+
+        // BRAND FILTER
+
+        if ($this->brandId)
+        {
+            $query->where(
+                'brand_id',
+                $this->brandId
             );
         }
 

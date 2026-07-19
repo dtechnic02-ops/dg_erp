@@ -11,251 +11,176 @@ use App\Models\AccountTransaction;
 class AccountTransactionController extends Controller
 {
     public function index(Request $request)
-{
-    $companyId = auth()->user()->company_id;
-
-    /*
-    |--------------------------------------------------------------------------
-    | ACTIVE FINANCIAL YEAR
-    |--------------------------------------------------------------------------
-    */
-
-    $activeFy = FinancialYear::where(
-        'company_id',
-        $companyId
-    )
-    ->where(
-        'is_active',
-        1
-    )
-    ->first();
-
-    $financialYears = FinancialYear::where(
-        'company_id',
-        $companyId
-    )
-    ->orderByDesc(
-        'start_date'
-    )
-    ->get();
-
-    /*
-    |--------------------------------------------------------------------------
-    | QUERY
-    |--------------------------------------------------------------------------
-    */
-
-    $query = AccountTransaction::with(
-        'account'
-    )
-    ->where(
-        'company_id',
-        $companyId
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | DEFAULT FILTER
-    |--------------------------------------------------------------------------
-    */
-
-    $financialYearId =
-        $request->financial_year_id
-        ?? $activeFy?->id;
-
-    $startDate =
-        $activeFy?->start_date;
-
-    $endDate =
-        $activeFy?->end_date;
-
-    /*
-    |--------------------------------------------------------------------------
-    | DATE RANGE OVERRIDE
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        $request->filled('start_date') ||
-        $request->filled('end_date')
-    )
     {
-        $financialYearId = 'all';
+        $companyId = auth()->user()->company_id;
 
-        $startDate =
-            $request->start_date;
-
-        $endDate =
-            $request->end_date;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | FINANCIAL YEAR FILTER
-    |--------------------------------------------------------------------------
-    */
-
-    elseif (
-        $request->filled('financial_year_id') &&
-        $request->financial_year_id != 'all'
-    )
-    {
-        $query->where(
-            'financial_year_id',
-            $request->financial_year_id
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | SEARCH
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        $request->filled('search')
-    )
-    {
-        $query->where(function ($q) use ($request) {
-
-            $q->where(
-                'voucher_no',
-                'like',
-                '%' . $request->search . '%'
-            )
-
-            ->orWhere(
-                'reference_no',
-                'like',
-                '%' . $request->search . '%'
-            )
-
-            ->orWhere(
-                'note',
-                'like',
-                '%' . $request->search . '%'
-            );
-
-        });
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | ACCOUNT FILTER
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        $request->filled('account_id')
-    )
-    {
-        $query->where(
-            'account_id',
-            $request->account_id
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | STATUS FILTER
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        $request->filled('status')
-    )
-    {
-        $query->where(
-            'status',
-            $request->status
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | DATE FILTER
-    |--------------------------------------------------------------------------
-    */
-
-    if ($startDate)
-    {
-        $query->whereDate(
-            'transaction_date',
-            '>=',
-            $startDate
-        );
-    }
-
-    if ($endDate)
-    {
-        $query->whereDate(
-            'transaction_date',
-            '<=',
-            $endDate
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | DATA
-    |--------------------------------------------------------------------------
-    */
-
-    $transactions = $query
-        ->latest()
-        ->paginate(20)
-        ->withQueryString();
-
-    /*
-    |--------------------------------------------------------------------------
-    | SUMMARY
-    |--------------------------------------------------------------------------
-    */
-
-    $summary = [
-'total_debit' => $query->clone()
-    ->sum('debit'),
-
-        'total_credit' => $query->clone()
-    ->sum('credit'),
-
-       'total_transactions' =>
-$query->clone()->count(),
-
-    ];
-
-    /*
-    |--------------------------------------------------------------------------
-    | ACCOUNTS
-    |--------------------------------------------------------------------------
-    */
-
-    $accounts = Account::where(
-        'company_id',
-        $companyId
-    )
-    ->where(
-        'status',
-        1
-    )
-    ->orderBy(
-        'account_name'
-    )
-    ->get();
-
-    return view(
-        'company.account-transaction.index',
-        compact(
-            'transactions',
-            'accounts',
-            'summary',
-            'financialYears',
-            'financialYearId',
-            'startDate',
-            'endDate'
+        $activeFy = FinancialYear::where(
+            'company_id',
+            $companyId
         )
-    );
-}
+        ->where(
+            'is_active',
+            1
+        )
+        ->first();
+
+        $financialYears = FinancialYear::where(
+            'company_id',
+            $companyId
+        )
+        ->latest('id')
+        ->get();
+
+        $query = AccountTransaction::with(
+            'account'
+        )
+        ->where(
+            'company_id',
+            $companyId
+        );
+
+        if ($request->search)
+        {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+
+                $q->where(
+                    'voucher_no',
+                    'like',
+                    '%' . $search . '%'
+                )
+
+                ->orWhere(
+                    'reference_no',
+                    'like',
+                    '%' . $search . '%'
+                )
+
+                ->orWhere(
+                    'note',
+                    'like',
+                    '%' . $search . '%'
+                );
+
+            });
+        }
+
+        if ($request->account_id)
+        {
+            $query->where(
+                'account_id',
+                $request->account_id
+            );
+        }
+
+        if (!$request->has('status'))
+        {
+            $query->where(
+                'status',
+                1
+            );
+        }
+        elseif ($request->filled('status'))
+        {
+            $query->where(
+                'status',
+                $request->status
+            );
+        }
+
+        if (!$request->has('financial_year_id'))
+        {
+            if ($activeFy)
+            {
+                $query->where(
+                    'financial_year_id',
+                    $activeFy->id
+                );
+
+                $startDate = $activeFy->start_date;
+                $endDate   = $activeFy->end_date;
+            }
+            else
+            {
+                $startDate = null;
+                $endDate   = null;
+            }
+        }
+        else
+        {
+            if ($request->financial_year_id)
+            {
+                $query->where(
+                    'financial_year_id',
+                    $request->financial_year_id
+                );
+            }
+
+            $startDate = $request->start_date;
+            $endDate   = $request->end_date;
+        }
+
+        if ($startDate)
+        {
+            $query->whereDate(
+                'transaction_date',
+                '>=',
+                $startDate
+            );
+        }
+
+        if ($endDate)
+        {
+            $query->whereDate(
+                'transaction_date',
+                '<=',
+                $endDate
+            );
+        }
+
+        $perPage = in_array((int) $request->per_page, [10, 25, 50, 100], true)
+            ? (int) $request->per_page
+            : 10;
+
+        $transactions = $query
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $summary = [
+            'total_debit' => (clone $query)->sum('debit'),
+            'total_credit' => (clone $query)->sum('credit'),
+            'total_transactions' => (clone $query)->count(),
+        ];
+
+        $accounts = Account::where(
+            'company_id',
+            $companyId
+        )
+        ->where(
+            'status',
+            1
+        )
+        ->orderBy(
+            'account_name'
+        )
+        ->get();
+
+        return view(
+            'company.account-transaction.index',
+            compact(
+                'transactions',
+                'accounts',
+                'summary',
+                'financialYears',
+                'activeFy',
+                'startDate',
+                'endDate',
+                'perPage'
+            )
+        );
+    }
    public function show($id)
 {
     $transaction =

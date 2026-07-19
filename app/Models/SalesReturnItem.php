@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Product;
+use App\Models\Service;
 
 class SalesReturnItem extends Model
 {
@@ -19,6 +20,8 @@ protected $fillable = [
     'sales_item_id',
 
     'product_id',
+
+    'service_id',
 
     'quantity',
 
@@ -48,6 +51,15 @@ Product::class,
 );
 
 }
+
+public function service()
+{
+    return $this->belongsTo(
+        Service::class,
+        'service_id'
+    );
+}
+
 public function salesItem()
 {
     return $this->belongsTo(

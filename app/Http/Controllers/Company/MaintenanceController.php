@@ -7,6 +7,7 @@ use App\Services\AccountBalanceService;
 use App\Services\StockService;
 use App\Services\PurchaseService;
 use App\Services\SupplierBalanceService;
+use App\Services\CustomerStatementService;
 class MaintenanceController extends Controller
 {
     /*
@@ -86,6 +87,32 @@ public function recalculateSupplierBalance()
         'Supplier Balance Recalculated Successfully.'
     );
 }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RECALCULATE CUSTOMER STATEMENT
+    |--------------------------------------------------------------------------
+    */
+    public function recalculateCustomerStatement()
+    {
+        $summary = CustomerStatementService::recalculateAll(
+            auth()->user()->company_id,
+            auth()->id()
+        );
+
+        $message = sprintf(
+            'Customer Statement Recalculated. Customers Processed: %d. Statements Recalculated: %d. Errors: %d.',
+            $summary['total_customers_processed'],
+            $summary['total_statements_recalculated'],
+            $summary['total_errors']
+        );
+
+        if ($summary['total_errors'] > 0) {
+            return back()->with('warning', $message);
+        }
+
+        return back()->with('success', $message);
+    }
 
     
 }

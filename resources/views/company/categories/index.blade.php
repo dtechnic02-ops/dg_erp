@@ -2,497 +2,174 @@
 
 @section('content')
 
-<div class="page-title">
+<div class="dg-page">
 
-<h3>
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center gap-2">
 
-📂 Product Categories
+                <div class="flex-fill">
+                    <h1 class="h4 mb-0">Product Categories</h1>
+                </div>
 
-</h3>
+                <div class="flex-shrink-0">
+                    <div class="dg-summary mb-0">
+                        <div class="dg-summary-item mb-0">
+                            <span>Total Categories</span>
+                            <span class="fw-bold">{{ $totalCategories }}</span>
+                        </div>
+                    </div>
+                </div>
 
+                <div class="flex-fill d-flex justify-content-end align-items-center gap-2">
+                    <form method="GET" class="d-flex gap-2">
+                        <label for="search" class="visually-hidden">Search Category</label>
+                        <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Search Category" class="form-control dg-input">
+                        <button type="submit" class="btn btn-primary dg-btn">Search</button>
+                    </form>
 
-<div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ route('company.categories.print', request()->query()) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
 
-<form
+                    <button type="button" class="btn btn-success dg-btn" data-bs-toggle="modal" data-bs-target="#categoryModal">Add Category</button>
+                </div>
 
-method="GET"
+            </div>
+        </div>
+    </header>
 
-action="{{ route(
-'company.categories.index'
-) }}"
+    <main class="dg-container">
+        <div class="container-fluid">
 
-class="d-flex gap-2">
+            <section class="dg-section">
+                <article class="card dg-card">
+                    <header class="card-header dg-card-header">
+                        <h2 class="h6 mb-0">Category List</h2>
+                    </header>
 
-<input
+                    <div class="card-body dg-card-body">
+                        <form method="GET" class="d-flex justify-content-end align-items-center gap-2 mb-2">
+                            <input type="hidden" name="search" value="{{ request('search') }}">
 
-name="search"
+                            <label for="per_page" class="mb-0 fw-bold">Show</label>
+                            <select name="per_page" id="per_page" class="form-select form-select-sm dg-select w-auto" onchange="this.form.submit()">
+                                <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
+                                <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
+                                <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
+                                <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
+                                <option value="200" {{ $perPage == 200 ? 'selected' : '' }}>200</option>
+                                <option value="500" {{ $perPage == 500 ? 'selected' : '' }}>500</option>
+                            </select>
+                        </form>
 
-value="{{ request('search') }}"
+                        <div class="table-responsive">
+                            <table class="table dg-table">
+                                <thead class="dg-head">
+                                    <tr>
+                                        <th scope="col">Category Name</th>
+                                        <th scope="col">Description</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col" width="170">Action</th>
+                                    </tr>
+                                </thead>
 
-placeholder="Search"
+                                <tbody class="dg-body">
+                                    @forelse ($categories as $cat)
+                                        <tr class="dg-row">
+                                            <td>{{ $cat->name }}</td>
+                                            <td>{{ $cat->description ?: '-' }}</td>
+                                            <td>
+                                                @if ($cat->status == 'active')
+                                                    <span class="badge bg-success">Active</span>
+                                                @else
+                                                    <span class="badge bg-secondary">Inactive</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group" aria-label="Category actions">
+                                                    <button type="button" class="btn btn-sm btn-outline-success dg-btn" data-bs-toggle="modal" data-bs-target="#edit{{ $cat->id }}">Edit</button>
 
-class="erp-input">
+                                                    <form method="POST" action="{{ route('company.categories.delete', $cat->id) }}" class="d-inline">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger dg-btn" onclick="return confirm('Delete Category?')">Delete</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr class="dg-row">
+                                            <td colspan="4" class="text-center">No Categories Found</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
 
+                        <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+                            <p class="mb-0 text-muted">
+                                Showing {{ $categories->firstItem() ?? 0 }} to {{ $categories->lastItem() ?? 0 }} of {{ $categories->total() }} records
+                            </p>
 
-<button
+                            <nav aria-label="Category list pagination">
+                                {{ $categories->links() }}
+                            </nav>
+                        </div>
+                    </div>
+                </article>
+            </section>
 
-class="erp-btn btn-blue">
-
-Search
-
-</button>
-
-</form>
-
-
-
-<button
-
-class="erp-btn btn-blue"
-
-data-bs-toggle="modal"
-
-data-bs-target="#categoryModal">
-
-+ Add Category
-
-</button>
+        </div>
+    </main>
 
 </div>
 
-</div>
-
-
-
-
-<div class="card-box">
-
-<div class="table-responsive">
-
-<table class="erp-table">
-
-<thead>
-
-<tr>
-
-<th>
-
-Name
-
-</th>
-
-<th>
-
-Description
-
-</th>
-
-<th width="180">
-
-Action
-
-</th>
-
-</tr>
-
-</thead>
-
-
-<tbody>
-
-@forelse($categories as $cat)
-
-<tr>
-
-<td>
-
-{{ $cat->name }}
-
-</td>
-
-<td>
-
-{{ $cat->description ?? '-' }}
-
-</td>
-
-<td>
-
-<div class="action-box">
-
-
-<button
-
-class="erp-btn btn-green"
-
-data-bs-toggle="modal"
-
-data-bs-target="#editModal{{ $cat->id }}">
-
-Edit
-
-</button>
-
-
-
-<form
-
-method="POST"
-
-action="{{ route(
-'company.categories.delete',
-$cat->id
-) }}">
-
-@csrf
-<button
-
-type="submit"
-
-class="erp-btn btn-red"
-
-onclick="return confirm('Delete Category?')"
-
->
-
-Delete
-
-
-
-</button>
-
-</form>
-
-</div>
-
-</td>
-
-</tr>
-
-@empty
-
-<tr>
-
-<td colspan="3">
-
-No Categories Found
-
-</td>
-
-</tr>
-
-@endforelse
-
-</tbody>
-
-</table>
-
-</div>
-
-
-<div class="mt-3">
-
-{{ $categories->links() }}
-
-</div>
-
-</div>
-
-
-
-
-<!-- EDIT MODALS -->
-
-@foreach($categories as $cat)
-
-<div
-
-class="modal fade"
-
-id="editModal{{ $cat->id }}"
-
-tabindex="-1">
-
-<div class="modal-dialog">
-
-<div class="modal-content">
-
-<form
-
-method="POST"
-
-action="{{ route(
-'company.categories.update',
-$cat->id
-) }}">
-
-@csrf
-
-
-<div class="modal-header">
-
-<h5>
-
-Edit Category
-
-</h5>
-
-<button
-
-type="button"
-
-class="btn-close"
-
-data-bs-dismiss="modal">
-
-</button>
-
-</div>
-
-
-
-<div class="modal-body">
-
-
-<div class="form-group">
-
-<label class="form-label">
-
-Category Name
-
-</label>
-
-<input
-
-name="name"
-
-class="form-input"
-
-value="{{ $cat->name }}"
-
-required>
-
-</div>
-
-
-<div class="form-group mt-3">
-
-<label class="form-label">
-
-Description
-
-</label>
-
-<textarea
-
-name="description"
-
-class="form-input"
-
-rows="3">{{ $cat->description }}</textarea>
-
-</div>
-
-</div>
-
-
-
-<div class="modal-footer">
-
-<button
-
-type="button"
-
-class="erp-btn btn-gray"
-
-data-bs-dismiss="modal">
-
-Close
-
-</button>
-
-
-<button
-
-class="erp-btn btn-blue">
-
-Update
-
-</button>
-
-</div>
-
-</form>
-
-</div>
-
-</div>
-
-</div>
-
+{{-- Edit Category Modals --}}
+@foreach ($categories as $cat)
+    <div class="modal fade" id="edit{{ $cat->id }}" tabindex="-1" aria-labelledby="editCategoryLabel{{ $cat->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('company.categories.update', $cat->id) }}">
+                    @csrf
+
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editCategoryLabel{{ $cat->id }}">Edit Category</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        @include('company.categories.form', ['category' => $cat])
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary dg-btn">Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @endforeach
 
+{{-- Add Category Modal --}}
+<div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="addCategoryLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="{{ route('company.categories.store') }}">
+                @csrf
 
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addCategoryLabel">Add Category</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
 
+                <div class="modal-body">
+                    @include('company.categories.form')
+                </div>
 
-
-<!-- ADD MODAL -->
-
-<div
-
-class="modal fade"
-
-id="categoryModal"
-
-tabindex="-1">
-
-<div class="modal-dialog">
-
-<div class="modal-content">
-
-<form
-
-method="POST"
-
-id="categoryForm"
-
-action="{{ route(
-'company.categories.store'
-) }}">
-
-@csrf
-
-
-
-<div class="modal-header">
-
-<h5>
-
-Add Category
-
-</h5>
-
-<button
-
-type="button"
-
-class="btn-close"
-
-data-bs-dismiss="modal">
-
-</button>
-
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary dg-btn">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
-
-
-
-<div class="modal-body">
-
-
-<div class="form-group">
-
-<label class="form-label">
-
-Category Name
-
-</label>
-
-<input
-
-name="name"
-
-class="form-input"
-
-required>
-
-</div>
-
-
-
-<div class="form-group mt-3">
-
-<label class="form-label">
-
-Description
-
-</label>
-
-<textarea
-
-name="description"
-
-class="form-input"
-
-rows="3"></textarea>
-
-</div>
-
-</div>
-
-
-
-<div class="modal-footer">
-
-<button
-
-type="button"
-
-class="erp-btn btn-gray"
-
-data-bs-dismiss="modal">
-
-Close
-
-</button>
-
-
-<button
-
-type="submit"
-
-id="categorySubmitBtn"
-
-class="erp-btn btn-blue">
-
-Save
-
-</button>
-
-</div>
-
-
-</form>
-
-</div>
-</div>
-
-<script>
-
-document
-.getElementById(
-'categoryForm'
-)
-
-.addEventListener(
-
-'submit',
-
-function(){
-
-const btn =
-
-document.getElementById(
-'categorySubmitBtn'
-);
-
-btn.disabled=true;
-
-btn.innerText='Saving...';
-
-}
-
-);
-
-</script>
 
 @endsection

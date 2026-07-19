@@ -3,100 +3,94 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Customer;
-use App\Models\SalesInvoice;
-use App\Models\SalesReturnItem;
 
 class SalesReturn extends Model
 {
     protected $fillable = [
+        'company_id',
+        'financial_year_id',
+        'sales_invoice_id',
+        'customer_id',
+        'return_no',
+        'return_date',
+        'subtotal',
+        'total_vat',
+        'grand_total',
+        'adjust_amount',
+        'refund_amount',
+        'note',
+        'damage_photo',
+        'created_by',
+        'status',
+    ];
 
-    'company_id',
-'financial_year_id',
-    'sales_invoice_id',
+    protected $casts = [
+        'return_date'   => 'date',
+        'subtotal'      => 'decimal:2',
+        'total_vat'     => 'decimal:2',
+        'grand_total'   => 'decimal:2',
+        'adjust_amount' => 'decimal:2',
+        'refund_amount' => 'decimal:2',
+        'status'        => 'integer',
+    ];
 
-    'customer_id',
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
+    }
 
-    'return_no',
+    public function invoice()
+    {
+        return $this->belongsTo(
+            SalesInvoice::class,
+            'sales_invoice_id'
+        );
+    }
 
-    'return_date',
+    public function refunds()
+    {
+        return $this->hasMany(
+            SalesReturnRefund::class,
+            'sales_return_id'
+        );
+    }
 
-    'subtotal',
+    public function items()
+    {
+        return $this->hasMany(
+            SalesReturnItem::class,
+            'sales_return_id'
+        );
+    }
 
-    'total_vat',
+    public function financialYear()
+    {
+        return $this->belongsTo(FinancialYear::class);
+    }
 
-    'grand_total',
+    public function getRefundedAmountAttribute(): float
+    {
+        return (float) ($this->attributes['adjust_amount'] ?? 0);
+    }
 
-    'note',
+    public function getRemainingAmountAttribute(): float
+    {
+        return (float) ($this->attributes['refund_amount'] ?? 0);
+    }
 
-    'damage_photo',
+    public function getRefundStatusAttribute(): string
+    {
+        $refunded = (float) $this->refunded_amount;
+        $remaining = (float) $this->remaining_amount;
 
-    'created_by',
+        if ($refunded <= 0) {
+            return 'Unpaid';
+        }
 
-    'status',
+        if ($remaining <= 0) {
+            return 'Paid';
+        }
 
-];
-    /**
- * 🔥 CUSTOMER
- */
-
-             public function customer()
-     {
-    return $this->belongsTo(
-        Customer::class
-    );
-       }
-    /**
- * 🔥 SALES INVOICE
- */
-
-public function invoice()
-{
-    return $this->belongsTo(
-        SalesInvoice::class,
-        'sales_invoice_id'
-    );
-} 
-
-public function refunds()
-{
-
-return $this->hasMany(
-
-SalesReturnRefund::class,
-
-'sales_return_id'
-
-);
-
-}
-
-
-
-/**
- * RETURN ITEMS
- */
-
-public function items()
-{
-
-return $this->hasMany(
-
-SalesReturnItem::class,
-
-'sales_return_id'
-
-);
-
-}
-public function financialYear()
-{
-    return $this->belongsTo(
-        FinancialYear::class
-    );
-}
-
-
-
-
+        return 'Partial';
+    }
 }

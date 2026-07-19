@@ -6,16 +6,17 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\ProductCategory;
+use App\Services\ValidationService;
 
 class ProductCategoryController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
-    | CATEGORY LIST
+    | FILTERED QUERY (shared by index() and print())
     |--------------------------------------------------------------------------
     */
 
-    public function index(Request $request)
+    private function filteredCategoryQuery(Request $request)
     {
         $query = ProductCategory::company();
 
@@ -30,14 +31,46 @@ class ProductCategoryController extends Controller
             );
         }
 
-        $categories = $query
+        return $query;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CATEGORY LIST
+    |--------------------------------------------------------------------------
+    */
+
+    public function index(Request $request)
+    {
+        $totalCategories = $this->filteredCategoryQuery($request)->count();
+
+        /* =====================
+
+        PER PAGE (MASTER PAGINATION)
+
+        Allowed values only.
+        Any other value falls back to 10.
+
+        ===================== */
+
+        $allowedPerPage = [10, 25, 50, 100, 200, 500];
+
+        $perPage = (int) $request->get('per_page', 10);
+
+        if (!in_array($perPage, $allowedPerPage)) {
+
+            $perPage = 10;
+
+        }
+
+        $categories = $this->filteredCategoryQuery($request)
             ->latest()
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view(
             'company.categories.index',
-            compact('categories')
+            compact('categories', 'totalCategories', 'perPage')
         );
     }
 
@@ -58,17 +91,17 @@ class ProductCategoryController extends Controller
                 'required',
                 'max:255',
 
-                'unique:product_categories,name,NULL,id,company_id,' .
-                $companyId
+                ValidationService::uniquePerCompany(
+                    'product_categories',
+                    'name',
+                    $companyId
+                ),
 
             ],
 
-            'description' => [
+            'description' => ValidationService::text(1000),
 
-                'nullable',
-                'max:1000'
-
-            ]
+            'status' => ValidationService::enum(['active', 'inactive']),
 
         ]);
 
@@ -88,7 +121,7 @@ $validated['description'] ?? ''
 ),
 
 'status'=>
-ProductCategory::STATUS_ACTIVE
+$validated['status'] ?? ProductCategory::STATUS_ACTIVE
 
 ]
 
@@ -120,19 +153,18 @@ ProductCategory::STATUS_ACTIVE
                 'required',
                 'max:255',
 
-                'unique:product_categories,name,' .
-                $id .
-                ',id,company_id,' .
-                $companyId
+                ValidationService::uniquePerCompany(
+                    'product_categories',
+                    'name',
+                    $companyId,
+                    $id
+                ),
 
             ],
 
-            'description' => [
+            'description' => ValidationService::text(1000),
 
-                'nullable',
-                'max:1000'
-
-            ]
+            'status' => ValidationService::enum(['active', 'inactive']),
 
         ]);
 
@@ -147,7 +179,9 @@ ProductCategory::STATUS_ACTIVE
 
             'description' => trim(
                 $validated['description'] ?? ''
-            )
+            ),
+
+            'status' => $validated['status'] ?? $category->status,
 
         ]);
 
@@ -165,27 +199,22 @@ ProductCategory::STATUS_ACTIVE
 
     public function destroy($id)
     {
-        DB::transaction(function () use ($id) {
+        $category = ProductCategory::company()
+            ->findOrFail($id);
 
-            $category = ProductCategory::company()
-                ->findOrFail($id);
+        if (
+            $category
+                ->products()
+                ->exists()
+        ) {
 
-            if (
-                method_exists(
-                    $category,
-                    'products'
-                )
-                &&
-                $category
-                    ->products()
-                    ->exists()
-            ) {
+            return back()->with(
+                'error',
+                'Category cannot be deleted because it is already used by one or more Products.'
+            );
+        }
 
-                abort(
-                    422,
-                    'Category is being used by products'
-                );
-            }
+        DB::transaction(function () use ($category) {
 
             $category->delete();
         });
@@ -195,5 +224,24 @@ ProductCategory::STATUS_ACTIVE
             'Category Deleted Successfully'
         );
     }
-}
 
+    /*
+    |--------------------------------------------------------------------------
+    | CATEGORY LIST PRINT
+    |--------------------------------------------------------------------------
+    */
+
+    public function print(Request $request)
+    {
+        $categories = $this->filteredCategoryQuery($request)
+            ->latest()
+            ->get();
+
+        $totalCategories = $categories->count();
+
+        return view(
+            'company.categories.print',
+            compact('categories', 'totalCategories')
+        );
+    }
+}

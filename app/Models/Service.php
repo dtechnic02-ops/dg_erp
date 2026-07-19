@@ -10,34 +10,20 @@ class Service extends Model
     use HasFactory;
 
     protected $fillable = [
-
         'company_id',
-         'financial_year_id',
-
+        'financial_year_id',
         'service_category_id',
-
         'name',
-
         'service_code',
-
         'slug',
-
         'price',
-
         'vat_id',
-
         'upload_path',
-
         'description',
-
         'status',
-
         'created_by',
     ];
 
-    /**
-     * CATEGORY
-     */
     public function category()
     {
         return $this->belongsTo(
@@ -46,14 +32,19 @@ class Service extends Model
         );
     }
 
-    /**
-     * VAT
-     */
     public function vat()
     {
         return $this->belongsTo(
             Vat::class,
             'vat_id'
+        );
+    }
+
+    public function salesItems()
+    {
+        return $this->hasMany(
+            SalesItem::class,
+            'service_id'
         );
     }
 }

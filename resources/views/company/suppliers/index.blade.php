@@ -12,55 +12,56 @@ href="{{ asset(
 
 @section('content')
 
-<div class="page-title">
+<div class="dg-page">
 
-<h3>
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center gap-2">
 
-🏢 Supplier Management
+                <div class="flex-fill">
+                    <h1 class="h4 mb-0">Supplier Management</h1>
+                </div>
 
-</h3>
+                <div class="flex-shrink-0">
+                    <div class="dg-summary mb-0">
+                        <div class="dg-summary-item mb-0">
+                            <span>Total Current Balance</span>
+                            <span class="fw-bold">{{ number_format($totalCurrentBalance, 2) }}</span>
+                        </div>
+                    </div>
+                </div>
 
-<div class="d-flex gap-2 flex-wrap">
+                <div class="flex-fill d-flex justify-content-end align-items-center gap-2">
+                    <form method="GET" class="d-flex gap-2">
+                        <label for="search" class="visually-hidden">Search Supplier</label>
+                        <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Search Supplier" class="form-control dg-input">
+                        <button type="submit" class="btn btn-primary dg-btn">Search</button>
+                    </form>
 
-<form
-method="GET"
-class="d-flex gap-2">
+                    <a href="{{ route('company.suppliers.print', request()->query()) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
 
-<input
-name="search"
-value="{{ request('search') }}"
-placeholder="Search Supplier"
-class="erp-input">
+                    <button type="button" class="btn btn-success dg-btn" data-bs-toggle="modal" data-bs-target="#supplierModal">Add Supplier</button>
+                </div>
 
-<button
-class="erp-btn btn-blue">
+            </div>
+        </div>
+    </header>
 
-Search
+<main class="dg-container">
+<div class="container-fluid">
 
-</button>
+<section class="dg-section">
+<article class="card dg-card">
 
-</form>
+<header class="card-header dg-card-header">
+<h2 class="h6 mb-0">Supplier List</h2>
+</header>
 
-
-
-<button
-class="erp-btn btn-green"
-data-bs-toggle="modal"
-data-bs-target="#supplierModal">
-
-+ Add Supplier
-
-</button>
-
-</div>
-
-</div>
-
-<div class="card-box">
+<div class="card-body dg-card-body">
 
 <div class="table-responsive">
 
-<table class="erp-table">
+<table class="table dg-table">
 
 <thead>
 
@@ -91,7 +92,9 @@ data-bs-target="#supplierModal">
 
 <img
 src="{{ asset($s->image_path) }}"
-class="erp-image">
+alt="{{ $s->name }}"
+width="40"
+height="40">
 
 @endif
 
@@ -118,7 +121,7 @@ $s->current_balance,
 
 @if($s->status=='active')
 
-<span class="stock stock-ok">
+<span class="badge bg-success">
 
 Active
 
@@ -126,7 +129,7 @@ Active
 
 @else
 
-<span class="stock stock-out">
+<span class="badge bg-secondary">
 
 Inactive
 
@@ -137,10 +140,11 @@ Inactive
 </td>
 
 <td>
-<div class="action-box">
+<div class="btn-group dg-action" role="group" aria-label="Supplier actions">
 
     <button
-        class="erp-btn btn-green"
+        type="button"
+        class="btn btn-sm btn-outline-success dg-btn"
         data-bs-toggle="modal"
         data-bs-target="#edit{{ $s->id }}">
 
@@ -149,15 +153,17 @@ Inactive
     </button>
 
     <a href="{{ route('company.supplier-ledger.index', $s->id) }}"
-       class="erp-btn btn-blue">
+       class="btn btn-sm btn-outline-secondary dg-btn">
 
         <i class="fas fa-book"></i>
 
         Ledger
 
-  <a
+    </a>
+
+    <a
 href="{{ route('company.suppliers.show', $s->id) }}"
-class="btn btn-info btn-sm">
+class="btn btn-sm btn-outline-info dg-btn">
 
 <i class="fas fa-eye"></i>
  Show
@@ -165,12 +171,14 @@ class="btn btn-info btn-sm">
 
     <form
         method="POST"
-        action="{{ route('company.suppliers.delete', $s->id) }}">
+        action="{{ route('company.suppliers.delete', $s->id) }}"
+        class="d-inline">
 
         @csrf
 
         <button
-            class="erp-btn btn-red"
+            type="submit"
+            class="btn btn-sm btn-outline-danger dg-btn"
             onclick="return confirm('Delete Supplier?')">
 
             Delete
@@ -205,13 +213,19 @@ No Suppliers Found
 
 </div>
 
-<div class="mt-3">
+<nav aria-label="Supplier list pagination" class="mt-3">
 
 {{ $suppliers->links() }}
 
-</div>
+</nav>
 
 </div>
+
+</article>
+</section>
+
+</div>
+</main>
 
 
 {{-- Edit Modals --}}
@@ -267,7 +281,8 @@ data-bs-dismiss="modal">
 <div class="modal-footer">
 
 <button
-class="erp-btn btn-blue">
+type="submit"
+class="btn btn-primary dg-btn">
 
 Update
 
@@ -333,7 +348,8 @@ data-bs-dismiss="modal">
 <div class="modal-footer">
 
 <button
-class="erp-btn btn-blue">
+type="submit"
+class="btn btn-primary dg-btn">
 
 Save
 
@@ -342,6 +358,8 @@ Save
 </div>
 
 </form>
+
+</div>
 
 </div>
 

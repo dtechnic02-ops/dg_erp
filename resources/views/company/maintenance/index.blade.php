@@ -113,6 +113,39 @@
 
     </div>
 
+    <div class="col-md-4 mb-3">
+
+        <div class="card">
+
+            <div class="card-body">
+
+                <h5>
+
+                    Customer Statement
+
+                </h5>
+
+                <form method="POST"
+                      action="{{ route('company.maintenance.recalculate.customer.statement') }}">
+
+                    @csrf
+
+                    <button
+                        class="erp-btn btn-blue"
+                        onclick="return confirm('Recalculate Customer Statement?')">
+
+                        Recalculate Customer Statement
+
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
 </div>
 
 @endsection

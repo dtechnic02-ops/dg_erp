@@ -9,37 +9,44 @@ class SalesItem extends Model
 {
     use HasFactory;
 
-  protected $fillable = [
+    protected $fillable = [
 
-    'created_by',
+        'created_by',
 
-    'company_id',
+        'company_id',
 
-    'financial_year_id',
+        'financial_year_id',
 
-    'sales_invoice_id',
+        'sales_invoice_id',
 
-    'item_type',
+        'item_type',
 
-    'product_id',
+        'product_id',
 
-    'service_id',
+        'service_id',
 
-    'quantity',
+        'quantity',
 
-    'returned_qty',
+        'returned_qty',
 
-    'unit_price',
+        'unit_price',
 
-    'vat_rate',
+        'vat_rate',
 
-    'vat_amount',
+        'vat_amount',
 
-    'total_price',
+        'total_price',
 
-];
+    ];
 
-    // INVOICE
+    protected $casts = [
+        'quantity'     => 'decimal:2',
+        'returned_qty' => 'decimal:2',
+        'unit_price'   => 'decimal:2',
+        'vat_rate'     => 'decimal:2',
+        'vat_amount'   => 'decimal:2',
+        'total_price'  => 'decimal:2',
+    ];
 
     public function invoice()
     {
@@ -49,14 +56,13 @@ class SalesItem extends Model
         );
     }
 
-    // PRODUCT
-
     public function product()
     {
         return $this->belongsTo(Product::class);
     }
+
     public function service()
-{
-    return $this->belongsTo(Service::class);
-}
+    {
+        return $this->belongsTo(Service::class);
+    }
 }

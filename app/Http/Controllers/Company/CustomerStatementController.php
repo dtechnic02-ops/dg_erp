@@ -217,53 +217,19 @@ class CustomerStatementController extends Controller
 
         /**
          * -----------------------------------------
-         * OPENING BALANCE
+         * OPENING BALANCE + RUNNING BALANCE
          * -----------------------------------------
          */
 
-        $openingBalance = 0;
+        $statementBalances = $this->buildStatementBalances(
+            $companyId,
+            $request,
+            $query,
+            $startDate
+        );
 
-        if (!empty($startDate))
-        {
-            $openingTransaction = CustomerTransaction::where(
-                'company_id',
-                $companyId
-            )
-            ->where(
-                'status',
-                1
-            )
-
-            ->when(
-                $request->filled('customer_id'),
-                function ($q) use ($request) {
-
-                    $q->where(
-                        'customer_id',
-                        $request->customer_id
-                    );
-
-                }
-            )
-
-            ->whereDate(
-                'transaction_date',
-                '<',
-                $startDate
-            )
-
-            ->orderByDesc('transaction_date')
-
-            ->orderByDesc('id')
-
-            ->first();
-
-            if ($openingTransaction)
-            {
-                $openingBalance =
-                    $openingTransaction->balance;
-            }
-        }
+        $openingBalance = $statementBalances['opening'];
+        $closingBalance = $statementBalances['closing'];
 
         /**
          * -----------------------------------------
@@ -276,13 +242,8 @@ class CustomerStatementController extends Controller
         $totalRecords =
             $summaryQuery->count();
 
-        $totalDebit =
-            (clone $summaryQuery)
-                ->sum('debit');
-
-        $totalCredit =
-            (clone $summaryQuery)
-                ->sum('credit');
+        $totalDebit = $statementBalances['totalDebit'];
+        $totalCredit = $statementBalances['totalCredit'];
 
         /**
          * -----------------------------------------
@@ -304,6 +265,11 @@ class CustomerStatementController extends Controller
 
             ->withQueryString();
 
+        foreach ($transactions as $transaction) {
+            $transaction->balance = $statementBalances['balances'][$transaction->id]
+                ?? $openingBalance;
+        }
+
         /**
          * -----------------------------------------
          * FILTER DATA
@@ -323,11 +289,6 @@ class CustomerStatementController extends Controller
         )
         ->orderByDesc('start_date')
         ->get();
-
-        $closingBalance =
-            optional(
-                $transactions->last()
-            )->balance ?? $openingBalance;
 
         /**
          * -----------------------------------------
@@ -365,5 +326,165 @@ class CustomerStatementController extends Controller
 
             )
         );
+    }
+
+    protected function buildStatementBalances(
+        int $companyId,
+        Request $request,
+        $query,
+        ?string $startDate
+    ): array {
+        $summaryQuery = clone $query;
+
+        $transactionTotalsQuery = (clone $summaryQuery)->where(function ($q) {
+            $q->whereNull('reference_type')
+                ->orWhere('reference_type', '!=', 'opening_balance');
+        });
+
+        $totalDebit = round((float) (clone $transactionTotalsQuery)->sum('debit'), 2);
+        $totalCredit = round((float) (clone $transactionTotalsQuery)->sum('credit'), 2);
+
+        $periodStarts = $this->getCustomerPeriodStartBalances(
+            $companyId,
+            $request,
+            $startDate
+        );
+
+        $openingBalance = round(array_sum($periodStarts), 2);
+
+        if ($request->filled('customer_id')) {
+            $openingBalance = round(
+                $periodStarts[(int) $request->customer_id] ?? 0,
+                2
+            );
+        }
+
+        $orderedTransactions = (clone $query)
+            ->orderBy('transaction_date')
+            ->orderBy('id')
+            ->get(['id', 'customer_id', 'debit', 'credit']);
+
+        $customerRunning = [];
+        $balances = [];
+
+        foreach ($orderedTransactions as $transaction) {
+            $customerId = (int) $transaction->customer_id;
+
+            if (!array_key_exists($customerId, $customerRunning)) {
+                $customerRunning[$customerId] = $this->getCustomerPrePeriodLedgerNet(
+                    $companyId,
+                    $customerId,
+                    $request,
+                    $startDate
+                );
+            }
+
+            $customerRunning[$customerId] = round(
+                $customerRunning[$customerId]
+                + (float) $transaction->debit
+                - (float) $transaction->credit,
+                2
+            );
+
+            $balances[$transaction->id] = $customerRunning[$customerId];
+        }
+
+        $closingBalance = round(
+            $openingBalance + $totalDebit - $totalCredit,
+            2
+        );
+
+        return [
+            'opening'      => $openingBalance,
+            'closing'      => $closingBalance,
+            'totalDebit'   => $totalDebit,
+            'totalCredit'  => $totalCredit,
+            'balances'     => $balances,
+        ];
+    }
+
+    protected function getCustomerPeriodStartBalances(
+        int $companyId,
+        Request $request,
+        ?string $startDate
+    ): array {
+        $customersQuery = Customer::where('company_id', $companyId);
+
+        if ($request->filled('customer_id')) {
+            $customersQuery->where('id', $request->customer_id);
+        }
+
+        $customers = $customersQuery->get(['id', 'opening_balance']);
+        $periodStarts = [];
+
+        foreach ($customers as $customer) {
+            $periodStarts[(int) $customer->id] = round(
+                (float) $customer->opening_balance,
+                2
+            );
+        }
+
+        if (empty($startDate)) {
+            return $periodStarts;
+        }
+
+        foreach ($customers as $customer) {
+            $prePeriodQuery = CustomerTransaction::where('company_id', $companyId)
+                ->where('customer_id', $customer->id)
+                ->whereDate('transaction_date', '<', $startDate);
+
+            $this->applyStatusFilter($prePeriodQuery, $request);
+
+            $prePeriodNet = round(
+                (float) $prePeriodQuery
+                    ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as net')
+                    ->value('net'),
+                2
+            );
+
+            $periodStarts[(int) $customer->id] = round(
+                ($periodStarts[(int) $customer->id] ?? 0) + $prePeriodNet,
+                2
+            );
+        }
+
+        return $periodStarts;
+    }
+
+    protected function getCustomerPrePeriodLedgerNet(
+        int $companyId,
+        int $customerId,
+        Request $request,
+        ?string $startDate
+    ): float {
+        if (empty($startDate)) {
+            return 0;
+        }
+
+        $prePeriodQuery = CustomerTransaction::where('company_id', $companyId)
+            ->where('customer_id', $customerId)
+            ->whereDate('transaction_date', '<', $startDate);
+
+        $this->applyStatusFilter($prePeriodQuery, $request);
+
+        return round(
+            (float) $prePeriodQuery
+                ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as net')
+                ->value('net'),
+            2
+        );
+    }
+
+    protected function applyStatusFilter($query, Request $request): void
+    {
+        if (!$request->filled('status')) {
+            $query->where('status', 1);
+
+            return;
+        }
+
+        if ($request->status != 'all') {
+            $query->where('status', $request->status);
+        }
     }
 }      

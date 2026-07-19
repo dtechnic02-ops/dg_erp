@@ -23,6 +23,7 @@ use App\Http\Controllers\Company\CompanyDashboardController as CompanyDashboard;
 
 use App\Http\Controllers\Company\ProductController;
 use App\Http\Controllers\Company\ProductCategoryController;
+use App\Http\Controllers\Company\BrandController;
 use App\Http\Controllers\Admin\CompanyController as AdminCompanyController;
 
 use App\Http\Controllers\Company\CompanyDashboardController;
@@ -267,23 +268,16 @@ Route::middleware(['auth','role:2',\App\Http\Middleware\UpdateLastSeen::class])-
             [MaintenanceController::class, 'recalculatePurchaseInvoices']
         )->name('recalculate.purchase.invoices');
 
+        Route::post(
+            '/recalculate-customer-statement',
+            [MaintenanceController::class, 'recalculateCustomerStatement']
+        )->name('recalculate.customer.statement');
+
     });
 
 
 
 
-
-  Route::prefix('categories')->name('categories.')->group(function () {
-
-    Route::get('/', [ProductCategoryController::class, 'index'])->name('index');
-
-    Route::post('/', [ProductCategoryController::class, 'store'])->name('store');
-
-    Route::post('/update/{id}', [ProductCategoryController::class, 'update'])->name('update');
-
-    Route::post('/delete/{id}', [ProductCategoryController::class, 'destroy'])->name('delete');
-
-});
 
     /*
     |--------------------------------------------------------------------------
@@ -291,7 +285,45 @@ Route::middleware(['auth','role:2',\App\Http\Middleware\UpdateLastSeen::class])-
     |--------------------------------------------------------------------------
     */
 
+    Route::get('products/print', [ProductController::class, 'print'])->name('products.print');
+
+    Route::get('products/{id}/print', [ProductController::class, 'printProfile'])->name('products.printProfile');
+
     Route::resource('products',ProductController::class);
+
+    /*
+    |--------------------------------------------------------------------------
+    | BRANDS
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('brands')
+        ->name('brands.')
+        ->group(function () {
+
+        Route::get('/',
+            [BrandController::class, 'index']
+        )->name('index');
+
+        Route::post('/',
+            [BrandController::class, 'store']
+        )->name('store');
+
+        Route::post('/update/{id}',
+            [BrandController::class, 'update']
+        )->name('update');
+
+        Route::post('/delete/{id}',
+            [BrandController::class, 'destroy']
+        )->name('delete');
+
+        Route::get('/print',[BrandController::class,'print'])->name('print');
+
+        Route::get('/{id}/print',[BrandController::class, 'printProfile'])->name('printProfile');
+
+        Route::get('/{id}',[BrandController::class, 'show'])->name('show');
+
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -304,6 +336,7 @@ Route::middleware(['auth','role:2',\App\Http\Middleware\UpdateLastSeen::class])-
        Route::post('/',[ProductCategoryController::class, 'store'])->name('store');
        Route::post('/update/{id}',[ProductCategoryController::class, 'update'])->name('update');
        Route::post('/delete/{id}',[ProductCategoryController::class, 'destroy'])->name('delete');
+       Route::get('/print',[ProductCategoryController::class, 'print'])->name('print');
 
     });
 
@@ -332,6 +365,15 @@ Route::middleware(['auth','role:2',\App\Http\Middleware\UpdateLastSeen::class])-
         Route::post('/delete/{id}',
             [SupplierController::class, 'destroy']
         )->name('delete');
+
+        Route::get('/print',
+            [SupplierController::class, 'print']
+        )->name('print');
+
+        Route::get('/show/{id}/print',
+            [SupplierController::class, 'printProfile']
+        )->name('printProfile');
+
          Route::get(
             '/show/{id}',
             [SupplierController::class,'show']
@@ -368,9 +410,11 @@ Route::middleware(['auth','role:2',\App\Http\Middleware\UpdateLastSeen::class])-
             [CustomerController::class, 'destroy']
         )->name('delete');
          
-        Route::get('/{id}',[CustomerController::class, 'show'])->name('show');
-        
         Route::get('/print',[CustomerController::class,'print'])->name('print');
+
+        Route::get('/{id}/print',[CustomerController::class, 'printProfile'])->name('printProfile');
+
+        Route::get('/{id}',[CustomerController::class, 'show'])->name('show');
 
     });
 
@@ -408,12 +452,6 @@ Route::post(
 )->name('store');
 
 
-Route::get(
-'/{id}/edit',
-[\App\Http\Controllers\Company\UnitController::class,'edit']
-)->name('edit');
-
-
 Route::post(
 '/update/{id}',
 [\App\Http\Controllers\Company\UnitController::class,'update']
@@ -424,6 +462,12 @@ Route::post(
 '/delete/{id}',
 [\App\Http\Controllers\Company\UnitController::class,'destroy']
 )->name('destroy');
+
+
+Route::get(
+'/print',
+[\App\Http\Controllers\Company\UnitController::class,'print']
+)->name('print');
 
 });
 
@@ -479,6 +523,10 @@ Route::post(
         Route::get('/show/{id}',
             [AccountController::class,'show']
         )->name('show');
+
+        Route::get('/show/{id}/print',
+            [AccountController::class, 'printProfile']
+        )->name('printProfile');
 
         Route::get( '/print', [AccountController::class,'print'] ) ->name( 'print' );
 
@@ -635,14 +683,34 @@ Route::post(
             [SalesController::class, 'show']
         )->name('show');
 
+        Route::get(
+            '/edit/{id}',
+            [SalesController::class, 'edit']
+        )->name('edit');
+
+        Route::put(
+            '/update/{id}',
+            [SalesController::class, 'update']
+        )->name('update');
+
         /**
          * PRINT ROUTE
          */
 
         Route::get(
+            '/print-list',
+            [SalesController::class, 'printList']
+        )->name('print-list');
+
+        Route::get(
             '/print/{id}',
             [SalesController::class, 'print']
         )->name('print');
+
+        Route::post(
+            '/cancel/{id}',
+            [SalesController::class, 'cancel']
+        )->name('cancel');
 
     });
 
@@ -712,6 +780,11 @@ Route::post(
         [SalesReturnController::class, 'print']
     )->name('print');
 
+    Route::post(
+        '/cancel/{id}',
+        [SalesReturnController::class, 'cancel']
+    )->name('cancel');
+
     
 
 
@@ -768,9 +841,25 @@ Route::post(
             [ServiceController::class, 'index']
         )->name('index');
 
+        Route::get('/print',
+            [ServiceController::class, 'print']
+        )->name('print');
+
+        Route::get('/create',
+            [ServiceController::class, 'create']
+        )->name('create');
+
         Route::post('/store',
             [ServiceController::class, 'store']
         )->name('store');
+
+        Route::get('/{id}/print',
+            [ServiceController::class, 'printProfile']
+        )->name('printProfile');
+
+        Route::get('/{id}/edit',
+            [ServiceController::class, 'edit']
+        )->name('edit');
 
         Route::post('/update/{id}',
             [ServiceController::class, 'update']
@@ -779,6 +868,10 @@ Route::post(
         Route::post('/delete/{id}',
             [ServiceController::class, 'destroy']
         )->name('delete');
+
+        Route::get('/{id}',
+            [ServiceController::class, 'show']
+        )->name('show');
 
     });
 
@@ -978,6 +1071,11 @@ Route::prefix('sales-return-refunds')
         [SalesReturnRefundController::class, 'print']
     )->name('print');
 
+    Route::post(
+        '/cancel/{id}',
+        [SalesReturnRefundController::class, 'cancel']
+    )->name('cancel');
+
 });
 
 Route::prefix('sales-payments')
@@ -1005,9 +1103,19 @@ Route::prefix('sales-payments')
     )->name('show');
 
     Route::get(
+        '/print-list',
+        [SalesPaymentController::class, 'printList']
+    )->name('print-list');
+
+    Route::get(
         '/print/{id}',
         [SalesPaymentController::class, 'print']
     )->name('print');
+
+    Route::post(
+        '/cancel/{id}',
+        [SalesPaymentController::class, 'cancel']
+    )->name('cancel');
 
 });
 
