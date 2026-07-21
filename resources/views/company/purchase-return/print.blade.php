@@ -2,7 +2,7 @@
 
 
 
-@section('title', 'Purchase Return Details')
+@section('title', 'Purchase Return Print')
 
 
 
@@ -56,61 +56,7 @@
 
 
 
-<div class="dg-page">
-
-
-
-    <header class="dg-toolbar d-print-none">
-
-        <div class="container-fluid">
-
-            <div class="d-flex flex-nowrap align-items-center justify-content-end gap-2">
-
-                <nav class="btn-group" aria-label="Purchase return toolbar">
-
-                    <a href="{{ route('company.purchase-return.index') }}" class="btn btn-outline-secondary dg-btn">Back</a>
-
-                    <a href="{{ route('company.purchase-return.print', $return->id) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
-
-                    @if ($invoice)
-
-                        <a href="{{ route('company.purchases.show', $invoice->id) }}" class="btn btn-outline-primary dg-btn">View Invoice</a>
-
-                    @endif
-
-                    @if ((float) $return->remaining_amount > 0 && (int) $return->status === 1)
-
-                        <a href="{{ route('company.purchase-return-refunds.create', $return->id) }}" class="btn btn-outline-warning dg-btn">Refund</a>
-
-                    @endif
-
-                    @if ((int) $return->status === 1 && $return->refund_status === 'Unpaid')
-
-                        <button type="button" class="btn btn-outline-danger dg-btn" data-bs-toggle="modal" data-bs-target="#dgPurchaseReturnCancelModal">Cancel Return</button>
-
-                    @endif
-
-                </nav>
-
-            </div>
-
-        </div>
-
-    </header>
-
-
-
-    @if ((int) $return->status === 1 && $return->refund_status === 'Unpaid')
-
-        @include('company.partials.dg-sales-cancel-modal', [
-            'modalId' => 'dgPurchaseReturnCancelModal',
-            'modalTitle' => 'Cancel Purchase Return',
-            'action' => route('company.purchase-return.cancel', $return->id),
-            'submitLabel' => 'Cancel Return',
-            'entityId' => $return->id,
-        ])
-
-    @endif
+<div class="dg-page dg-payment-print">
 
 
 
@@ -120,33 +66,9 @@
 
 
 
-            @if (session('success'))
+            <div id="printArea">
 
-                <div class="alert alert-success dg-alert d-print-none" role="alert">
-
-                    {{ session('success') }}
-
-                </div>
-
-            @endif
-
-
-
-            @if (session('error'))
-
-                <div class="alert alert-danger dg-alert d-print-none" role="alert">
-
-                    {{ session('error') }}
-
-                </div>
-
-            @endif
-
-
-
-            <section class="dg-section">
-
-                <article class="card dg-card dg-payment dg-print">
+                <article class="card dg-card dg-payment">
 
 
 
@@ -566,28 +488,6 @@
 
 
 
-                        @if ($return->damage_photo)
-
-                            <section class="card dg-card mb-2 d-print-none">
-
-                                <header class="card-header dg-card-header py-2">
-
-                                    <h2 class="h6 mb-0">Damage Photo</h2>
-
-                                </header>
-
-                                <div class="card-body dg-card-body py-2 px-3">
-
-                                    <img src="{{ asset('storage/' . $return->damage_photo) }}" alt="Damage photo" class="img-fluid" style="max-width: 180px; max-height: 180px;">
-
-                                </div>
-
-                            </section>
-
-                        @endif
-
-
-
                         <section class="card dg-card mb-2">
 
                             <header class="card-header dg-card-header py-2">
@@ -714,7 +614,7 @@
 
                 </article>
 
-            </section>
+            </div>
 
 
 
@@ -728,19 +628,21 @@
 
 
 
-@if ($errors->has('cancel_date') || $errors->has('cancel_reason'))
-    @push('scripts')
-        <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                var modalEl = document.getElementById('dgPurchaseReturnCancelModal');
+@push('scripts')
 
-                if (modalEl) {
-                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
-                }
-            });
-        </script>
-    @endpush
-@endif
+    <script>
+
+        document.body.classList.add('dg-payment-print');
+
+        window.addEventListener('load', function () {
+
+            window.print();
+
+        });
+
+    </script>
+
+@endpush
 
 
 

@@ -1,6 +1,6 @@
 @extends('company.layout')
 
-@section('title', 'Purchase Payment List Print')
+@section('title', 'Purchase Invoice List Print')
 
 @section('content')
 
@@ -33,22 +33,19 @@
         $filterSupplier = $selectedSupplier->name ?? '-';
     }
 
-    $filterInvoiceNo = request('invoice_no') ?: '-';
+    $filterInvoiceNo = request('search') ?: '-';
+    $filterSearch = request('search') ?: '-';
 
-    $filterAccount = '-';
-    if (request('account_id')) {
-        $selectedAccount = $accounts->firstWhere('id', (int) request('account_id'));
-        $filterAccount = $selectedAccount->account_name ?? '-';
-    }
+    $filterPaymentStatus = request('payment_status')
+        ? ucfirst(request('payment_status'))
+        : '-';
 
     if (request('status') === '0') {
         $filterStatus = 'Cancelled';
     } elseif (request()->has('status') && request('status') === '') {
         $filterStatus = 'All';
-    } elseif (!request()->has('status') || request('status') === '1') {
-        $filterStatus = 'Active';
     } else {
-        $filterStatus = '-';
+        $filterStatus = 'Active';
     }
 @endphp
 
@@ -121,7 +118,7 @@
                         </section>
 
                         <section class="dg-print-list-header-col dg-print-list-header-center">
-                            <h1 class="dg-print-list-title">PURCHASE PAYMENT LIST</h1>
+                            <h1 class="dg-print-list-title">PURCHASE INVOICE LIST</h1>
                         </section>
 
                         <section class="dg-print-list-header-col dg-print-list-header-right">
@@ -152,14 +149,19 @@
                                     <span class="dg-print-list-header-filter-value">{{ $filterInvoiceNo }}</span>
                                 </div>
                                 <div class="dg-print-list-header-filter-row">
-                                    <span class="dg-print-list-header-filter-label">Account</span>
+                                    <span class="dg-print-list-header-filter-label">Payment Status</span>
                                     <span class="dg-print-list-header-filter-sep">:</span>
-                                    <span class="dg-print-list-header-filter-value">{{ $filterAccount }}</span>
+                                    <span class="dg-print-list-header-filter-value">{{ $filterPaymentStatus }}</span>
                                 </div>
                                 <div class="dg-print-list-header-filter-row">
                                     <span class="dg-print-list-header-filter-label">Status</span>
                                     <span class="dg-print-list-header-filter-sep">:</span>
                                     <span class="dg-print-list-header-filter-value">{{ $filterStatus }}</span>
+                                </div>
+                                <div class="dg-print-list-header-filter-row">
+                                    <span class="dg-print-list-header-filter-label">Search</span>
+                                    <span class="dg-print-list-header-filter-sep">:</span>
+                                    <span class="dg-print-list-header-filter-value">{{ $filterSearch }}</span>
                                 </div>
                             </div>
                         </section>
@@ -168,17 +170,22 @@
                     <div class="dg-summary-bar dg-print-list-summary">
                         <div class="dg-summary-bar-row">
                             <div class="dg-summary-bar-item">
-                                <span class="dg-summary-bar-label">Total Payment</span>
+                                <span class="dg-summary-bar-label">Total Purchases</span>
                                 <span class="dg-summary-bar-sep">:</span>
-                                <span class="dg-summary-bar-value">{{ number_format($totalPayment, 2) }}</span>
+                                <span class="dg-summary-bar-value">{{ number_format($totalAmount, 2) }}</span>
                             </div>
                             <div class="dg-summary-bar-item">
-                                <span class="dg-summary-bar-label">Payment Amount</span>
+                                <span class="dg-summary-bar-label">Paid</span>
                                 <span class="dg-summary-bar-sep">:</span>
-                                <span class="dg-summary-bar-value">{{ number_format($totalPayment, 2) }}</span>
+                                <span class="dg-summary-bar-value">{{ number_format($totalPaid, 2) }}</span>
                             </div>
                             <div class="dg-summary-bar-item">
-                                <span class="dg-summary-bar-label">Payment Count</span>
+                                <span class="dg-summary-bar-label">Due</span>
+                                <span class="dg-summary-bar-sep">:</span>
+                                <span class="dg-summary-bar-value">{{ number_format($totalDue, 2) }}</span>
+                            </div>
+                            <div class="dg-summary-bar-item">
+                                <span class="dg-summary-bar-label">Invoices</span>
                                 <span class="dg-summary-bar-sep">:</span>
                                 <span class="dg-summary-bar-value">{{ number_format($totalCount) }}</span>
                             </div>
@@ -200,27 +207,33 @@
                             <thead class="dg-head">
                                 <tr>
                                     <th scope="col" class="dg-col-num">#</th>
-                                    <th scope="col">Payment No</th>
-                                    <th scope="col" class="dg-col-date">Payment Date</th>
                                     <th scope="col">Invoice No</th>
+                                    <th scope="col" class="dg-col-date">Invoice Date</th>
                                     <th scope="col">Supplier</th>
-                                    <th scope="col">Account</th>
-                                    <th scope="col" class="dg-col-num">Payment Amount</th>
+                                    <th scope="col" class="dg-col-num">Grand Total</th>
+                                    <th scope="col" class="dg-col-num">Paid</th>
+                                    <th scope="col" class="dg-col-num">Due</th>
+                                    <th scope="col" class="dg-col-status">Payment Status</th>
                                     <th scope="col" class="dg-col-status">Status</th>
                                 </tr>
                             </thead>
                             <tbody class="dg-body">
-                                @forelse ($payments as $payment)
+                                @forelse ($invoices as $invoice)
                                     <tr class="dg-row">
                                         <td class="dg-col-num">{{ $loop->iteration }}</td>
-                                        <td>{{ $payment->payment_no }}</td>
-                                        <td class="dg-col-date">{{ $payment->payment_date?->format('d-m-Y') }}</td>
-                                        <td>{{ $payment->invoice->invoice_no ?? '-' }}</td>
-                                        <td>{{ $payment->supplier->name ?? '-' }}</td>
-                                        <td>{{ $payment->account->account_name ?? '-' }}</td>
-                                        <td class="dg-col-num">{{ number_format($payment->amount, 2) }}</td>
+                                        <td>{{ $invoice->invoice_no }}</td>
+                                        <td class="dg-col-date">{{ \Illuminate\Support\Carbon::parse($invoice->purchase_date)->format('d-m-Y') }}</td>
+                                        <td>{{ $invoice->supplier->name ?? '-' }}</td>
+                                        <td class="dg-col-num">{{ number_format($invoice->grand_total, 2) }}</td>
+                                        <td class="dg-col-num">{{ number_format($invoice->paid_amount, 2) }}</td>
+                                        <td class="dg-col-num">{{ number_format($invoice->due_amount, 2) }}</td>
                                         <td class="dg-col-status">
-                                            @if ((int) $payment->status === 1)
+                                            <span class="dg-badge dg-badge-status dg-badge-{{ $invoice->payment_status == 'paid' ? 'success' : ($invoice->payment_status == 'partial' ? 'warning' : ($invoice->payment_status == 'cancelled' ? 'secondary' : 'danger')) }}">
+                                                {{ ucfirst($invoice->payment_status ?? '-') }}
+                                            </span>
+                                        </td>
+                                        <td class="dg-col-status">
+                                            @if ((int) $invoice->status === 1)
                                                 <span class="dg-badge dg-badge-status dg-badge-success">Active</span>
                                             @else
                                                 <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
@@ -229,7 +242,7 @@
                                     </tr>
                                 @empty
                                     <tr class="dg-row">
-                                        <td colspan="8" class="dg-print-list-empty">No payment records found.</td>
+                                        <td colspan="9" class="dg-print-list-empty">No purchase invoices found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

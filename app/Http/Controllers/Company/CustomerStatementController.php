@@ -336,13 +336,8 @@ class CustomerStatementController extends Controller
     ): array {
         $summaryQuery = clone $query;
 
-        $transactionTotalsQuery = (clone $summaryQuery)->where(function ($q) {
-            $q->whereNull('reference_type')
-                ->orWhere('reference_type', '!=', 'opening_balance');
-        });
-
-        $totalDebit = round((float) (clone $transactionTotalsQuery)->sum('debit'), 2);
-        $totalCredit = round((float) (clone $transactionTotalsQuery)->sum('credit'), 2);
+        $totalDebit = round((float) (clone $summaryQuery)->sum('debit'), 2);
+        $totalCredit = round((float) (clone $summaryQuery)->sum('credit'), 2);
 
         $periodStarts = $this->getCustomerPeriodStartBalances(
             $companyId,
@@ -366,17 +361,19 @@ class CustomerStatementController extends Controller
 
         $customerRunning = [];
         $balances = [];
+        $lastRunningBalance = $openingBalance;
 
         foreach ($orderedTransactions as $transaction) {
             $customerId = (int) $transaction->customer_id;
 
             if (!array_key_exists($customerId, $customerRunning)) {
-                $customerRunning[$customerId] = $this->getCustomerPrePeriodLedgerNet(
-                    $companyId,
-                    $customerId,
-                    $request,
-                    $startDate
-                );
+                $customerRunning[$customerId] = $periodStarts[$customerId]
+                    ?? $this->getCustomerPrePeriodLedgerNet(
+                        $companyId,
+                        $customerId,
+                        $request,
+                        $startDate
+                    );
             }
 
             $customerRunning[$customerId] = round(
@@ -387,12 +384,19 @@ class CustomerStatementController extends Controller
             );
 
             $balances[$transaction->id] = $customerRunning[$customerId];
+            $lastRunningBalance = $customerRunning[$customerId];
         }
 
-        $closingBalance = round(
-            $openingBalance + $totalDebit - $totalCredit,
-            2
-        );
+        if ($request->filled('customer_id')) {
+            $closingBalance = $orderedTransactions->isEmpty()
+                ? $openingBalance
+                : round($lastRunningBalance, 2);
+        } else {
+            $closingBalance = round(
+                $openingBalance + $totalDebit - $totalCredit,
+                2
+            );
+        }
 
         return [
             'opening'      => $openingBalance,
@@ -414,37 +418,22 @@ class CustomerStatementController extends Controller
             $customersQuery->where('id', $request->customer_id);
         }
 
-        $customers = $customersQuery->get(['id', 'opening_balance']);
         $periodStarts = [];
 
-        foreach ($customers as $customer) {
-            $periodStarts[(int) $customer->id] = round(
-                (float) $customer->opening_balance,
-                2
-            );
-        }
+        foreach ($customersQuery->pluck('id') as $customerId) {
+            $customerId = (int) $customerId;
 
-        if (empty($startDate)) {
-            return $periodStarts;
-        }
+            if (empty($startDate)) {
+                $periodStarts[$customerId] = 0.0;
 
-        foreach ($customers as $customer) {
-            $prePeriodQuery = CustomerTransaction::where('company_id', $companyId)
-                ->where('customer_id', $customer->id)
-                ->whereDate('transaction_date', '<', $startDate);
+                continue;
+            }
 
-            $this->applyStatusFilter($prePeriodQuery, $request);
-
-            $prePeriodNet = round(
-                (float) $prePeriodQuery
-                    ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as net')
-                    ->value('net'),
-                2
-            );
-
-            $periodStarts[(int) $customer->id] = round(
-                ($periodStarts[(int) $customer->id] ?? 0) + $prePeriodNet,
-                2
+            $periodStarts[$customerId] = $this->getCustomerPrePeriodLedgerNet(
+                $companyId,
+                $customerId,
+                $request,
+                $startDate
             );
         }
 

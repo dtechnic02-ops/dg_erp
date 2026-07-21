@@ -641,16 +641,32 @@ Route::prefix('vat-reports')
         Route::get('/show/{id}',
             [PurchaseController::class, 'show']
         )->name('show');
-Route::post(
-    '/{id}/cancel',
-    [PurchaseController::class, 'cancel']
-)->name('cancel');
 
-     Route::get(
-    '/print',
-    [PurchaseController::class, 'print']
-)->name('print');
-    
+        Route::get(
+            '/edit/{id}',
+            [PurchaseController::class, 'edit']
+        )->name('edit');
+
+        Route::put(
+            '/update/{id}',
+            [PurchaseController::class, 'update']
+        )->name('update');
+
+        Route::get(
+            '/print-list',
+            [PurchaseController::class, 'printList']
+        )->name('print-list');
+
+        Route::get(
+            '/print/{id}',
+            [PurchaseController::class, 'print']
+        )->name('print');
+
+        Route::post(
+            '/cancel/{id}',
+            [PurchaseController::class, 'cancel']
+        )->name('cancel');
+
     });
 
 
@@ -906,7 +922,16 @@ Route::prefix('purchase-payments')
         Route::post('/update/{id}',[PurchasePaymentController::class, 'update'])->name('update');
         Route::post('/cancel/{id}',[PurchasePaymentController::class, 'cancel'])->name('cancel');
 
-        Route::get('/print',[PurchasePaymentController::class, 'printList'])->name('print');
+        Route::get(
+            '/print-list',
+            [PurchasePaymentController::class, 'printList']
+        )->name('print-list');
+
+        Route::get(
+            '/print/{id}',
+            [PurchasePaymentController::class, 'print']
+        )->name('print');
+
         Route::get('/show/{id}',[PurchasePaymentController::class,'show'])->name('show');
 
     });
@@ -938,10 +963,17 @@ Route::prefix('purchase-payments')
                Route::get('/show/{id}',
         [PurchaseReturnController::class, 'show']
         )->name('show');
+
         Route::get(
-    'print',
-    [PurchaseReturnController::class, 'print']
-)->name('print');
+            '/print-list',
+            [PurchaseReturnController::class, 'printList']
+        )->name('print-list');
+
+        Route::get(
+            '/print/{id}',
+            [PurchaseReturnController::class, 'print']
+        )->name('print');
+
 Route::post(
     '/cancel/{id}',
     [PurchaseReturnController::class, 'cancel']
@@ -974,10 +1006,17 @@ Route::post(
     Route::get('/show/{id}',
         [PurchaseReturnRefundController::class, 'show']
     )->name('show');
-Route::get(
-    '/print',
-    [PurchaseReturnRefundController::class,'print']
-)->name('print');
+
+        Route::get(
+            '/print-list',
+            [PurchaseReturnRefundController::class, 'printList']
+        )->name('print-list');
+
+        Route::get(
+            '/print/{id}',
+            [PurchaseReturnRefundController::class, 'print']
+        )->name('print');
+
 Route::post(
     '/cancel/{id}',
     [PurchaseReturnRefundController::class,'cancel']

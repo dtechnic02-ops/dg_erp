@@ -9,40 +9,47 @@ class PurchaseItem extends Model
 {
     use HasFactory;
 
-   protected $fillable = [
+    public const ITEM_TYPE_PRODUCT = 'product';
 
-    'created_by',
+    public const ITEM_TYPE_SERVICE = 'service';
 
-    'company_id',
+    protected $fillable = [
+        'created_by',
+        'company_id',
+        'financial_year_id',
+        'purchase_invoice_id',
+        'item_type',
+        'product_id',
+        'service_id',
+        'quantity',
+        'returned_qty',
+        'price',
+        'unit_price',
+        'total',
+        'total_price',
+        'vat_id',
+        'vat_rate',
+        'vat_amount',
+        'status',
+    ];
 
-    'financial_year_id',
+    protected $casts = [
+        'quantity'     => 'decimal:2',
+        'returned_qty' => 'decimal:2',
+        'unit_price'   => 'decimal:2',
+        'price'        => 'decimal:2',
+        'total'        => 'decimal:2',
+        'vat_rate'     => 'decimal:2',
+        'vat_amount'   => 'decimal:2',
+        'total_price'  => 'decimal:2',
+    ];
 
-    'purchase_invoice_id',
-
-    'product_id',
-
-    'vat_id',
-
-    'quantity',
-
-    'price',
-
-    'unit_price',
-
-    'total',
-
-    'total_price',
-
-    'vat_rate',
-
-    'vat_amount',
-
-    'status',
-
-];
     public function invoice()
     {
-        return $this->belongsTo(PurchaseInvoice::class, 'purchase_invoice_id');
+        return $this->belongsTo(
+            PurchaseInvoice::class,
+            'purchase_invoice_id'
+        );
     }
 
     public function product()
@@ -50,9 +57,13 @@ class PurchaseItem extends Model
         return $this->belongsTo(Product::class);
     }
 
+    public function service()
+    {
+        return $this->belongsTo(Service::class);
+    }
+
     public function vat()
     {
         return $this->belongsTo(Vat::class);
     }
-
 }

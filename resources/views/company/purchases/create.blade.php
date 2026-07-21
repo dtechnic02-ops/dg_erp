@@ -2,1135 +2,357 @@
 
 @section('content')
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<div class="dg-page">
 
-
-
-<div class="container-fluid">
-@if(session('error'))
-<div class="alert alert-danger">
-    {{ session('error') }}
-</div>
-@endif
-<form action="{{ route('company.purchases.store') }}"
-method="POST">
-
-@csrf
-
-@if ($errors->any())
-
-<div class="alert alert-danger">
-
-<ul class="mb-0">
-
-@foreach($errors->all() as $error)
-
-<li>{{ $error }}</li>
-
-@endforeach
-
-</ul>
-
-</div>
-
-@endif
-
-<!-- TOP -->
-
-<div class="card purchase-card mb-3">
-
-    <div class="card-body">
-
-        <div class="row g-2 align-items-end">
-
-            {{-- INVOICE --}}
-
-            <div class="col-md-2">
-
-                <label class="erp-label">
-
-                    Invoice No
-
-                </label>
-
-                <input type="text"
-                       name="invoice_no"
-                       value="{{ $invoiceNo }}"
-                       class="form-control form-control-sm erp-input"
-                       readonly>
-
-            </div>
-
-            {{-- DATE --}}
-
-            <div class="col-md-2">
-
-                <label class="erp-label">
-
-                    Purchase Date
-
-                </label>
-
-                <input type="date"
-name="purchase_date"
-value="{{ old('purchase_date', date('Y-m-d')) }}"
-class="form-control form-control-sm erp-input"
-required>
-
-            </div>
-
-            {{-- BARCODE --}}
-
-            <div class="col-md-2">
-
-                <label class="erp-label">
-
-                    Scan Barcode
-
-                </label>
-
-                <input type="text"
-                       id="barcode_input"
-                       class="form-control form-control-sm"
-                       placeholder="Scan barcode"
-                       autocomplete="off"
-                       autofocus>
-
-            </div>
-<div class="col-md-2">
-
-<label class="erp-label">
-Financial Year
-</label>
-
-<select
-name="financial_year_id"
-class="form-select form-select-sm"
-required>
-
-@foreach($financialYears as $year)
-
-<option value="{{ $year->id }}">
-    {{ $year->name }}
-</option>
-@endforeach
-
-</select>
-
-</div>
-            {{-- SUPPLIER --}}
-
-            <div class="col-md-4">
-
-                <label class="erp-label">
-
-                    Supplier
-
-                </label>
-
-                <select name="supplier_id"
-        id="supplier_select"
-        class="form-select form-select-sm erp-input"
-        required>
-
-                    <option value="">
-
-                        Select Supplier
-
-                    </option>
-
-                    @foreach($suppliers as $supplier)
-
-                        <option
-                            value="{{ $supplier->id }}"
-
-                            data-balance="
-                                {{ $supplier->current_balance }}
-                            ">
-
-                            {{ $supplier->name }}
-
-                            |
-
-                            Due:
-                            {{ number_format(
-                                $supplier->current_balance,
-                                2
-                            ) }}
-
-                        </option>
-
-                    @endforeach
-
-                </select>
-
-                <div
-                    id="supplier_balance_box"
-                    class="supplier-balance-box mt-2"
-                    style="display:none;">
-
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="row align-items-center g-2">
+                <div class="col">
+                    <h1 class="h4 mb-0">Create Purchase Invoice</h1>
                 </div>
-
+                <div class="col-auto">
+                    <nav class="btn-group" aria-label="Purchase toolbar">
+                        <a href="{{ route('company.dashboard') }}" class="btn btn-outline-secondary dg-btn">Dashboard</a>
+                        <a href="{{ route('company.purchases.index') }}" class="btn btn-outline-secondary dg-btn">Purchase List</a>
+                        <a href="{{ route('company.purchases.create') }}" class="btn btn-outline-secondary dg-btn">Refresh</a>
+                        <a href="{{ route('company.suppliers.index') }}" class="btn btn-outline-secondary dg-btn">Supplier</a>
+                        <a href="{{ route('company.products.index') }}" class="btn btn-outline-secondary dg-btn">Product</a>
+                        <a href="{{ route('company.services.index') }}" class="btn btn-outline-secondary dg-btn">Service</a>
+                        <a href="{{ route('company.service-categories.index') }}" class="btn btn-outline-secondary dg-btn">Service Category</a>
+                        <a href="{{ route('company.units.index') }}" class="btn btn-outline-secondary dg-btn">Unit</a>
+                        <a href="{{ route('company.categories.index') }}" class="btn btn-outline-secondary dg-btn">Category</a>
+                    </nav>
+                </div>
             </div>
-
         </div>
-
-    </div>
-
-</div>
-
-<!-- TABLE -->
-
-<div class="card purchase-card mb-3">
-
-    <div class="card-body table-responsive">
-
-        <table class="table table-bordered purchase-table"
-               id="purchaseTable">
-
-            <thead>
-
-                <tr>
-
-                    <th style="width:30%;">
-
-                        Product
-
-                    </th>
-
-                    <th>
-
-                        Qty
-
-                    </th>
-
-                    <th>
-
-                        Unit
-
-                    </th>
-
-                    <th>
-
-                        Cost
-
-                    </th>
-
-                    <th>
-
-                        VAT
-
-                    </th>
-
-                    <th>
-
-                        VAT Amt
-
-                    </th>
-
-                    <th>
-
-                        Total
-
-                    </th>
-
-                    <th>
-
-                        X
-
-                    </th>
-
-                </tr>
-
-            </thead>
-
-            <tbody>
-
-                <tr>
-
-                    <!-- PRODUCT -->
-
-                    <td>
-
-                        <select name="product_id[]"
-                                class="form-select form-select-sm product-select"
-                                required>
-
-                            <option value="">
-
-                                Select Product
-
-                            </option>
-
-                            @foreach($products as $product)
-
-                                <option
-                                    value="{{ $product->id }}"
-
-                                    data-barcode="{{ $product->barcode }}"
-
-                                    data-price="{{ $product->cost_price }}"
-
-                                    data-unit="{{ $product->unit->name ?? '' }}"
-
-                                    data-vat="{{ $product->vat_id }}"
-
-                                    data-stock="{{ $product->current_stock }}">
-
-                                    {{ $product->barcode }}
-
-                                    |
-
-                                    {{ $product->name }}
-
-                                    |
-
-                                    Stock:
-                                    {{ $product->current_stock }}
-
-                                </option>
-
-                            @endforeach
-
-                        </select>
-
-                    </td>
-
-                    <!-- QTY -->
-
-                    <td>
-
-                        <input type="number"
-                               step="0.01"
-                               min="0"
-                               name="quantity[]"
-                               class="form-control form-control-sm qty-input qty">
-
-                        <div class="stock-box">
-
-                            Current Stock : 0
-
+    </header>
+
+    <main class="dg-container">
+        <div class="container-fluid">
+
+            @if ($errors->any())
+                <div class="alert alert-danger dg-alert" role="alert">
+                    <ul class="mb-0">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if (session('error'))
+                <div class="alert alert-danger dg-alert" role="alert">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            @php
+                $selectedSupplierBalance = '0.00';
+
+                if (old('supplier_id')) {
+                    $selectedSupplier = $suppliers->firstWhere('id', (int) old('supplier_id'));
+
+                    if ($selectedSupplier) {
+                        $selectedSupplierBalance = number_format($selectedSupplier->current_balance, 2);
+                    }
+                }
+
+                $selectedAccountBalance = '0.00';
+
+                if (old('account_id')) {
+                    $selectedAccount = $accounts->firstWhere('id', (int) old('account_id'));
+
+                    if ($selectedAccount) {
+                        $selectedAccountBalance = number_format($selectedAccount->current_balance, 2);
+                    }
+                }
+            @endphp
+
+            <form id="dgForm" method="POST" action="{{ route('company.purchases.store') }}">
+                @csrf
+
+                <section class="dg-section">
+                    <article class="card dg-card">
+                        <header class="card-header dg-card-header">
+                            <h2 class="h6 mb-0">Invoice Information</h2>
+                        </header>
+
+                        <div class="card-body dg-card-body">
+                            <div class="row g-3 align-items-start">
+
+                                <div class="col-md-2">
+                                    <label for="invoice_no" class="form-label">Invoice No</label>
+                                    <input type="text" id="invoice_no" class="form-control dg-input" value="{{ $invoiceNo }}" readonly>
+                                </div>
+
+                                <div class="col-md-2 d-none">
+                                    <label for="financial_year" class="form-label">Financial Year</label>
+                                    <input type="text" id="financial_year" class="form-control dg-input" value="{{ $activeFy->name ?? '' }}" readonly>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label for="purchase_date" class="form-label">Purchase Date</label>
+                                    <input type="date" name="purchase_date" id="purchase_date" class="form-control dg-input" value="{{ old('purchase_date', date('Y-m-d')) }}" required>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label for="supplier_id" class="form-label">Supplier</label>
+                                    <select name="supplier_id" id="supplier_id" class="form-select dg-select" required>
+                                        <option value="">Select Supplier</option>
+                                        @foreach ($suppliers as $supplier)
+                                            <option value="{{ $supplier->id }}" data-balance="{{ $supplier->current_balance }}" @selected(old('supplier_id') == $supplier->id)>{{ $supplier->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <small class="form-text text-muted dg-note">Supplier Balance: {{ $selectedSupplierBalance }}</small>
+                                </div>
+
+                                <div class="col-md-5">
+                                    <label for="barcode" class="form-label">Barcode</label>
+                                    <input type="text" name="barcode" id="barcode" class="form-control dg-input" placeholder="Scan or enter barcode">
+                                </div>
+
+                            </div>
+                        </div>
+                    </article>
+                </section>
+
+                <section class="dg-section">
+                    <article class="card dg-card">
+                        <header class="card-header dg-card-header">
+                            <h2 class="h6 mb-0">Items</h2>
+                        </header>
+
+                        <div class="card-body dg-card-body">
+                            <div class="table-responsive">
+                                <table class="table dg-table">
+                                    <thead class="dg-head">
+                                        <tr>
+                                            <th scope="col">#</th>
+                                            <th scope="col" width="30%">Product / Service</th>
+                                            <th scope="col" width="8%">Quantity</th>
+                                            <th scope="col" width="8%">Unit</th>
+                                            <th scope="col">Unit Cost</th>
+                                            <th scope="col">VAT Rate</th>
+                                            <th scope="col">VAT Amount</th>
+                                            <th scope="col">Line Total</th>
+                                            <th scope="col" class="dg-action-col-compact d-print-none">Delete</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody class="dg-body">
+                                        <tr class="dg-row">
+                                            <td>1</td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">Product or Service</label>
+                                                <select class="form-select dg-select dg-item-select" aria-label="Product or Service">
+                                                    <option value="">Select Item</option>
+                                                    <optgroup label="Products">
+                                                        @foreach ($products as $product)
+                                                            <option
+                                                                value="product:{{ $product->id }}"
+                                                                data-item-type="product"
+                                                                data-product-id="{{ $product->id }}"
+                                                                data-unit="{{ $product->unit?->short_name ?? $product->unit?->name }}"
+                                                                data-cost-price="{{ $product->cost_price }}"
+                                                                data-stock="{{ $product->current_stock }}"
+                                                                data-barcode="{{ $product->barcode }}"
+                                                                data-vat-rate="{{ $product->vat?->rate }}"
+                                                            >{{ $product->name }}</option>
+                                                        @endforeach
+                                                    </optgroup>
+                                                    <optgroup label="Services">
+                                                        @foreach ($services as $service)
+                                                            <option
+                                                                value="service:{{ $service->id }}"
+                                                                data-item-type="service"
+                                                                data-service-id="{{ $service->id }}"
+                                                                data-price="{{ $service->price }}"
+                                                                data-vat-rate="{{ $service->vat?->rate }}"
+                                                            >{{ $service->name }}</option>
+                                                        @endforeach
+                                                    </optgroup>
+                                                </select>
+                                                <input type="hidden" name="item_type[]" class="dg-item-type" value="product">
+                                                <input type="hidden" name="product_id[]" class="dg-product-id" value="">
+                                                <input type="hidden" name="service_id[]" class="dg-service-id" value="">
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">Quantity</label>
+                                                <input type="number" name="quantity[]" class="form-control dg-input" min="1" step="1" aria-label="Quantity">
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">Unit</label>
+                                                <input type="text" class="form-control dg-input dg-unit-display" value="-" readonly aria-label="Unit">
+                                                <small class="form-text text-muted dg-note dg-stock-note"></small>
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">Unit Cost</label>
+                                                <input type="number" name="unit_price[]" class="form-control dg-input" min="0" step="0.01" aria-label="Unit Cost">
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">VAT Rate</label>
+                                                <select name="vat_rate[]" class="form-select dg-select" aria-label="VAT Rate">
+                                                    <option value="0">No VAT</option>
+                                                    @foreach ($vats as $vat)
+                                                        <option value="{{ $vat->rate }}">{{ $vat->name }} ({{ $vat->rate }}%)</option>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">VAT Amount</label>
+                                                <input type="number" name="vat_amount[]" class="form-control dg-input" min="0" step="0.01" value="0" aria-label="VAT Amount">
+                                            </td>
+
+                                            <td>
+                                                <label class="form-label visually-hidden">Line Total</label>
+                                                <input type="number" name="total_price[]" class="form-control dg-input" min="0" step="0.01" value="0" aria-label="Line Total">
+                                            </td>
+
+                                            <td class="dg-action-col-compact d-print-none">
+                                                <div class="dg-action-group" role="group" aria-label="Delete row 1">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger dg-action-btn" aria-label="Delete row 1">Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <button type="button" class="btn btn-outline-primary btn-sm dg-btn dg-add-item mt-2">+ Add Item</button>
+                        </div>
+                    </article>
+                </section>
+
+                <section class="dg-section">
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <article class="card dg-card dg-payment">
+                                <header class="card-header dg-card-header">
+                                    <h2 class="h6 mb-0">Payment Information</h2>
+                                </header>
+
+                                <div class="card-body dg-card-body">
+                                    <div class="row g-3">
+
+                                        <div class="col-md-6">
+                                            <label for="account_id" class="form-label">Payment Account</label>
+                                            <select name="account_id" id="account_id" class="form-select dg-select">
+                                                <option value="">Select Account</option>
+                                                @forelse ($accounts as $account)
+                                                    <option value="{{ $account->id }}" data-balance="{{ $account->current_balance }}" @selected(old('account_id') == $account->id)>{{ $account->account_name }}</option>
+                                                @empty
+                                                    <option value="" disabled>No active accounts found</option>
+                                                @endforelse
+                                            </select>
+                                            <small class="form-text text-muted dg-note">Account Balance: {{ $selectedAccountBalance }}</small>
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <label for="paid_amount" class="form-label">Paid Amount</label>
+                                            <input type="number" name="paid_amount" id="paid_amount" class="form-control dg-input" min="0" step="0.01" value="{{ old('paid_amount', 0) }}">
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <label for="discount_amount" class="form-label">Discount</label>
+                                            <input type="number" name="discount_amount" id="discount_amount" class="form-control dg-input" min="0" step="0.01" value="{{ number_format(old('discount_amount', 0), 2) }}">
+                                        </div>
+
+                                        <div class="col-md-12">
+                                            <label for="note" class="form-label">Note</label>
+                                            <textarea name="note" id="note" class="form-control dg-textarea" rows="3">{{ old('note') }}</textarea>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </article>
                         </div>
 
-                    </td>
-
-                    <!-- UNIT -->
-
-                    <td>
-
-                        <input type="text"
-                               class="form-control form-control-sm unit-input unit-name"
-                               readonly>
-
-                    </td>
-
-                    <!-- COST -->
-
-                    <td>
-
-                        <input type="number"
-                               step="0.01"
-                               min="0"
-                               name="unit_price[]"
-                               class="form-control form-control-sm price-input price">
-
-                    </td>
-
-                    <!-- VAT -->
-
-                    <td>
-
-                        <select name="vat_id[]"
-                                class="form-select form-select-sm vat-select">
-
-                            <option value="">
-
-                                No VAT
-
-                            </option>
-
-                            @foreach($vats as $vat)
-
-                                <option value="{{ $vat->id }}"
-                                        data-rate="{{ $vat->rate }}">
-
-                                    {{ $vat->rate }}%
-
-                                </option>
-
-                            @endforeach
-
-                        </select>
-
-                        <input type="hidden"
-                               name="vat_rate[]"
-                               class="vat-rate">
-
-                    </td>
-
-                    <!-- VAT AMOUNT -->
-
-                    <td>
-
-                        <input type="number"
-                               step="0.01"
-                               name="vat_amount[]"
-                               class="form-control form-control-sm vat-amount"
-                               readonly>
-
-                    </td>
-
-                    <!-- TOTAL -->
-
-                    <td>
-
-                        <input type="number"
-                               step="0.01"
-                               name="total_price[]"
-                               class="form-control form-control-sm total-price"
-                               readonly>
-
-                    </td>
-
-                    <!-- REMOVE -->
-
-                    <td>
-
-                        <button type="button"
-                                class="btn btn-danger btn-sm removeRow remove-btn">
-
-                            ×
-
-                        </button>
-
-                    </td>
-
-                </tr>
-
-            </tbody>
-
-        </table>
-
-        <!-- ADD -->
-
-        <button type="button"
-                class="btn btn-success btn-sm"
-                id="addRow">
-
-            + Add Item
-
-        </button>
-
-    </div>
-
-</div>
-
-<!-- TOTAL -->
-
-<div class="card purchase-card">
-
-    <div class="card-body">
-
-        <div class="row">
-
-            <!-- BUTTONS -->
-
-            <div class="col-md-4 d-flex gap-2 align-items-start">
-
-                <a href="{{ route(
-                        'company.purchases.index'
-                    ) }}"
-                   class="btn btn-secondary px-4">
-
-                    <i class="fa fa-arrow-left"></i>
-
-                    Back
-
-                </a>
-
-                <button type="submit"
-                        class="btn btn-primary px-4">
-
-                    <i class="fa fa-save"></i>
-
-                    Save Purchase
-
-                </button>
-
-            </div>
-
-            <!-- TOTALS -->
-
-            <div class="col-md-8">
-
-                <div class="total-box">
-
-                    <div class="row g-2">
-
-                        <!-- SUBTOTAL -->
-
-                        <div class="col-md-4">
-
-                            <label class="erp-label">
-
-                                Subtotal
-
-                            </label>
-
-                            <input type="number"
-                                   name="subtotal"
-                                   id="subtotal"
-                                   class="form-control form-control-sm"
-                                   readonly>
-
-                        </div>
-
-                        <!-- VAT TOTAL -->
-
-                        <div class="col-md-4">
-
-                            <label class="erp-label">
-
-                                VAT Total
-
-                            </label>
-
-                            <input type="number"
-                                   name="total_vat"
-                                   id="totalVat"
-                                   class="form-control form-control-sm"
-                                   readonly>
-
-                        </div>
-
-                        <!-- GRAND TOTAL -->
-
-                        <div class="col-md-4">
-
-                            <label class="erp-label">
-
-                                Grand Total
-
-                            </label>
-
-                            <input type="number"
-                                   name="grand_total"
-                                   id="grandTotal"
-                                   class="form-control form-control-sm"
-                                   readonly>
-
-                        </div>
-<div class="col-md-4">
-
-<label>
-Payment Account
-</label>
-
-<select
-name="account_id"
-class="form-select form-select-sm">
-
-<option value="">
-Select Account
-</option>
-
-@foreach($accounts as $account)
-
-<option value="{{ $account->id }}">
-
-{{ $account->account_type }}
-
-|
-
-{{ $account->account_name }}
-
-|
-
-Balance:
-
-{{ number_format(
-    $account->current_balance,
-    2
-) }}
-
-</option>
-
-@endforeach
-
-</select>
-
-</div>
-                        <!-- PAID -->
-
-                        <div class="col-md-4">
-
-                            <label class="erp-label">
-
-                                Paid Amount
-
-                            </label>
-
-                            <input type="number"
-                                   min="0"
-                                   step="0.01"
-                                   name="paid_amount"
-                                   id="paidAmount"
-                                   value="{{ old('paid_amount',0) }}"
-                                   class="form-control form-control-sm">
-
-                        </div>
-
-                        <!-- DUE -->
-
-                        <div class="col-md-4">
-
-                            <label class="erp-label">
-
-                                Due Amount
-
-                            </label>
-
-                           <input type="number"
-id="dueAmount"
-class="form-control form-control-sm"
-readonly>
-
-                        </div>
-
-                        <!-- NOTE -->
-
-                        <div class="col-md-4">
-
-                            <label class="erp-label">
-
-                                Note
-
-                            </label>
-
-                           <input type="text"
-name="note"
-value="{{ old('note') }}"
-class="form-control form-control-sm">
-
+                        <div class="col-md-6">
+                            <article class="card dg-card">
+                                <header class="card-header dg-card-header">
+                                    <h2 class="h6 mb-0">Summary</h2>
+                                </header>
+                                <div class="card-body dg-card-body dg-summary py-2">
+
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label for="subtotal" class="form-label mb-0 small">Subtotal</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" name="subtotal" id="subtotal" class="form-control form-control-sm dg-input text-end" min="0" step="0.01" value="{{ number_format(old('subtotal', 0), 2) }}" readonly>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label for="taxable_amount" class="form-label mb-0 small">Taxable Amount</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" id="taxable_amount" class="form-control form-control-sm dg-input text-end" min="0" step="0.01" value="0.00" readonly>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label for="total_vat" class="form-label mb-0 small">Total VAT</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" name="total_vat" id="total_vat" class="form-control form-control-sm dg-input text-end" min="0" step="0.01" value="{{ number_format(old('total_vat', 0), 2) }}" readonly>
+                                        </div>
+                                    </div>
+
+                                    <hr class="my-1">
+
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label for="grand_total" class="form-label mb-0 small fw-bold">Grand Total</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" name="grand_total" id="grand_total" class="form-control form-control-sm dg-input text-end fw-bold" min="0" step="0.01" value="{{ number_format(old('grand_total', 0), 2) }}" readonly>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label for="summary_paid_amount" class="form-label mb-0 small">Paid Amount</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" id="summary_paid_amount" class="form-control form-control-sm dg-input text-end" min="0" step="0.01" value="0.00" readonly>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label for="due_amount" class="form-label mb-0 small fw-bold">Due Amount</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" id="due_amount" class="form-control form-control-sm dg-input text-end fw-bold" min="0" step="0.01" value="0.00" readonly>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </article>
                         </div>
 
                     </div>
 
-                </div>
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary dg-btn">Save Invoice</button>
+                        <a href="{{ route('company.purchases.index') }}" class="btn btn-outline-secondary dg-btn">Cancel</a>
+                    </div>
+                </section>
 
-            </div>
+            </form>
 
         </div>
-
-    </div>
-
-</div>
-
-</form>
+    </main>
 
 </div>
-<script>
-
-/**
-|--------------------------------------------------------------------------
-| 🔥 SINGLE ROW CALCULATION
-|--------------------------------------------------------------------------
-*/
-
-function calculateRow(row)
-{
-    let qty =
-        parseFloat(
-            row.querySelector('.qty').value
-        ) || 0;
-
-    let price =
-        parseFloat(
-            row.querySelector('.price').value
-        ) || 0;
-
-    let vatSelect =
-        row.querySelector('.vat-select');
-
-    let vatRate =
-        parseFloat(
-            vatSelect.options[
-                vatSelect.selectedIndex
-            ]?.dataset.rate
-        ) || 0;
-
-    row.querySelector('.vat-rate').value =
-        vatRate;
-
-    let subtotal =
-        qty * price;
-
-    let vatAmount =
-        (subtotal * vatRate) / 100;
-
-    let total =
-        subtotal + vatAmount;
-
-    row.querySelector('.vat-amount').value =
-        vatAmount.toFixed(2);
-
-    row.querySelector('.total-price').value =
-        total.toFixed(2);
-
-    calculateTotals();
-}
-
-/**
-|--------------------------------------------------------------------------
-| 🔥 TOTAL CALCULATION
-|--------------------------------------------------------------------------
-*/
-
-function calculateTotals()
-{
-    let totalVat = 0;
-
-    let grandTotal = 0;
-
-    document.querySelectorAll('.vat-amount')
-        .forEach(function(input){
-
-            totalVat +=
-                parseFloat(input.value) || 0;
-
-        });
-
-    document.querySelectorAll('.total-price')
-        .forEach(function(input){
-
-            grandTotal +=
-                parseFloat(input.value) || 0;
-
-        });
-
-    let subtotal =
-        grandTotal - totalVat;
-
-    document.getElementById(
-        'subtotal'
-    ).value =
-        subtotal.toFixed(2);
-
-    document.getElementById(
-        'totalVat'
-    ).value =
-        totalVat.toFixed(2);
-
-    document.getElementById(
-        'grandTotal'
-    ).value =
-        grandTotal.toFixed(2);
-
-    let paid =
-        parseFloat(
-            document.getElementById(
-                'paidAmount'
-            ).value
-        ) || 0;
-
-    // BLOCK OVER PAYMENT
-
-    if (paid > grandTotal)
-    {
-        paid = grandTotal;
-
-        document.getElementById(
-            'paidAmount'
-        ).value =
-            grandTotal.toFixed(2);
-
-        alert(
-            'Paid amount exceeds total.'
-        );
-    }
-
-    document.getElementById(
-        'dueAmount'
-    ).value =
-        (grandTotal - paid).toFixed(2);
-}
-
-/**
-|--------------------------------------------------------------------------
-| 🔥 PRODUCT CHANGE
-|--------------------------------------------------------------------------
-*/
-
-document.addEventListener(
-    'change',
-    function(e){
-
-        /**
-         * PRODUCT SELECT
-         */
-
-        if (
-            e.target.classList.contains(
-                'product-select'
-            )
-        )
-        {
-            let row =
-                e.target.closest('tr');
-
-            let selected =
-                e.target.options[
-                    e.target.selectedIndex
-                ];
-
-            /**
-             * PRICE
-             */
-
-            row.querySelector('.price').value =
-                selected.dataset.price || 0;
-
-            /**
-             * UNIT
-             */
-
-            row.querySelector('.unit-name').value =
-                selected.dataset.unit || '';
-
-            /**
-             * VAT
-             */
-
-            let vatId =
-                selected.dataset.vat || '';
-
-            let vatSelect =
-                row.querySelector('.vat-select');
-
-            if (vatId)
-            {
-                vatSelect.value = vatId;
-            }
-
-            /**
-             * STOCK
-             */
-
-            let stock =
-                parseFloat(
-                    selected.dataset.stock
-                ) || 0;
-
-            let stockBox =
-                row.querySelector(
-                    '.stock-box'
-                );
-
-            if (stockBox)
-            {
-                stockBox.innerHTML =
-                    'Current Stock : ' +
-                    stock;
-
-                stockBox.style.color =
-                    stock > 0
-                    ? '#22c55e'
-                    : '#ef4444';
-            }
-
-            calculateRow(row);
-        }
-
-        /**
-         * QTY / PRICE / VAT CHANGE
-         */
-
-        if (
-            e.target.classList.contains('qty') ||
-            e.target.classList.contains('price') ||
-            e.target.classList.contains('vat-select')
-        )
-        {
-            calculateRow(
-                e.target.closest('tr')
-            );
-        }
-
-    }
-);
-
-/**
-|--------------------------------------------------------------------------
-| 🔥 BARCODE SCAN
-|--------------------------------------------------------------------------
-*/
-
-document
-    .getElementById(
-        'barcode_input'
-    )
-    .addEventListener(
-        'keydown',
-        function(e){
-
-            if (e.key !== 'Enter')
-            {
-                return;
-            }
-
-            e.preventDefault();
-
-            let barcode =
-                this.value.trim();
-
-            if (!barcode)
-            {
-                return;
-            }
-
-            let row =
-                document.querySelector(
-                    '#purchaseTable tbody tr:last-child'
-                );
-
-            let select =
-                row.querySelector(
-                    '.product-select'
-                );
-
-            let found = false;
-
-            Array.from(
-                select.options
-            ).forEach(function(option){
-
-                if (
-                    option.dataset.barcode ==
-                    barcode
-                )
-                {
-                    found = true;
-
-                    /**
-                     * AUTO SELECT
-                     */
-
-                    select.value =
-                        option.value;
-
-                    /**
-                     * TRIGGER CHANGE
-                     */
-
-                    select.dispatchEvent(
-                        new Event('change')
-                    );
-
-                    /**
-                     * AUTO QTY
-                     */
-
-                    row.querySelector(
-                        '.qty'
-                    ).value = 1;
-
-                    calculateRow(row);
-                }
-
-            });
-
-            /**
-             * NOT FOUND
-             */
-
-            if (!found)
-            {
-                alert(
-                    'Product not found.'
-                );
-            }
-
-            /**
-             * RESET
-             */
-
-            this.value = '';
-
-        }
-);
-
-/**
-|--------------------------------------------------------------------------
-| 🔥 PAID AMOUNT
-|--------------------------------------------------------------------------
-*/
-
-document
-    .getElementById(
-        'paidAmount'
-    )
-    .addEventListener(
-        'input',
-        calculateTotals
-    );
-
-/**
-|--------------------------------------------------------------------------
-| 🔥 SUPPLIER BALANCE
-|--------------------------------------------------------------------------
-*/
-
-let supplierSelect =
-    document.getElementById(
-        'supplier_select'
-    );
-
-let supplierBalanceBox =
-    document.getElementById(
-        'supplier_balance_box'
-    );
-
-if (supplierSelect)
-{
-    supplierSelect.addEventListener(
-        'change',
-        function(){
-
-            let option =
-                this.options[
-                    this.selectedIndex
-                ];
-
-            let balance =
-                parseFloat(
-                    option.dataset.balance
-                ) || 0;
-
-            if (this.value)
-            {
-                supplierBalanceBox.style.display =
-                    'block';
-
-                supplierBalanceBox.innerHTML =
-                    'Current Due : ' +
-                    balance.toLocaleString();
-            }
-            else
-            {
-                supplierBalanceBox.style.display =
-                    'none';
-            }
-
-        }
-    );
-}
-
-/**
-|--------------------------------------------------------------------------
-| 🔥 ADD ROW
-|--------------------------------------------------------------------------
-*/
-
-document
-    .getElementById(
-        'addRow'
-    )
-    .addEventListener(
-        'click',
-        function(){
-
-            let tbody =
-                document.querySelector(
-                    '#purchaseTable tbody'
-                );
-
-            let firstRow =
-                tbody.querySelector('tr');
-
-            let newRow =
-                firstRow.cloneNode(true);
-
-            /**
-             * RESET INPUTS
-             */
-
-            newRow.querySelectorAll('input')
-                .forEach(function(input){
-
-                    if (
-                        input.type !== 'hidden'
-                    )
-                    {
-                        input.value = '';
-                    }
-
-                });
-
-            /**
-             * RESET SELECTS
-             */
-
-            newRow.querySelectorAll('select')
-                .forEach(function(select){
-
-                    select.selectedIndex = 0;
-
-                });
-
-            /**
-             * RESET STOCK
-             */
-
-            let stockBox =
-                newRow.querySelector(
-                    '.stock-box'
-                );
-
-            if (stockBox)
-            {
-                stockBox.innerHTML =
-                    'Current Stock : 0';
-            }
-
-            tbody.appendChild(newRow);
-
-        }
-);
-
-/**
-|--------------------------------------------------------------------------
-| 🔥 REMOVE ROW
-|--------------------------------------------------------------------------
-*/
-
-document.addEventListener(
-    'click',
-    function(e){
-
-        if (
-            e.target.classList.contains(
-                'removeRow'
-            )
-        )
-        {
-            let rows =
-                document.querySelectorAll(
-                    '#purchaseTable tbody tr'
-                );
-
-            if (rows.length > 1)
-            {
-                e.target
-                    .closest('tr')
-                    .remove();
-
-                calculateTotals();
-            }
-        }
-
-    }
-);
-
-</script>
-
 @endsection

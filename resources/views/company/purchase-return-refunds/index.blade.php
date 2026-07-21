@@ -2,577 +2,558 @@
 
 @section('content')
 
-<div class="container-fluid">
+@if (request('print'))
+    @php
+        $company = auth()->user()->company;
 
-    {{-- PAGE HEADER --}}
+        $filterFinancialYear = '-';
+        if (request()->has('financial_year_id')) {
+            if (request('financial_year_id')) {
+                $selectedFy = $financialYears->firstWhere('id', (int) request('financial_year_id'));
+                $filterFinancialYear = $selectedFy->name ?? '-';
+            } else {
+                $filterFinancialYear = 'All Years';
+            }
+        } elseif ($activeFy) {
+            $filterFinancialYear = $activeFy->name;
+        }
 
-    <div class="
-        d-flex
-        justify-content-between
-        align-items-center
-        mb-3
-    ">
+        $filterDateFrom = !empty($startDate)
+            ? \Illuminate\Support\Carbon::parse($startDate)->format('d-m-Y')
+            : (request('start_date') ? \Illuminate\Support\Carbon::parse(request('start_date'))->format('d-m-Y') : '-');
 
-        <div>
-            
+        $filterDateTo = !empty($endDate)
+            ? \Illuminate\Support\Carbon::parse($endDate)->format('d-m-Y')
+            : (request('end_date') ? \Illuminate\Support\Carbon::parse(request('end_date'))->format('d-m-Y') : '-');
 
-            <h4 class="mb-1">
+        $filterSupplier = '-';
+        if (request('supplier_id')) {
+            $selectedSupplier = $suppliers->firstWhere('id', (int) request('supplier_id'));
+            $filterSupplier = $selectedSupplier->name ?? '-';
+        }
 
-                Purchase Return Refunds
+        $filterRefundNo = request('search') ?: '-';
+        $filterSearch = request('search') ?: '-';
 
-            </h4>
-            <a
-    href="{{ route(
-        'company.purchase-return-refunds.print',
-        request()->query()
-    ) }}"
-    target="_blank"
-    class="btn btn-success"
->
-    <i class="fa fa-print"></i>
-    Print
-</a>
+        if (request('status') === '0') {
+            $filterStatus = 'Cancelled';
+        } elseif (request('status') === '1' || request('status') === '3') {
+            $filterStatus = 'Active';
+        } elseif (request()->has('status') && request('status') === '') {
+            $filterStatus = 'All';
+        } else {
+            $filterStatus = 'Active';
+        }
 
-            <small class="text-muted">
+        $totalCount = $refunds->total();
+    @endphp
 
-                Refund payment history
+    <div class="dg-page dg-print-list-landscape">
 
-            </small>
+        <main class="dg-container">
+            <div class="container-fluid">
 
-        </div>
+                <div id="printArea">
+                    <div class="dg-print-list-sheet">
 
-    </div>
+                        <header class="dg-print-list-header dg-print-landscape">
+                            <section class="dg-print-list-header-col dg-print-list-header-left">
+                                @if ($company?->logo_path)
+                                    <img
+                                        src="{{ asset('companies/' . $company->id . '/' . $company->logo_path) }}"
+                                        alt="{{ $company->company_name ?? 'Company Logo' }}"
+                                        class="dg-print-list-logo">
+                                @endif
+                                <div class="dg-print-list-company">
+                                    @if (!empty($company?->company_name))
+                                        <div class="dg-print-list-company-name">{{ $company->company_name }}</div>
+                                    @endif
+                                    <div class="dg-print-list-company-meta">
+                                        @if (!empty($company?->address))
+                                            <div class="dg-print-list-company-line">{{ $company->address }}</div>
+                                        @endif
+                                        @if (!empty($company?->telephone) || !empty($company?->mobile))
+                                            <div class="dg-print-list-company-line">
+                                                <span class="dg-print-list-company-label">Phone</span>
+                                                <span class="dg-print-list-company-sep">:</span>
+                                                <span class="dg-print-list-company-value">
+                                                    {{ $company->telephone ?? $company->mobile }}
+                                                    @if (!empty($company->telephone) && !empty($company->mobile) && $company->telephone !== $company->mobile)
+                                                        / {{ $company->mobile }}
+                                                    @endif
+                                                </span>
+                                            </div>
+                                        @endif
+                                        @if (!empty($company?->email))
+                                            <div class="dg-print-list-company-line">
+                                                <span class="dg-print-list-company-label">Email</span>
+                                                <span class="dg-print-list-company-sep">:</span>
+                                                <span class="dg-print-list-company-value">{{ $company->email }}</span>
+                                            </div>
+                                        @endif
+                                        @if (!empty($company?->vat_number))
+                                            <div class="dg-print-list-company-line">
+                                                <span class="dg-print-list-company-label">VAT No</span>
+                                                <span class="dg-print-list-company-sep">:</span>
+                                                <span class="dg-print-list-company-value">{{ $company->vat_number }}</span>
+                                            </div>
+                                        @endif
+                                        @if (!empty($company?->pan_number))
+                                            <div class="dg-print-list-company-line">
+                                                <span class="dg-print-list-company-label">PAN No</span>
+                                                <span class="dg-print-list-company-sep">:</span>
+                                                <span class="dg-print-list-company-value">{{ $company->pan_number }}</span>
+                                            </div>
+                                        @endif
+                                        @if (!empty($company?->website))
+                                            <div class="dg-print-list-company-line">
+                                                <span class="dg-print-list-company-label">Website</span>
+                                                <span class="dg-print-list-company-sep">:</span>
+                                                <span class="dg-print-list-company-value">{{ $company->website }}</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </section>
 
-    {{-- FILTER --}}
+                            <section class="dg-print-list-header-col dg-print-list-header-center">
+                                <h1 class="dg-print-list-title">PURCHASE RETURN REFUND LIST</h1>
+                            </section>
 
-    <div class="
-        card
-        border-0
-        shadow-sm
-        mb-2
-    ">
+                            <section class="dg-print-list-header-col dg-print-list-header-right">
+                                <div class="dg-print-list-header-filters">
+                                    <div class="dg-print-list-header-filter-row">
+                                        <span class="dg-print-list-header-filter-label">Financial Year</span>
+                                        <span class="dg-print-list-header-filter-sep">:</span>
+                                        <span class="dg-print-list-header-filter-value">{{ $filterFinancialYear }}</span>
+                                    </div>
+                                    <div class="dg-print-list-header-filter-row">
+                                        <span class="dg-print-list-header-filter-label">Date From</span>
+                                        <span class="dg-print-list-header-filter-sep">:</span>
+                                        <span class="dg-print-list-header-filter-value">{{ $filterDateFrom }}</span>
+                                    </div>
+                                    <div class="dg-print-list-header-filter-row">
+                                        <span class="dg-print-list-header-filter-label">Date To</span>
+                                        <span class="dg-print-list-header-filter-sep">:</span>
+                                        <span class="dg-print-list-header-filter-value">{{ $filterDateTo }}</span>
+                                    </div>
+                                    <div class="dg-print-list-header-filter-row">
+                                        <span class="dg-print-list-header-filter-label">Supplier</span>
+                                        <span class="dg-print-list-header-filter-sep">:</span>
+                                        <span class="dg-print-list-header-filter-value">{{ $filterSupplier }}</span>
+                                    </div>
+                                    <div class="dg-print-list-header-filter-row">
+                                        <span class="dg-print-list-header-filter-label">Refund No</span>
+                                        <span class="dg-print-list-header-filter-sep">:</span>
+                                        <span class="dg-print-list-header-filter-value">{{ $filterRefundNo }}</span>
+                                    </div>
+                                    <div class="dg-print-list-header-filter-row">
+                                        <span class="dg-print-list-header-filter-label">Refund Status</span>
+                                        <span class="dg-print-list-header-filter-sep">:</span>
+                                        <span class="dg-print-list-header-filter-value">{{ $filterStatus }}</span>
+                                    </div>
+                                    <div class="dg-print-list-header-filter-row">
+                                        <span class="dg-print-list-header-filter-label">Search</span>
+                                        <span class="dg-print-list-header-filter-sep">:</span>
+                                        <span class="dg-print-list-header-filter-value">{{ $filterSearch }}</span>
+                                    </div>
+                                </div>
+                            </section>
+                        </header>
 
-        <div class="card-body">
+                        <div class="dg-summary-bar dg-print-list-summary">
+                            <div class="dg-summary-bar-row">
+                                <div class="dg-summary-bar-item">
+                                    <span class="dg-summary-bar-label">Total Refund</span>
+                                    <span class="dg-summary-bar-sep">:</span>
+                                    <span class="dg-summary-bar-value">{{ number_format($totalRefund, 2) }}</span>
+                                </div>
+                                <div class="dg-summary-bar-item">
+                                    <span class="dg-summary-bar-label">Adjustment</span>
+                                    <span class="dg-summary-bar-sep">:</span>
+                                    <span class="dg-summary-bar-value">{{ number_format($totalAdjust, 2) }}</span>
+                                </div>
+                                <div class="dg-summary-bar-item">
+                                    <span class="dg-summary-bar-label">Cash Refund</span>
+                                    <span class="dg-summary-bar-sep">:</span>
+                                    <span class="dg-summary-bar-value">{{ number_format($totalCash, 2) }}</span>
+                                </div>
+                                <div class="dg-summary-bar-item">
+                                    <span class="dg-summary-bar-label">Refunds</span>
+                                    <span class="dg-summary-bar-sep">:</span>
+                                    <span class="dg-summary-bar-value">{{ number_format($totalCount) }}</span>
+                                </div>
+                                <div class="dg-summary-bar-item">
+                                    <span class="dg-summary-bar-label">Refund Status</span>
+                                    <span class="dg-summary-bar-sep">:</span>
+                                    <span class="dg-summary-bar-value">{{ $filterStatus }}</span>
+                                </div>
+                            </div>
+                        </div>
 
-            <form method="GET"
-                  action="{{ route(
-                        'company.purchase-return-refunds.index'
-                  ) }}">
+                        <div class="dg-print-list-table-wrap">
+                            <table class="table dg-print-list-table">
+                                <thead class="dg-head">
+                                    <tr>
+                                        <th scope="col" class="dg-col-num">#</th>
+                                        <th scope="col">Refund No</th>
+                                        <th scope="col" class="dg-col-date">Refund Date</th>
+                                        <th scope="col">Original Return No</th>
+                                        <th scope="col">Supplier</th>
+                                        <th scope="col">Account</th>
+                                        <th scope="col" class="dg-col-num">Refund Total</th>
+                                        <th scope="col" class="dg-col-num">Adjustment</th>
+                                        <th scope="col" class="dg-col-status">Refund Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="dg-body">
+                                    @forelse ($refunds as $refund)
+                                        <tr class="dg-row">
+                                            <td class="dg-col-num">{{ $refunds->firstItem() + $loop->index }}</td>
+                                            <td>{{ $refund->refund_no }}</td>
+                                            <td class="dg-col-date">{{ $refund->refund_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $refund->purchaseReturn->return_no ?? '-' }}</td>
+                                            <td>{{ $refund->supplier->name ?? '-' }}</td>
+                                            <td>
+                                                @if ($refund->account)
+                                                    {{ $refund->account->account_name }}
+                                                @elseif ((float) $refund->cash_amount <= 0 && (float) $refund->adjust_amount > 0)
+                                                    Original Invoice Adjustment
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                            <td class="dg-col-num">{{ number_format($refund->refund_amount, 2) }}</td>
+                                            <td class="dg-col-num">{{ number_format($refund->adjust_amount, 2) }}</td>
+                                            <td class="dg-col-status">
+                                                @if ((int) $refund->status === 0)
+                                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
+                                                @else
+                                                    <span class="dg-badge dg-badge-status dg-badge-success">Active</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr class="dg-row">
+                                            <td colspan="9" class="dg-print-list-empty">No purchase return refunds found.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
 
-                <div class="row g-2">
-
-                    {{-- START DATE --}}
-
-                    <div class="col-md-2">
-
-                        <label class="form-label">
-
-                            Start Date
-
-                        </label>
-
-                        <input type="date"
-                               name="start_date"
-                               value="{{ request(
-                                    'start_date'
-                               ) }}"
-                               class="form-control">
+                        @include('company.partials.print-footer-landscape')
 
                     </div>
-
-                    {{-- END DATE --}}
-
-                    <div class="col-md-2">
-
-                        <label class="form-label">
-
-                            End Date
-
-                        </label>
-
-                        <input type="date"
-                               name="end_date"
-                               value="{{ request(
-                                    'end_date'
-                               ) }}"
-                               class="form-control">
-
-                    </div>
-
-                    {{-- SUPPLIER --}}
-
-                    <div class="col-md-2">
-
-                        <label class="form-label">
-
-                            Supplier
-
-                        </label>
-
-                        <select name="supplier_id"
-                                class="form-select">
-
-                            <option value="">
-
-                                All Suppliers
-
-                            </option>
-
-                            @foreach($suppliers as $supplier)
-
-                                <option
-                                    value="{{ $supplier->id }}"
-
-                                    {{
-                                        request(
-                                            'supplier_id'
-                                        ) == $supplier->id
-                                        ? 'selected'
-                                        : ''
-                                    }}>
-
-                                    {{ $supplier->name }}
-
-                                </option>
-
-                            @endforeach
-
-                        </select>
-
-                    </div>
-                    <div class="col-md-2">
-
-    <label class="form-label">
-        Financial Year
-    </label>
-
-    <select
-        name="financial_year_id"
-        class="form-select"
-    >
-
-        <option value="">
-            All FY
-        </option>
-
-        @foreach($financialYears as $fy)
-
-            <option
-                value="{{ $fy->id }}"
-                {{ request('financial_year_id') == $fy->id ? 'selected' : '' }}
-            >
-                {{ $fy->name }}
-            </option>
-
-        @endforeach
-
-    </select>
-
-</div>
-<div class="col-md-2">
-
-    <label class="form-label">
-
-        Status
-
-    </label>
-
-    <select
-        name="status"
-        class="form-select"
-    >
-
-        <option value=""
-            {{ request('status') == '' ? 'selected' : '' }}
-        >
-            Active
-        </option>
-
-        <option
-            value="all"
-            {{ request('status') == 'all' ? 'selected' : '' }}
-        >
-            All
-        </option>
-
-        <option
-            value="active"
-            {{ request('status') == 'active' ? 'selected' : '' }}
-        >
-            Active
-        </option>
-
-        <option
-            value="cancelled"
-            {{ request('status') == 'cancelled' ? 'selected' : '' }}
-        >
-            Cancelled
-        </option>
-
-    </select>
-
-</div>
-                    {{-- ACCOUNT --}}
-
-                    <div class="col-md-2">
-
-                        <label class="form-label">
-
-                            Account
-
-                        </label>
-
-                        <select name="account_id"
-                                class="form-select">
-
-                            <option value="">
-
-                                All Accounts
-
-                            </option>
-
-                            @foreach($accounts as $account)
-
-                                <option
-                                    value="{{ $account->id }}"
-
-                                    {{
-                                        request(
-                                            'account_id'
-                                        ) == $account->id
-                                        ? 'selected'
-                                        : ''
-                                    }}>
-
-                                    {{ $account->account_name }}
-
-                                </option>
-
-                            @endforeach
-
-                        </select>
-
-                    </div>
-
-                </div>
-
-                {{-- BUTTONS --}}
-
-                <div class="
-                    d-flex
-                    gap-2
-                    mt-2
-                ">
-
-                    <button type="submit"
-                            class="
-                                btn
-                                btn-primary
-                            ">
-
-                        <i class="
-                            fa-solid
-                            fa-filter
-                        "></i>
-
-                        Filter
-
-                    </button>
-
-                    <a href="{{ route(
-                            'company.purchase-return-refunds.index'
-                        ) }}"
-                       class="
-                            btn
-                            btn-dark
-                       ">
-
-                        Reset
-
-                    </a>
-
-                </div>
-
-            </form>
-
-        </div>
-
-    </div>
-
-    {{-- SUMMARY --}}
-
-    <div class="row mb-3">
-
-        {{-- TOTAL REFUND --}}
-
-        <div class="col-md-4">
-
-            <div class="
-                card
-                border-0
-                shadow-sm
-                bg-success
-                text-white
-            ">
-
-                <div class="card-body">
-
-                    <small>
-
-                        Total Refund
-
-                    </small>
-
-                    <h4 class="mb-0">
-
-                        {{ number_format(
-                            $refunds->sum('amount'),
-                            2
-                        ) }}
-
-                    </h4>
-
                 </div>
 
             </div>
-
-        </div>
-
-        {{-- TOTAL RECORDS --}}
-
-        <div class="col-md-4">
-
-            <div class="
-                card
-                border-0
-                shadow-sm
-                bg-primary
-                text-white
-            ">
-
-                <div class="card-body">
-
-                    <small>
-
-                        Total Records
-
-                    </small>
-
-                    <h4 class="mb-0">
-
-                        {{ $refunds->total() }}
-
-                    </h4>
-
-                </div>
-
-            </div>
-
-        </div>
-
-        {{-- TODAY REFUND --}}
-
-        <div class="col-md-4">
-
-            <div class="
-                card
-                border-0
-                shadow-sm
-                bg-warning
-                text-dark
-            ">
-
-                <div class="card-body">
-
-                    <small>
-
-                        Today Refund
-
-                    </small>
-
-                    <h4 class="mb-0">
-
-                        {{ number_format(
-                            $refunds
-                            ->where(
-                                'refund_date',
-                                now()->format('Y-m-d')
-                            )
-                            ->sum('amount'),
-                            2
-                        ) }}
-
-                    </h4>
-
-                </div>
-
-            </div>
-
-        </div>
+        </main>
 
     </div>
 
-    {{-- TABLE --}}
-
-    <div class="
-        card
-        border-0
-        shadow-sm
-    ">
-
-        <div class="
-            card-body
-            table-responsive
-        ">
-
-            <table class="
-                table
-                table-bordered
-                table-hover
-                align-middle
-            ">
-<thead class="table-dark">
-
-<tr>
-
-<th>Date</th>
-<th>Refund No</th>
-<th>Return No</th>
-<th>Supplier</th>
-<th>Account</th>
-<th>Amount</th>
-<th>Status</th>
-<th>Action</th>
-
-</tr>
-
-</thead>
-<tbody>
-
-@forelse($refunds as $refund)
-
-<tr>
-
-<td>
-    {{ $refund->refund_date }}
-</td>
-
-<td>
-    {{ $refund->refund_no ?? '-' }}
-</td>
-
-<td>
-    {{ $refund->purchaseReturn->return_no ?? '-' }}
-</td>
-
-<td>
-    {{ $refund->purchaseReturn->supplier->name ?? '-' }}
-</td>
-
-<td>
-    {{ $refund->account->account_name ?? '-' }}
-</td>
-
-<td class="text-success fw-bold">
-    {{ number_format($refund->amount,2) }}
-</td>
-
-<td>
-
-@if($refund->status == 1)
-
-<span class="badge bg-success">
-    Active
-</span>
+    @push('scripts')
+        <script>
+            window.addEventListener('load', function () {
+                window.print();
+            });
+        </script>
+    @endpush
 
 @else
 
-<span class="badge bg-danger">
-    Cancelled
-</span>
+<div class="dg-page">
 
-@endif
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="d-flex flex-nowrap align-items-center gap-2">
 
-</td>
+                <div class="flex-shrink-0">
+                    <h1 class="h4 mb-0">Purchase Return Refunds</h1>
+                </div>
 
-<td>
-
-<div class="d-flex gap-1 flex-wrap">
-
-<a
-href="{{ route(
-'company.purchase-return-refunds.show',
-$refund->id
-) }}"
-class="btn btn-sm btn-outline-primary">
-
-View
-
-</a>
-
-
-
-@if($refund->status == 1)
-
-<form
-action="{{ route(
-'company.purchase-return-refunds.cancel',
-$refund->id
-) }}"
-method="POST"
-class="d-inline"
-onsubmit="return confirm('Are you sure to cancel this refund?')">
-
-@csrf
-
-<button
-type="submit"
-class="btn btn-sm btn-danger">
-
-Cancel
-
-</button>
-
-</form>
-
-@endif
-
-</div>
-
-</td>
-
-</tr>
-
-@empty
-
-<tr>
-
-<td colspan="8"
-class="text-center text-muted">
-
-No refund found.
-
-</td>
-
-</tr>
-
-@endforelse
-
-</tbody>
-            </table>
-
-            {{-- PAGINATION --}}
-
-            <div class="mt-3">
-
-                {{ $refunds->links() }}
+                <div class="flex-fill d-flex justify-content-end align-items-center gap-2 flex-wrap flex-md-nowrap">
+                    <nav class="btn-group" aria-label="Purchase return refund list toolbar">
+                        <a href="{{ route('company.dashboard') }}" class="btn btn-outline-secondary dg-btn">Dashboard</a>
+                        <a href="{{ route('company.purchase-return.index') }}" class="btn btn-outline-secondary dg-btn">Returns</a>
+                        <a href="{{ route('company.purchase-return-refunds.index') }}" class="btn btn-outline-secondary dg-btn">Refresh</a>
+                        <a href="{{ route('company.purchase-return-refunds.index', array_merge(request()->query(), ['print' => 1])) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print List</a>
+                        <a href="{{ route('company.suppliers.index') }}" class="btn btn-outline-secondary dg-btn">Supplier</a>
+                    </nav>
+                </div>
 
             </div>
+        </div>
+    </header>
+
+    <main class="dg-container">
+        <div class="container-fluid">
+
+            @if ($errors->any())
+                <div class="alert alert-danger dg-alert" role="alert">
+                    <ul class="mb-0">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if (session('success'))
+                <div class="alert alert-success dg-alert" role="alert">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            @if (session('error'))
+                <div class="alert alert-danger dg-alert" role="alert">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            <section class="dg-section dg-filter">
+                <article class="card dg-card">
+                    <header class="card-header dg-card-header">
+                        <h2 class="h6 mb-0">Filter</h2>
+                    </header>
+
+                    <div class="card-body dg-card-body">
+                        <form method="GET" action="{{ route('company.purchase-return-refunds.index') }}">
+                            <div class="row g-2 align-items-end">
+
+                                <div class="col-md-2 col-lg-1">
+                                    <label for="financial_year_id" class="form-label">Financial Year</label>
+                                    <select name="financial_year_id" id="financial_year_id" class="form-select dg-select">
+                                        <option value="">All Years</option>
+                                        @foreach ($financialYears as $financialYear)
+                                            <option value="{{ $financialYear->id }}" @selected(
+                                                request()->has('financial_year_id')
+                                                    ? request('financial_year_id') == $financialYear->id
+                                                    : ($activeFy && $activeFy->id == $financialYear->id)
+                                            )>{{ $financialYear->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2 col-lg-1">
+                                    <label for="start_date" class="form-label">Date From</label>
+                                    <input type="date" name="start_date" id="start_date" class="form-control dg-input" value="{{ request('start_date', !empty($startDate) ? \Illuminate\Support\Carbon::parse($startDate)->format('Y-m-d') : '') }}">
+                                </div>
+
+                                <div class="col-md-2 col-lg-1">
+                                    <label for="end_date" class="form-label">Date To</label>
+                                    <input type="date" name="end_date" id="end_date" class="form-control dg-input" value="{{ request('end_date', !empty($endDate) ? \Illuminate\Support\Carbon::parse($endDate)->format('Y-m-d') : '') }}">
+                                </div>
+
+                                <div class="col-md-3 col-lg-2">
+                                    <label for="supplier_id" class="form-label">Supplier</label>
+                                    <select name="supplier_id" id="supplier_id" class="form-select dg-select">
+                                        <option value="">All Suppliers</option>
+                                        @foreach ($suppliers as $supplier)
+                                            <option value="{{ $supplier->id }}" @selected(request('supplier_id') == $supplier->id)>{{ $supplier->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2 col-lg-1">
+                                    <label for="search" class="form-label">Refund No</label>
+                                    <input type="text" name="search" id="search" class="form-control dg-input" value="{{ request('search') }}" placeholder="Refund No">
+                                </div>
+
+                                <div class="col-md-2 col-lg-1">
+                                    <label for="status" class="form-label">Refund Status</label>
+                                    <select name="status" id="status" class="form-select dg-select">
+                                        <option value="" @selected(request()->has('status') && request('status') === '')>All</option>
+                                        <option value="1" @selected(!request()->has('status') || request('status') === '1')>Active</option>
+                                        <option value="0" @selected(request('status') === '0')>Cancelled</option>
+                                    </select>
+                                </div>
+
+                                @if (request('per_page'))
+                                    <input type="hidden" name="per_page" value="{{ request('per_page') }}">
+                                @endif
+
+                                <div class="col-md-2 col-lg-2 d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary dg-btn">Search</button>
+                                    <a href="{{ route('company.purchase-return-refunds.index') }}" class="btn btn-outline-secondary dg-btn">Reset</a>
+                                </div>
+
+                            </div>
+                        </form>
+                    </div>
+                </article>
+            </section>
+
+            <section class="dg-section dg-summary mb-2">
+                <div class="row dg-row g-2">
+
+                    <div class="col-12 col-md-4">
+                        <article class="card dg-card h-100">
+                            <header class="card-header dg-card-header py-1 px-3 border-bottom-0">
+                                <span class="small mb-0">Total Refund</span>
+                            </header>
+                            <div class="card-body dg-card-body py-1 px-3 pt-0 text-end">
+                                <span class="fw-bold fs-6">{{ number_format($totalRefund, 2) }}</span>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <article class="card dg-card h-100">
+                            <header class="card-header dg-card-header py-1 px-3 border-bottom-0">
+                                <span class="small mb-0">Adjustment</span>
+                            </header>
+                            <div class="card-body dg-card-body py-1 px-3 pt-0 text-end">
+                                <span class="fw-bold fs-6">{{ number_format($totalAdjust, 2) }}</span>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <article class="card dg-card h-100">
+                            <header class="card-header dg-card-header py-1 px-3 border-bottom-0">
+                                <span class="small mb-0">Cash Refund</span>
+                            </header>
+                            <div class="card-body dg-card-body py-1 px-3 pt-0 text-end">
+                                <span class="fw-bold fs-6">{{ number_format($totalCash, 2) }}</span>
+                            </div>
+                        </article>
+                    </div>
+
+                </div>
+            </section>
+
+            <section class="dg-section" id="dgPurchaseReturnRefundList">
+                <article class="card dg-card dg-print">
+                    <header class="card-header dg-card-header dg-list-card-header">
+                        <h2 class="dg-list-card-title">Purchase Return Refund List</h2>
+
+                        <form method="GET" action="{{ route('company.purchase-return-refunds.index') }}" class="dg-list-per-page">
+                            <input type="hidden" name="financial_year_id" value="{{ request('financial_year_id', $activeFy?->id) }}">
+                            <input type="hidden" name="start_date" value="{{ request('start_date', !empty($startDate) ? \Illuminate\Support\Carbon::parse($startDate)->format('Y-m-d') : '') }}">
+                            <input type="hidden" name="end_date" value="{{ request('end_date', !empty($endDate) ? \Illuminate\Support\Carbon::parse($endDate)->format('Y-m-d') : '') }}">
+                            <input type="hidden" name="supplier_id" value="{{ request('supplier_id') }}">
+                            <input type="hidden" name="search" value="{{ request('search') }}">
+                            <input type="hidden" name="status" value="{{ request()->has('status') ? request('status') : '1' }}">
+
+                            <label for="per_page" class="dg-list-per-page-label">Show</label>
+                            <select name="per_page" id="per_page" class="form-select dg-select dg-list-per-page-select" onchange="this.form.submit()">
+                                <option value="10" @selected($perPage == 10)>10</option>
+                                <option value="20" @selected($perPage == 20)>20</option>
+                                <option value="100" @selected($perPage == 100)>100</option>
+                                <option value="200" @selected($perPage == 200)>200</option>
+                            </select>
+                        </form>
+                    </header>
+
+                    <div class="card-body dg-card-body dg-list-card-body">
+                        <div class="dg-table-scroll">
+                            <table class="table dg-table dg-table-compact">
+                                <thead class="dg-head">
+                                    <tr>
+                                        <th scope="col">#</th>
+                                        <th scope="col">Refund No</th>
+                                        <th scope="col" class="dg-col-date">Refund Date</th>
+                                        <th scope="col">Original Return No</th>
+                                        <th scope="col">Supplier</th>
+                                        <th scope="col">Account</th>
+                                        <th scope="col" class="dg-col-num dg-col-total">Refund Total</th>
+                                        <th scope="col" class="dg-col-num">Adjustment</th>
+                                        <th scope="col" class="dg-col-status">Refund Status</th>
+                                        <th scope="col" class="dg-action-col">Action</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody class="dg-body">
+                                    @forelse ($refunds as $refund)
+                                        <tr class="dg-row">
+                                            <td>{{ $refunds->firstItem() + $loop->index }}</td>
+                                            <td>{{ $refund->refund_no }}</td>
+                                            <td class="dg-col-date">{{ $refund->refund_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $refund->purchaseReturn->return_no ?? '-' }}</td>
+                                            <td>{{ $refund->supplier->name ?? '-' }}</td>
+                                            <td>
+                                                @if ($refund->account)
+                                                    {{ $refund->account->account_name }}
+                                                @elseif ((float) $refund->cash_amount <= 0 && (float) $refund->adjust_amount > 0)
+                                                    Original Invoice Adjustment
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                            <td class="dg-col-num dg-col-total">{{ number_format($refund->refund_amount, 2) }}</td>
+                                            <td class="dg-col-num">{{ number_format($refund->adjust_amount, 2) }}</td>
+                                            <td class="dg-col-status">
+                                                @if ((int) $refund->status === 0)
+                                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
+                                                @else
+                                                    <span class="dg-badge dg-badge-status dg-badge-success">Active</span>
+                                                @endif
+                                            </td>
+                                            <td class="dg-action-col">
+                                                <div class="dg-action-group" role="group" aria-label="Refund actions for {{ $refund->refund_no }}">
+                                                    <a href="{{ route('company.purchase-return-refunds.show', $refund->id) }}" class="btn btn-sm btn-outline-primary dg-action-btn">View</a>
+                                                    @if ((int) $refund->status !== 0)
+                                                        <button type="button" class="btn btn-sm btn-outline-danger dg-action-btn" data-bs-toggle="modal" data-bs-target="#dgPurchaseReturnRefundCancelModal{{ $refund->id }}">Cancel</button>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr class="dg-row">
+                                            <td colspan="10" class="text-center">No purchase return refunds found.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="dg-list-footer">
+                            <p class="dg-list-meta">
+                                Showing {{ $refunds->firstItem() ?? 0 }} to {{ $refunds->lastItem() ?? 0 }} of {{ $refunds->total() }} records
+                            </p>
+
+                            <div class="dg-pagination">
+                                {{ $refunds->withQueryString()->onEachSide(1)->links('pagination::bootstrap-5') }}
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </section>
+
+            @foreach ($refunds as $refund)
+                @if ((int) $refund->status !== 0)
+                    @include('company.partials.dg-sales-cancel-modal', [
+                        'modalId' => 'dgPurchaseReturnRefundCancelModal' . $refund->id,
+                        'modalTitle' => 'Cancel Purchase Return Refund',
+                        'action' => route('company.purchase-return-refunds.cancel', $refund->id),
+                        'submitLabel' => 'Cancel Refund',
+                        'entityId' => $refund->id,
+                    ])
+                @endif
+            @endforeach
 
         </div>
-
-    </div>
+    </main>
 
 </div>
+
+@endif
+
+@if ($errors->has('cancel_date') || $errors->has('cancel_reason'))
+    @if (old('cancel_entity_id'))
+        @push('scripts')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    var modalEl = document.getElementById('dgPurchaseReturnRefundCancelModal{{ old('cancel_entity_id') }}');
+
+                    if (modalEl) {
+                        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                    }
+                });
+            </script>
+        @endpush
+    @endif
+@endif
 
 @endsection

@@ -94,7 +94,10 @@ $transaction->update([
 public static function reverseTransaction(
     SupplierTransaction $transaction,
     string $referenceType,
-    string $description
+    string $description,
+    ?string $transactionDate = null,
+    ?int $financialYearId = null,
+    ?string $remarks = null
 )
 {
     return self::createTransaction([
@@ -109,11 +112,11 @@ public static function reverseTransaction(
 
         'financial_year_id' =>
 
-            $transaction->financial_year_id,
+            $financialYearId ?? $transaction->financial_year_id,
 
         'transaction_date' =>
 
-            now()->toDateString(),
+            $transactionDate ?? now()->toDateString(),
 
         'voucher_no' =>
 
@@ -146,7 +149,7 @@ public static function reverseTransaction(
 
         'remarks' =>
 
-            'Reverse Entry',
+            $remarks ?? 'Reverse Entry',
 
         'created_by' =>
 
@@ -156,6 +159,71 @@ public static function reverseTransaction(
 
     ]);
 }
+
+    /*
+    |--------------------------------------------------------------------------
+    | REVERSE BY REFERENCE (cancellation)
+    |--------------------------------------------------------------------------
+    */
+
+    public static function deleteByReference(
+        int $companyId,
+        string $referenceType,
+        int $referenceId,
+        ?string $transactionDate = null,
+        ?int $financialYearId = null,
+        ?string $cancelReason = null
+    ): void
+    {
+        $transactions = SupplierTransaction::where(
+            'company_id',
+            $companyId
+        )
+        ->where(
+            'reference_type',
+            $referenceType
+        )
+        ->where(
+            'reference_id',
+            $referenceId
+        )
+        ->where(
+            'status',
+            1
+        )
+        ->get();
+
+        if ($transactions->isEmpty()) {
+
+            return;
+
+        }
+
+        $cancelReferenceType = $referenceType . '_cancel';
+
+        $description = match ($referenceType) {
+
+            'purchase_invoice' => 'Purchase Invoice Cancel' . ($cancelReason ? ': ' . $cancelReason : ''),
+
+            'purchase_payment' => 'Purchase Payment Cancel' . ($cancelReason ? ': ' . $cancelReason : ''),
+
+            default => 'Transaction Cancel' . ($cancelReason ? ': ' . $cancelReason : ''),
+
+        };
+
+        foreach ($transactions as $transaction) {
+
+            self::reverseTransaction(
+                $transaction,
+                $cancelReferenceType,
+                $description,
+                $transactionDate,
+                $financialYearId,
+                $cancelReason
+            );
+
+        }
+    }
 
 
 }

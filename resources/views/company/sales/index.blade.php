@@ -242,8 +242,30 @@
                                             <td class="dg-action-col d-print-none">
                                                 <div class="dg-action-group" role="group" aria-label="Invoice actions for {{ $invoice->invoice_no }}">
                                                     <a href="{{ route('company.sales.show', $invoice->id) }}" class="btn btn-sm btn-outline-primary dg-action-btn">View</a>
-                                                    @if ($invoice->status == 1)
-                                                        <button type="button" class="btn btn-sm btn-outline-danger dg-action-btn" data-bs-toggle="modal" data-bs-target="#dgSalesInvoiceCancelModal{{ $invoice->id }}">Cancel</button>
+                                                    @if ((int) $invoice->status === 1)
+                                                        @php
+                                                            $hasActivePayments = (int) ($invoice->active_payments_count ?? 0) > 0;
+                                                            $hasActiveReturns = in_array((int) $invoice->id, $activeReturnInvoiceIds ?? [], true);
+                                                            $canCancelInvoice = !$hasActivePayments && !$hasActiveReturns;
+
+                                                            if ($hasActivePayments && $hasActiveReturns) {
+                                                                $cancelBlockMessage = 'Cannot cancel: active payment(s) and sales return(s) exist.';
+                                                            } elseif ($hasActivePayments) {
+                                                                $cancelBlockMessage = 'Cannot cancel: one or more active payments exist.';
+                                                            } elseif ($hasActiveReturns) {
+                                                                $cancelBlockMessage = 'Cannot cancel: one or more active sales returns exist.';
+                                                            } else {
+                                                                $cancelBlockMessage = '';
+                                                            }
+                                                        @endphp
+
+                                                        @if ($canCancelInvoice)
+                                                            <button type="button" class="btn btn-sm btn-outline-danger dg-action-btn" data-bs-toggle="modal" data-bs-target="#dgSalesInvoiceCancelModal{{ $invoice->id }}">Cancel</button>
+                                                        @else
+                                                            <span class="d-inline-block" tabindex="0" title="{{ $cancelBlockMessage }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="{{ $cancelBlockMessage }}">
+                                                                <button type="button" class="btn btn-sm btn-outline-danger dg-action-btn" disabled aria-disabled="true">Cancel</button>
+                                                            </span>
+                                                        @endif
                                                     @endif
                                                 </div>
                                             </td>
@@ -271,7 +293,12 @@
             </section>
 
             @foreach ($invoices as $invoice)
-                @if ((int) $invoice->status === 1)
+                @php
+                    $hasActivePayments = (int) ($invoice->active_payments_count ?? 0) > 0;
+                    $hasActiveReturns = in_array((int) $invoice->id, $activeReturnInvoiceIds ?? [], true);
+                    $canCancelInvoice = !$hasActivePayments && !$hasActiveReturns;
+                @endphp
+                @if ((int) $invoice->status === 1 && $canCancelInvoice)
                     @include('company.partials.dg-sales-cancel-modal', [
                         'modalId' => 'dgSalesInvoiceCancelModal' . $invoice->id,
                         'modalTitle' => 'Cancel Sales Invoice',
@@ -302,6 +329,16 @@
         @endpush
     @endif
 @endif
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                bootstrap.Tooltip.getOrCreateInstance(el);
+            });
+        });
+    </script>
+@endpush
 
 @if (request('print'))
     @push('scripts')

@@ -1,15 +1,16 @@
 @extends('company.layout')
 
-@section('title', 'Purchase Invoice Print')
+@section('title', 'Purchase Return Refund Print')
 
 @section('content')
 
 @php
     $company = auth()->user()->company;
+    $purchaseReturn = $refund->purchaseReturn;
 
-    $grandTotalAmount = (float) $invoice->grand_total;
-    $amountRupees = (int) floor($grandTotalAmount);
-    $amountPaisa = (int) round(($grandTotalAmount - $amountRupees) * 100);
+    $refundTotalAmount = (float) $refund->refund_amount;
+    $amountRupees = (int) floor($refundTotalAmount);
+    $amountPaisa = (int) round(($refundTotalAmount - $amountRupees) * 100);
     $rupeeWords = trim(preg_replace('/\s+only$/i', '', preg_replace('/\s+only\s+thousand\s+/i', ' Thousand ', numberToWords($amountRupees))));
     if ($amountPaisa > 0) {
         $paisaWords = trim(preg_replace('/\s+only$/i', '', preg_replace('/\s+only\s+thousand\s+/i', ' Thousand ', numberToWords($amountPaisa))));
@@ -110,63 +111,63 @@
                                     alt="{{ $company->company_name ?? 'Company' }}"
                                     class="dg-invoice-print-logo-center">
                             @endif
-                            <h1 class="dg-invoice-print-title">PURCHASE INVOICE</h1>
+                            <h1 class="dg-invoice-print-title">PURCHASE RETURN REFUND</h1>
                         </div>
 
                         <section class="dg-invoice-print-header-col dg-invoice-print-header-right">
                             <h2 class="dg-invoice-party-title">Supplier Information</h2>
                             <div class="dg-invoice-field-list">
-                                @if (!empty($invoice->supplier?->name))
+                                @if (!empty($refund->supplier?->name))
                                     <div class="dg-invoice-field-row">
                                         <span class="dg-invoice-field-label">Supplier Name</span>
                                         <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                        <span class="dg-invoice-field-value">{{ $invoice->supplier->name }}</span>
+                                        <span class="dg-invoice-field-value">{{ $refund->supplier->name }}</span>
                                     </div>
                                 @endif
 
-                                @if (!empty($invoice->supplier?->authority_name))
+                                @if (!empty($refund->supplier?->authority_name))
                                     <div class="dg-invoice-field-row">
                                         <span class="dg-invoice-field-label">Contact Person</span>
                                         <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                        <span class="dg-invoice-field-value">{{ $invoice->supplier->authority_name }}</span>
+                                        <span class="dg-invoice-field-value">{{ $refund->supplier->authority_name }}</span>
                                     </div>
                                 @endif
 
-                                @if (!empty($invoice->supplier?->address))
+                                @if (!empty($refund->supplier?->address))
                                     <div class="dg-invoice-field-row">
                                         <span class="dg-invoice-field-label">Address</span>
                                         <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                        <span class="dg-invoice-field-value">{{ $invoice->supplier->address }}</span>
+                                        <span class="dg-invoice-field-value">{{ $refund->supplier->address }}</span>
                                     </div>
                                 @endif
 
-                                @if (!empty($invoice->supplier?->mobile))
+                                @if (!empty($refund->supplier?->mobile))
                                     <div class="dg-invoice-field-row">
                                         <span class="dg-invoice-field-label">Phone</span>
                                         <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                        <span class="dg-invoice-field-value">{{ $invoice->supplier->mobile }}</span>
+                                        <span class="dg-invoice-field-value">{{ $refund->supplier->mobile }}</span>
                                     </div>
-                                @elseif (!empty($invoice->supplier?->telephone))
+                                @elseif (!empty($refund->supplier?->telephone))
                                     <div class="dg-invoice-field-row">
                                         <span class="dg-invoice-field-label">Phone</span>
                                         <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                        <span class="dg-invoice-field-value">{{ $invoice->supplier->telephone }}</span>
+                                        <span class="dg-invoice-field-value">{{ $refund->supplier->telephone }}</span>
                                     </div>
                                 @endif
 
-                                @if (!empty($invoice->supplier?->email))
+                                @if (!empty($refund->supplier?->email))
                                     <div class="dg-invoice-field-row">
                                         <span class="dg-invoice-field-label">Email</span>
                                         <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                        <span class="dg-invoice-field-value">{{ $invoice->supplier->email }}</span>
+                                        <span class="dg-invoice-field-value">{{ $refund->supplier->email }}</span>
                                     </div>
                                 @endif
 
-                                @if ($invoice->supplier)
+                                @if ($refund->supplier)
                                     <div class="dg-invoice-field-row">
                                         <span class="dg-invoice-field-label">VAT No</span>
                                         <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                        <span class="dg-invoice-field-value">{{ !empty($invoice->supplier->tax_no) ? $invoice->supplier->tax_no : '-' }}</span>
+                                        <span class="dg-invoice-field-value">{{ !empty($refund->supplier->tax_no) ? $refund->supplier->tax_no : '-' }}</span>
                                     </div>
 
                                     <div class="dg-invoice-field-row">
@@ -182,91 +183,89 @@
                     <div class="dg-invoice-print-header-rule" role="presentation"></div>
 
                     <div class="dg-invoice-print-meta">
-                        @if (!empty($invoice->invoice_no))
+                        @if (!empty($refund->refund_no))
                             <div class="dg-invoice-field-row">
-                                <span class="dg-invoice-field-label">Invoice No</span>
+                                <span class="dg-invoice-field-label">Refund No</span>
                                 <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                <span class="dg-invoice-field-value">{{ $invoice->invoice_no }}</span>
+                                <span class="dg-invoice-field-value">{{ $refund->refund_no }}</span>
                             </div>
                         @endif
 
-                        @if (!empty($invoice->purchase_date))
+                        @if (!empty($refund->refund_date))
                             <div class="dg-invoice-field-row">
-                                <span class="dg-invoice-field-label">Invoice Date</span>
+                                <span class="dg-invoice-field-label">Refund Date</span>
                                 <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                <span class="dg-invoice-field-value">{{ \Illuminate\Support\Carbon::parse($invoice->purchase_date)->format('d-m-Y') }}</span>
+                                <span class="dg-invoice-field-value">{{ $refund->refund_date->format('d-m-Y') }}</span>
                             </div>
                         @endif
 
                         <div class="dg-invoice-field-row">
-                            <span class="dg-invoice-field-label">Status</span>
+                            <span class="dg-invoice-field-label">Refund Status</span>
                             <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
                             <span class="dg-invoice-field-value">
-                                @if ((int) $invoice->status === 1)
-                                    <span class="dg-badge dg-badge-status dg-badge-success">Active</span>
-                                @else
+                                @if ((int) $refund->status === 0)
                                     <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
+                                @else
+                                    <span class="dg-badge dg-badge-status dg-badge-success">Active</span>
                                 @endif
                             </span>
                         </div>
 
-                        @if (!empty($invoice->payment_status))
+                        @if (!empty($purchaseReturn?->return_no))
                             <div class="dg-invoice-field-row">
-                                <span class="dg-invoice-field-label">Payment Status</span>
+                                <span class="dg-invoice-field-label">Original Return No</span>
                                 <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                <span class="dg-invoice-field-value">
-                                    <span class="dg-badge dg-badge-status dg-badge-{{ $invoice->payment_status == 'paid' ? 'success' : ($invoice->payment_status == 'partial' ? 'warning' : ($invoice->payment_status == 'cancelled' ? 'secondary' : 'danger')) }}">
-                                        {{ ucfirst($invoice->payment_status) }}
-                                    </span>
-                                </span>
+                                <span class="dg-invoice-field-value">{{ $purchaseReturn->return_no }}</span>
                             </div>
                         @endif
                     </div>
 
                     <section class="dg-invoice-lines">
-                        <h2 class="dg-invoice-lines-title">Invoice Items</h2>
+                        <h2 class="dg-invoice-lines-title">Refund Details</h2>
                         <div class="dg-table-scroll">
                             <table class="table dg-table dg-invoice-table">
                                 <thead class="dg-head">
                                     <tr>
                                         <th scope="col" class="dg-col-num">#</th>
-                                        <th scope="col">Item</th>
-                                        <th scope="col" class="dg-col-num">Qty</th>
-                                        <th scope="col">Unit</th>
-                                        <th scope="col" class="dg-col-num">Unit Cost</th>
-                                        <th scope="col" class="dg-col-num">VAT %</th>
-                                        <th scope="col" class="dg-col-num">VAT Amount</th>
+                                        <th scope="col">Description</th>
+                                        <th scope="col">Reference</th>
+                                        <th scope="col" class="dg-col-date">Date</th>
                                         <th scope="col" class="dg-col-num">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody class="dg-body">
-                                    @foreach ($invoice->items as $key => $item)
+                                    @php $lineNo = 0; @endphp
+                                    @foreach ($refund->adjustments as $adjustment)
+                                        @php $lineNo++; @endphp
                                         <tr class="dg-row">
-                                            <td class="dg-col-num">{{ $key + 1 }}</td>
-                                            <td class="dg-invoice-item-name">
-                                                @if ($item->item_type === 'service' && !empty($item->service?->name))
-                                                    {{ $item->service->name }}
-                                                @elseif ($item->item_type !== 'service' && !empty($item->product?->name))
-                                                    {{ $item->product->name }}
-                                                @endif
-                                                @if ($item->returned_qty > 0)
-                                                    <span class="dg-return-note">Returned: {{ $item->returned_qty }}</span>
-                                                @endif
-                                            </td>
-                                            <td class="dg-col-num">{{ $item->quantity }}</td>
-                                            <td>
-                                                @if ($item->item_type === 'service')
-                                                    Service
-                                                @elseif ($item->product)
-                                                    {{ $item->product->unit?->short_name ?? $item->product->unit?->name ?? 'Unit' }}
+                                            <td class="dg-col-num">{{ $lineNo }}</td>
+                                            <td class="dg-invoice-item-name">Original Invoice Adjustment</td>
+                                            <td>{{ $adjustment->invoice->invoice_no ?? '-' }}</td>
+                                            <td class="dg-col-date">
+                                                @if (!empty($adjustment->invoice?->purchase_date))
+                                                    {{ \Illuminate\Support\Carbon::parse($adjustment->invoice->purchase_date)->format('d-m-Y') }}
+                                                @else
+                                                    -
                                                 @endif
                                             </td>
-                                            <td class="dg-col-num">{{ number_format($item->unit_price, 2) }}</td>
-                                            <td class="dg-col-num">{{ number_format($item->vat_rate, 2) }}%</td>
-                                            <td class="dg-col-num">{{ number_format($item->vat_amount, 2) }}</td>
-                                            <td class="dg-col-num">{{ number_format($item->total_price, 2) }}</td>
+                                            <td class="dg-col-num">{{ number_format($adjustment->adjust_amount, 2) }}</td>
                                         </tr>
                                     @endforeach
+                                    @if ((float) $refund->cash_amount > 0)
+                                        @php $lineNo++; @endphp
+                                        <tr class="dg-row">
+                                            <td class="dg-col-num">{{ $lineNo }}</td>
+                                            <td class="dg-invoice-item-name">Cash Refund From Supplier</td>
+                                            <td>{{ $refund->account->account_name ?? '-' }}</td>
+                                            <td class="dg-col-date">{{ $refund->refund_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td class="dg-col-num">{{ number_format($refund->cash_amount, 2) }}</td>
+                                        </tr>
+                                    @endif
+                                    @if ($lineNo === 0)
+                                        <tr class="dg-row">
+                                            <td colspan="5" class="text-center">No refund details found.</td>
+                                        </tr>
+                                    @endif
                                 </tbody>
                             </table>
                         </div>
@@ -274,22 +273,22 @@
 
                     <div class="dg-invoice-footer dg-invoice-print-footer">
                         <section class="dg-invoice-payment">
-                            <h2 class="dg-invoice-party-title">Payment Information</h2>
+                            <h2 class="dg-invoice-party-title">Settlement Information</h2>
                             <dl class="dg-invoice-dl">
                                 <div class="dg-invoice-dl-row">
-                                    <dt class="dg-invoice-dl-label">Paid Amount</dt>
-                                    <dd class="dg-invoice-dl-value dg-summary-paid">{{ number_format($invoice->paid_amount, 2) }}</dd>
+                                    <dt class="dg-invoice-dl-label">Adjustment Amount</dt>
+                                    <dd class="dg-invoice-dl-value">{{ number_format($refund->adjust_amount, 2) }}</dd>
                                 </div>
                                 <div class="dg-invoice-dl-row">
-                                    <dt class="dg-invoice-dl-label">Due Amount</dt>
-                                    <dd class="dg-invoice-dl-value dg-summary-due">{{ number_format($invoice->due_amount, 2) }}</dd>
+                                    <dt class="dg-invoice-dl-label">Cash Refund Amount</dt>
+                                    <dd class="dg-invoice-dl-value dg-summary-paid">{{ number_format($refund->cash_amount, 2) }}</dd>
                                 </div>
                             </dl>
 
-                            @if (!empty($invoice->note))
+                            @if (!empty($refund->note))
                                 <div class="dg-invoice-note-block">
                                     <h3 class="dg-invoice-note-title">Note</h3>
-                                    <div class="dg-invoice-note-body">{{ $invoice->note }}</div>
+                                    <div class="dg-invoice-note-body">{{ $refund->note }}</div>
                                 </div>
                             @endif
 
@@ -303,35 +302,19 @@
                             <h2 class="dg-invoice-party-title">Summary</h2>
                             <div class="dg-invoice-totals-box">
                                 <div class="dg-summary-item">
-                                    <span class="dg-summary-label">Subtotal</span>
-                                    <span class="dg-summary-value">{{ number_format($invoice->subtotal, 2) }}</span>
+                                    <span class="dg-summary-label">Adjustment</span>
+                                    <span class="dg-summary-value">{{ number_format($refund->adjust_amount, 2) }}</span>
                                 </div>
                                 <div class="dg-summary-item">
-                                    <span class="dg-summary-label">Discount</span>
-                                    <span class="dg-summary-value">{{ number_format($invoice->discount, 2) }}</span>
-                                </div>
-                                <div class="dg-summary-item">
-                                    <span class="dg-summary-label">Taxable Amount</span>
-                                    <span class="dg-summary-value">{{ number_format(max(0, (float) $invoice->subtotal - (float) $invoice->discount), 2) }}</span>
-                                </div>
-                                <div class="dg-summary-item">
-                                    <span class="dg-summary-label">VAT</span>
-                                    <span class="dg-summary-value">{{ number_format($invoice->total_vat, 2) }}</span>
+                                    <span class="dg-summary-label">Cash Refund</span>
+                                    <span class="dg-summary-value">{{ number_format($refund->cash_amount, 2) }}</span>
                                 </div>
 
                                 <div class="dg-invoice-totals-divider"></div>
 
                                 <div class="dg-summary-item dg-summary-total">
-                                    <span class="dg-summary-label">Grand Total</span>
-                                    <span class="dg-summary-value">{{ number_format($invoice->grand_total, 2) }}</span>
-                                </div>
-                                <div class="dg-summary-item">
-                                    <span class="dg-summary-label">Paid</span>
-                                    <span class="dg-summary-value dg-summary-paid">{{ number_format($invoice->paid_amount, 2) }}</span>
-                                </div>
-                                <div class="dg-summary-item">
-                                    <span class="dg-summary-label">Due</span>
-                                    <span class="dg-summary-value dg-summary-due">{{ number_format($invoice->due_amount, 2) }}</span>
+                                    <span class="dg-summary-label">Refund Total</span>
+                                    <span class="dg-summary-value">{{ number_format($refund->refund_amount, 2) }}</span>
                                 </div>
                             </div>
                         </section>

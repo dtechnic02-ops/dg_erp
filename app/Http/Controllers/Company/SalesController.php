@@ -24,6 +24,7 @@ use App\Services\CustomerTransactionService;
 use App\Models\AccountTransaction;
 use App\Models\CustomerTransaction;
 use App\Models\StockMovement;
+
 use App\Services\ValidationService;
 class SalesController extends Controller
 
@@ -62,6 +63,11 @@ public function index(Request $request)
     $query = SalesInvoice::with([
         'customer',
         'items',
+    ])
+    ->withCount([
+        'payments as active_payments_count' => function ($payment) {
+            $payment->where('status', 1);
+        },
     ])
     ->where(
         'company_id',
@@ -203,9 +209,9 @@ public function index(Request $request)
 
     /**
      * SUMMARY TOTALS
-     * (Cloned from the fully filtered query, before pagination)
+     * (Active records only — FY §10B: cancelled records may display but never sum)
      */
-    $summaryQuery = clone $query;
+    $summaryQuery = (clone $query)->where('status', 1);
 
     $totalAmount = $summaryQuery->sum('grand_total');
     $totalPaid   = $summaryQuery->sum('paid_amount');
@@ -228,6 +234,13 @@ public function index(Request $request)
     app(SalesReturnController::class)
         ->attachReturnableQuantityToInvoices($invoices, $companyId);
 
+    $activeReturnInvoiceIds = SalesReturn::where('company_id', $companyId)
+        ->whereIn('sales_invoice_id', $invoices->pluck('id'))
+        ->where('status', 1)
+        ->pluck('sales_invoice_id')
+        ->unique()
+        ->all();
+
     return view(
         'company.sales.index',
         compact(
@@ -240,7 +253,8 @@ public function index(Request $request)
             'totalAmount',
             'totalPaid',
             'totalDue',
-            'perPage'
+            'perPage',
+            'activeReturnInvoiceIds'
         )
     );
 }
@@ -274,7 +288,6 @@ public function printList(Request $request)
 
     $query = SalesInvoice::with([
         'customer',
-        'creator',
     ])
     ->where(
         'company_id',
@@ -394,9 +407,11 @@ public function printList(Request $request)
         );
     }
 
-    $totalAmount    = (clone $query)->sum('grand_total');
-    $totalPaid      = (clone $query)->sum('paid_amount');
-    $totalDue       = (clone $query)->sum('due_amount');
+    $totalsQuery = (clone $query)->where('status', 1);
+
+    $totalAmount    = (clone $totalsQuery)->sum('grand_total');
+    $totalPaid      = (clone $totalsQuery)->sum('paid_amount');
+    $totalDue       = (clone $totalsQuery)->sum('due_amount');
     $totalCount     = (clone $query)->count();
     $activeCount    = (clone $query)->where('status', 1)->count();
     $cancelledCount = (clone $query)->where('status', 0)->count();
@@ -451,13 +466,23 @@ public function create()
     
     
 
-$invoiceNo = InvoiceNumberService::generate(
-    'SI',
-    $companyId,
-    $activeFy->id,
-    SalesInvoice::class,
-    'invoice_no'
-);
+    $invoiceNo = DB::transaction(function () use ($companyId, $activeFy) {
+        return InvoiceNumberService::generate(
+            'SI',
+            $companyId,
+            $activeFy->id,
+            SalesInvoice::class,
+            'invoice_no'
+        );
+    });
+
+    session([
+        'pending_sales_invoice' => [
+            'invoice_no'          => $invoiceNo,
+            'company_id'          => $companyId,
+            'financial_year_id'   => $activeFy->id,
+        ],
+    ]);
    
 
     $customers = Customer::where(
@@ -466,13 +491,20 @@ $invoiceNo = InvoiceNumberService::generate(
         )
         ->get();
 
-    $products = Product::where(
+    $products = Product::with([
+            'unit',
+            'vat',
+        ])
+        ->where(
             'company_id',
             $companyId
         )
         ->get();
 
-    $services = Service::where(
+    $services = Service::with([
+            'vat',
+        ])
+        ->where(
             'company_id',
             $companyId
         )
@@ -547,14 +579,6 @@ $request->validate([
     'paid_amount' =>
         'nullable|numeric|min:0',
 
-    'product_id.*' =>
-        'nullable|exists:products,id,company_id,' .
-        $companyId,
-
-    'service_id.*' =>
-        'nullable|exists:services,id,company_id,' .
-        $companyId,
-
     'account_id' =>
         'nullable|exists:accounts,id,company_id,' .
         $companyId,
@@ -576,7 +600,7 @@ if (
 
 try {
 
-    $amounts = $this->calculateStoreAmounts($request);
+    $amounts = $this->calculateStoreAmounts($request, $companyId);
 
     $paidAmount = round((float) ($request->paid_amount ?? 0), 2);
 
@@ -651,14 +675,44 @@ try {
                 'partial';
         }
 
-        $invoiceNo =
-            InvoiceNumberService::generate(
-                'SI',
-                $companyId,
-                $activeFy->id,
-                SalesInvoice::class,
-                'invoice_no'
+        $pending = session('pending_sales_invoice');
+
+        if (
+            !is_array($pending)
+            || (int) ($pending['company_id'] ?? 0) !== $companyId
+            || (int) ($pending['financial_year_id'] ?? 0) !== (int) $activeFy->id
+            || empty($pending['invoice_no'])
+        ) {
+            throw new \Exception(
+                'Please reopen the sales invoice create form and try again.'
             );
+        }
+
+        $invoiceNo = (string) $pending['invoice_no'];
+
+        $expectedPrefix = sprintf(
+            'SI-%d-%d-',
+            $companyId,
+            $activeFy->id
+        );
+
+        if (!str_starts_with($invoiceNo, $expectedPrefix)) {
+            throw new \Exception(
+                'Invalid invoice number. Please reopen the sales invoice create form and try again.'
+            );
+        }
+
+        $invoiceTaken = SalesInvoice::where('company_id', $companyId)
+            ->where('financial_year_id', $activeFy->id)
+            ->where('invoice_no', $invoiceNo)
+            ->lockForUpdate()
+            ->exists();
+
+        if ($invoiceTaken) {
+            throw new \Exception(
+                'Invoice number conflict. Please reopen the sales invoice create form and try again.'
+            );
+        }
 
         $customer = Customer::where('company_id', $companyId)
             ->findOrFail($request->customer_id);
@@ -719,6 +773,8 @@ try {
                 'status' => 1,
 
             ]);
+
+        session()->forget('pending_sales_invoice');
     
 
 
@@ -1020,7 +1076,7 @@ try {
             'VAT rate cannot be negative.',
             'VAT amount cannot be negative.',
             'Discount cannot be negative.',
-            'Discount cannot exceed subtotal.',
+            'Discount cannot exceed gross total.',
             'Grand total must be greater than zero.',
             'Insufficient stock.',
             'Invalid quantity',
@@ -1028,6 +1084,9 @@ try {
             'Insufficient account balance.',
             'Product is required for product lines.',
             'Service is required for service lines.',
+            'Please reopen the sales invoice create form and try again.',
+            'Invalid invoice number. Please reopen the sales invoice create form and try again.',
+            'Invoice number conflict. Please reopen the sales invoice create form and try again.',
         ];
 
         $this->logSaleException('Sales invoice store failed.', $e, [
@@ -1049,7 +1108,7 @@ try {
 
 }
 
-protected function calculateStoreAmounts(Request $request): array
+protected function calculateStoreAmounts(Request $request, int $companyId): array
 {
     $lineItems = [];
     $subtotal = 0;
@@ -1080,16 +1139,12 @@ protected function calculateStoreAmounts(Request $request): array
             throw new \Exception('VAT amount cannot be negative.');
         }
 
-        $productId = $request->product_id[$key] ?? null;
-        $serviceId = $request->service_id[$key] ?? null;
-
-        if ($type === 'product' && empty($productId)) {
-            throw new \Exception('Product is required for product lines.');
-        }
-
-        if ($type === 'service' && empty($serviceId)) {
-            throw new \Exception('Service is required for service lines.');
-        }
+        [$productId, $serviceId] = $this->normalizeStoreLineItemIds(
+            $type,
+            $request->product_id[$key] ?? null,
+            $request->service_id[$key] ?? null,
+            $companyId
+        );
 
         $subtotal = round($subtotal + $lineAmount, 2);
         $totalVat = round($totalVat + $vatAmount, 2);
@@ -1106,18 +1161,19 @@ protected function calculateStoreAmounts(Request $request): array
         ];
     }
 
+    $grossTotal = round($subtotal + $totalVat, 2);
+
     $discount = round((float) ($request->discount_amount ?? 0), 2);
 
     if ($discount < 0) {
         throw new \Exception('Discount cannot be negative.');
     }
 
-    if ($discount > $subtotal) {
-        throw new \Exception('Discount cannot exceed subtotal.');
+    if ($discount > $grossTotal) {
+        throw new \Exception('Discount cannot exceed gross total.');
     }
 
-    $taxableAmount = round(max(0, $subtotal - $discount), 2);
-    $grandTotal = round($taxableAmount + $totalVat, 2);
+    $grandTotal = round($grossTotal - $discount, 2);
 
     if ($grandTotal <= 0) {
         throw new \Exception('Grand total must be greater than zero.');
@@ -1127,10 +1183,51 @@ protected function calculateStoreAmounts(Request $request): array
         'lineItems'      => $lineItems,
         'subtotal'       => $subtotal,
         'discount'       => $discount,
-        'taxableAmount'  => $taxableAmount,
+        'grossTotal'     => $grossTotal,
         'totalVat'       => $totalVat,
         'grandTotal'     => $grandTotal,
     ];
+}
+
+protected function normalizeStoreLineItemIds(
+    string $type,
+    mixed $productId,
+    mixed $serviceId,
+    int $companyId
+): array {
+    if ($type === 'product') {
+        if (empty($productId)) {
+            throw new \Exception('Product is required for product lines.');
+        }
+
+        $validProduct = Product::where('company_id', $companyId)
+            ->where('id', $productId)
+            ->exists();
+
+        if (!$validProduct) {
+            throw new \Exception('Product is required for product lines.');
+        }
+
+        return [(int) $productId, null];
+    }
+
+    if ($type === 'service') {
+        if (empty($serviceId)) {
+            throw new \Exception('Service is required for service lines.');
+        }
+
+        $validService = Service::where('company_id', $companyId)
+            ->where('id', $serviceId)
+            ->exists();
+
+        if (!$validService) {
+            throw new \Exception('Service is required for service lines.');
+        }
+
+        return [null, (int) $serviceId];
+    }
+
+    throw new \Exception('Product is required for product lines.');
 }
 
 public function cancel(Request $request, $id)
@@ -1173,6 +1270,12 @@ public function cancel(Request $request, $id)
             if ($invoice->status == 0)
             {
                 throw new \Exception('Sales Already Cancelled.');
+            }
+
+            if ((int) $invoice->financial_year_id !== (int) $activeFy->id) {
+                throw new \Exception(
+                    'This Sales Invoice belongs to another Financial Year. Please activate that Financial Year first.'
+                );
             }
 
             $activePaymentsExist = SalesPayment::where('company_id', $companyId)
@@ -1239,6 +1342,7 @@ public function cancel(Request $request, $id)
     {
         $safeMessages = [
             'Sales Already Cancelled.',
+            'This Sales Invoice belongs to another Financial Year. Please activate that Financial Year first.',
             'Invoice cannot be cancelled because one or more active payments exist.',
             'This invoice cannot be cancelled because one or more active sales returns exist.',
             'Cancel date must belong to the active financial year.',
@@ -1265,10 +1369,9 @@ public function cancel(Request $request, $id)
 public function print($id)
 {
     $invoice = SalesInvoice::with([
-
             'customer',
-            'items.product'
-
+            'items.product.unit',
+            'items.service',
         ])
         ->where(
             'company_id',
@@ -1296,7 +1399,7 @@ public function print($id)
 
         'customer',
 
-        'items.product',
+        'items.product.unit',
 
         'items.service',
 
@@ -1323,7 +1426,7 @@ public function edit($id)
 
     $invoice = SalesInvoice::with([
             'customer',
-            'items.product',
+            'items.product.unit',
             'items.service',
             'financialYear',
             'payments.account',
@@ -1430,14 +1533,25 @@ public function update(Request $request, $id)
             $customer = Customer::where('company_id', $companyId)
                 ->findOrFail($invoice->customer_id);
 
+            $newSaleDate = $saleDate->toDateString();
+            $currentSaleDate = $invoice->sale_date?->format('Y-m-d');
+
             $invoice->update([
-                'sale_date' => $request->sale_date,
+                'sale_date' => $newSaleDate,
                 'due_date' => $this->calculateInvoiceDueDate(
-                    $request->sale_date,
+                    $newSaleDate,
                     $customer
                 ),
                 'note' => $request->note,
             ]);
+
+            if ($newSaleDate !== $currentSaleDate) {
+                $this->syncInvoiceSaleBusinessDate(
+                    $invoice,
+                    $newSaleDate,
+                    $companyId
+                );
+            }
         });
     } catch (\Throwable $e) {
         return back()->with(
@@ -1460,6 +1574,28 @@ public function update(Request $request, $id)
         ->route('company.sales.index')
         ->with('success', 'Sales invoice updated successfully.');
 }
+
+    protected function syncInvoiceSaleBusinessDate(
+        SalesInvoice $invoice,
+        string $saleDate,
+        int $companyId
+    ): void {
+        CustomerTransaction::where('company_id', $companyId)
+            ->where('reference_type', 'sales_invoice')
+            ->where('reference_id', $invoice->id)
+            ->update([
+                'transaction_date' => $saleDate,
+            ]);
+
+        StockMovement::where('company_id', $companyId)
+            ->where('financial_year_id', $invoice->financial_year_id)
+            ->where('type', 'sale')
+            ->where('reference_no', $invoice->invoice_no)
+            ->where('quantity', '<', 0)
+            ->update([
+                'transaction_date' => $saleDate,
+            ]);
+    }
 
     protected function invoiceSaleDateIsLocked(
         SalesInvoice $invoice,

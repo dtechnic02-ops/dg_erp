@@ -1,98 +1,242 @@
 <?php
 
+
+
 namespace App\Models;
 
 
-use App\Models\Company;
-use App\Models\Supplier;
-use App\Models\User;
-use App\Models\FinancialYear;
-use App\Models\PurchaseItem;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 use Illuminate\Database\Eloquent\Model;
 
+
+
 class PurchaseInvoice extends Model
+
 {
+
     use HasFactory;
+
+
 
     protected $fillable = [
 
-'created_by',
+        'created_by',
 
-'company_id',
+        'company_id',
 
-'financial_year_id',
+        'financial_year_id',
 
-'supplier_id',
+        'supplier_id',
 
-'invoice_no',
+        'invoice_no',
 
-'purchase_date',
+        'purchase_date',
 
-'subtotal',
+        'due_date',
 
-'discount',
+        'subtotal',
 
-'total_vat',
+        'discount',
 
-'grand_total',
+        'total_vat',
 
-'paid_amount',
+        'grand_total',
 
-'due_amount',
+        'paid_amount',
 
-'payment_status',
+        'due_amount',
 
-'note',
+        'payment_status',
 
-'status',
+        'note',
 
-];
+        'status',
 
-    // SUPPLIER
+    ];
+
+
+
+    protected $casts = [
+
+        'purchase_date' => 'date',
+
+        'due_date'      => 'date',
+
+        'subtotal'      => 'decimal:2',
+
+        'discount'      => 'decimal:2',
+
+        'total_vat'     => 'decimal:2',
+
+        'grand_total'   => 'decimal:2',
+
+        'paid_amount'   => 'decimal:2',
+
+        'due_amount'    => 'decimal:2',
+
+        'status'        => 'integer',
+
+    ];
+
+
 
     public function supplier()
+
     {
+
         return $this->belongsTo(Supplier::class);
+
     }
 
-    // PURCHASE ITEMS
+
 
     public function items()
+
     {
+
         return $this->hasMany(
+
             PurchaseItem::class,
+
             'purchase_invoice_id'
+
         );
+
     }
 
-    // COMPANY
+
 
     public function company()
-{
-    return $this->belongsTo(Company::class, 'company_id');
-}
 
-    // CREATOR
+    {
+
+        return $this->belongsTo(Company::class, 'company_id');
+
+    }
+
+
 
     public function creator()
+
     {
+
         return $this->belongsTo(
+
             User::class,
+
             'created_by'
+
         );
+
     }
+
+
+
     public function financialYear()
-{
 
-return $this->belongsTo(
+    {
 
-FinancialYear::class,
+        return $this->belongsTo(
 
-'financial_year_id'
+            FinancialYear::class,
 
-);
+            'financial_year_id'
+
+        );
+
+    }
+
+
+
+    public function payments()
+
+    {
+
+        return $this->hasMany(
+
+            PurchasePayment::class,
+
+            'purchase_invoice_id'
+
+        );
+
+    }
+
+
+
+    public function activePayments()
+
+    {
+
+        return $this->hasMany(
+
+            PurchasePayment::class,
+
+            'purchase_invoice_id'
+
+        )->where('status', PurchasePayment::STATUS_ACTIVE);
+
+    }
+
+
+
+    public function sumActivePaidAmount(): float
+
+    {
+
+        return round((float) $this->activePayments()->sum('amount'), 2);
+
+    }
+
+
+
+    public function dueDaysLabel(): string
+
+    {
+
+        if ((float) $this->due_amount <= 0) {
+
+            return 'Paid';
+
+        }
+
+
+
+        if (!$this->due_date) {
+
+            return '-';
+
+        }
+
+
+
+        $today = \Illuminate\Support\Carbon::today();
+
+        $dueDate = \Illuminate\Support\Carbon::parse($this->due_date)->startOfDay();
+
+
+
+        if ($today->lt($dueDate)) {
+
+            return $today->diffInDays($dueDate) . ' Days Left';
+
+        }
+
+
+
+        if ($today->gt($dueDate)) {
+
+            return 'Overdue ' . $dueDate->diffInDays($today) . ' Days';
+
+        }
+
+
+
+        return 'Due Today';
+
+    }
 
 }
-}
+

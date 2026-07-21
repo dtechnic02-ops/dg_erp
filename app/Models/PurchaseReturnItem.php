@@ -20,7 +20,9 @@ class PurchaseReturnItem extends Model
 
     'purchase_invoice_id',
 
-    'product_id',
+     'product_id',
+
+    'service_id',
 
     'vat_id',
 
@@ -50,6 +52,14 @@ class PurchaseReturnItem extends Model
     {
         return $this->belongsTo(
             Product::class
+        );
+    }
+
+    public function service()
+    {
+        return $this->belongsTo(
+            Service::class,
+            'service_id'
         );
     }
 

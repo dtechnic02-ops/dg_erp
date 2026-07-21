@@ -74,31 +74,60 @@ Sales Cancel ensures that a voided invoice leaves no residual effect on stock, c
 
 #### Sales Return
 
-**Sales Return** records the physical return of sold products back into inventory against an existing sales invoice.
+**Sales Return** records the return of sold invoice lines against an existing sales invoice. Sales Return consists of two official workflows: **Product Return** and **Service Return**.
 
-Business effect:
+**Product Return** business effect:
 
-- Available return quantity is validated before processing.
-- Product stock increases.
+- References an existing Product Sales Line on a Sales Invoice.
+- Available Quantity validation is mandatory.
+- Stock IN is mandatory.
 - Return totals are calculated.
-- `refund_amount` is set equal to the return Grand Total.
+- Refund Balance is created (`refund_amount` is set equal to the return Grand Total).
 - **No** Customer Ledger entry is created.
 - **No** Account Ledger entry is created.
 
-Sales Return handles goods and return value tracking only. It does not move money. Money movement is handled exclusively by Sales Return Refund.
+**Service Return** business effect:
+
+- References an existing Service Sales Line on a Sales Invoice.
+- Available Quantity validation is mandatory.
+- **No** stock movement. **No** inventory movement.
+- Return totals are calculated.
+- Refund Balance is created (`refund_amount` is set equal to the return Grand Total).
+- **No** Customer Ledger entry is created.
+- **No** Account Ledger entry is created.
+
+Sales Return handles return value tracking only. Product Return additionally restores inventory. It does not move money. Money movement is handled exclusively by Sales Return Refund.
+
+#### Sales Return Cancel
+
+**Sales Return Cancel** voids an active Sales Return that has **no** posted Sales Return Refund.
+
+Business effect:
+
+- Permitted **only** when Total Refunded Amount is zero and no active Sales Return Refund exists.
+- Product Return lines: product stock is reversed (Stock OUT).
+- Service Return lines: no stock movement.
+- Available Return Quantity on the original sales item is restored.
+- Stored financial values (`grand_total`, `adjust_amount`, `refund_amount`) are preserved for audit and historical purposes. **Status = Cancel** excludes the record from active business processing.
+- Sales Return status is set to **Cancel**.
+- All records are preserved for audit. Physical deletion is **forbidden**.
+
+If any Sales Return Refund has been posted, Sales Return Cancel is **strictly prohibited**.
 
 #### Sales Return Refund
 
-**Sales Return Refund** pays money back to the customer for a previously recorded sales return.
+**Sales Return Refund** settles a previously recorded sales return through the **Settlement Model**.
 
 Business effect:
 
 - Remaining refund amount is validated.
-- Account balance is validated and reduced.
-- Customer ledger receives a credit entry.
-- `refund_amount` on the sales return is reduced by the refund paid.
+- **Settlement Total** = Invoice Adjustment Amount + Cash Refund Amount (Cash Refund Amount is optional).
+- Sales Invoice is adjusted when Invoice Adjustment Amount is greater than zero.
+- Customer ledger receives credit for the settlement.
+- Account balance is validated and reduced **only when Cash Refund Amount is greater than zero**.
+- `refund_amount` on the sales return is reduced by the Settlement Total.
 
-This workflow represents actual cash or bank outflow to the customer.
+Cash Refund Amount represents actual cash or bank outflow. Invoice Adjustment Amount settles refund liability against outstanding invoice due without account movement.
 
 #### Refund Cancel
 
@@ -121,11 +150,11 @@ The Customer Ledger tracks how much each customer owes the business or how much 
 
 #### Account Ledger
 
-The Account Ledger tracks cash and bank balances. Sales Payment increases account balance. Sales Return Refund decreases account balance. Sales Return creates no entry.
+The Account Ledger tracks cash and bank balances. Sales Payment increases account balance. Sales Return Refund decreases account balance **only when Cash Refund Amount is greater than zero**. Sales Return creates no entry.
 
 #### Stock Control
 
-Stock Control ensures product quantity is accurate. Sales reduces stock. Sales Return increases stock. Refund and Refund Cancel do not affect stock because money movement is separate from goods movement.
+Stock Control ensures product quantity is accurate. Sales reduces stock. Product Return increases stock. Service Return does not affect stock. Refund and Refund Cancel do not affect stock because money movement is separate from goods movement.
 
 #### Invoice Number
 
@@ -157,10 +186,10 @@ Sales Invoice (1) ──────► (many) Sales Items
 Sales Invoice ──────────► Customer Transactions (Debit on invoice; Credit on payment)
 Sales Payment ──────────► Account Transactions (Debit on payment)
 Sales Payment ──────────► Customer Transactions (Credit on payment)
-Sales Return Refund ────► Account Transactions (Credit on refund)
-Sales Return Refund ────► Customer Transactions (Credit on refund)
+Sales Return Refund ────► Account Transactions (Credit on Cash Refund Amount only, when Cash Refund Amount > 0)
+Sales Return Refund ────► Customer Transactions (Credit on settlement)
 
-Sales Items (products) ─► Stock Movements (OUT on sale; IN on return or cancel)
+Sales Items (products) ─► Stock Movements (OUT on sale; IN on Product Return or invoice cancel)
 ```
 
 ### Sales Invoice
@@ -188,7 +217,8 @@ Sales Items (products) ─► Stock Movements (OUT on sale; IN on return or canc
 
 **Updated when:**
 
-- Not updated during normal sale flow. Return quantities are tracked through Sales Return Items against the original sales item.
+- Return quantities are updated through Sales Return Items when a Product Return or Service Return is processed.
+- Returned quantity is restored when Sales Return Cancel is processed.
 
 **Connected to:** Sales Invoice, Product (for product lines), Service (for service lines).
 
@@ -210,7 +240,7 @@ Sales Items (products) ─► Stock Movements (OUT on sale; IN on return or canc
 
 ### Sales Returns
 
-**Purpose:** Master record of a product return against a sales invoice. Holds return number, return date, totals, and `refund_amount` (amount still eligible to be refunded).
+**Purpose:** Master record of a Product Return or Service Return against a sales invoice. Holds return number, return date, totals, `adjust_amount` (Total Refunded Amount), and `refund_amount` (Remaining Refund Balance).
 
 **Written when:**
 
@@ -218,24 +248,37 @@ Sales Items (products) ─► Stock Movements (OUT on sale; IN on return or canc
 
 **Updated when:**
 
-- `refund_amount` is reduced when a Sales Return Refund is paid.
-- `refund_amount` is increased when a Refund Cancel is processed.
+- `adjust_amount` and `refund_amount` are set when a Sales Return is processed (`adjust_amount` = 0; `refund_amount` = return Grand Total).
+- `adjust_amount` and `refund_amount` are updated automatically when a Sales Return Refund is paid.
+- `adjust_amount` and `refund_amount` are updated automatically when a Refund Cancel is processed.
+- Sales Return Cancel is processed (status set to Cancel; stored financial values preserved for audit).
 
 **Connected to:** Sales Invoice, Customer, Financial Year, Sales Return Items, Sales Return Refunds.
 
 ### Sales Return Items
 
-**Purpose:** Line-level detail of each returned product. Holds returned quantity, unit price, VAT, and line total linked to the original sales item.
+**Purpose:** Line-level detail of each returned invoice line. Holds returned quantity, unit price, VAT, and line total linked to the original sales item. Each line is either a Product Return line or a Service Return line.
+
+**Line identity rule:**
+
+- Each Sales Return Item must contain **either** `product_id` **or** `service_id`.
+- Exactly **one** must contain a value.
+- Both cannot contain values.
+- Both cannot be NULL.
 
 **Written when:**
 
-- Each return line is processed during the Sales Return Workflow.
+- Each return line is processed during the Product Return Workflow or Service Return Workflow.
 
-**Connected to:** Sales Return, Sales Item, Product.
+**Updated when:**
+
+- Sales Return Cancel is processed (line status set to Cancel; returned quantity reversed on the linked sales item).
+
+**Connected to:** Sales Return, Sales Item, Product (Product Return lines), Service (Service Return lines).
 
 ### Sales Return Refunds
 
-**Purpose:** Records actual money refunded to the customer for a sales return.
+**Purpose:** Records settlement of a sales return refund. Holds Settlement Total, Invoice Adjustment Amount, Cash Refund Amount (optional), and audit fields.
 
 **Written when:**
 
@@ -245,7 +288,7 @@ Sales Items (products) ─► Stock Movements (OUT on sale; IN on return or canc
 
 - Refund is cancelled through Refund Cancel Workflow.
 
-**Connected to:** Sales Return, Customer, Account, Financial Year.
+**Connected to:** Sales Return, Customer, Account (when Cash Refund Amount > 0), Financial Year, Sales Return Refund Adjustments.
 
 ### Customer Transactions
 
@@ -271,12 +314,13 @@ Sales Items (products) ─► Stock Movements (OUT on sale; IN on return or canc
 **Written when:**
 
 - Sales Payment is received → **Debit** (account increases)
-- Sales Return Refund is paid → **Credit** (account decreases)
+- Sales Return Refund Cash Refund Amount is paid → **Credit** (account decreases)
 - Sales Cancel, payment cancel, or Refund Cancel → **Reverse** entries
 
 **Not written when:**
 
 - Sales Return is processed.
+- Sales Return Refund is processed with Cash Refund Amount equal to zero (adjustment-only settlement).
 
 **Connected to:** Account, Financial Year, reference document (payment or refund).
 
@@ -287,11 +331,14 @@ Sales Items (products) ─► Stock Movements (OUT on sale; IN on return or canc
 **Written when:**
 
 - Sales Invoice is created → Stock **OUT** for each product line
-- Sales Return is processed → Stock **IN** for each returned product line
+- Product Return is processed → Stock **IN** for each returned product line
+- Product Return Cancel is processed → Stock **OUT** for each cancelled product return line
 - Sales Invoice is cancelled → Stock **IN** (restored)
 
 **Not written when:**
 
+- Service Return is processed
+- Service Return Cancel is processed
 - Sales Return Refund is paid
 - Refund Cancel is processed
 
@@ -304,9 +351,10 @@ Sales Items (products) ─► Stock Movements (OUT on sale; IN on return or canc
 | Sales Invoice | Sales Invoice, Sales Items, Stock Movements, Customer Transactions; optionally Sales Payments, Account Transactions |
 | Sales Payment | Sales Payments, Account Transactions, Customer Transactions; Sales Invoice updated |
 | Sales Cancel | Stock Movements (restore), reverse Customer and Account Transactions; Sales Invoice and Sales Payments updated |
-| Sales Return | Sales Returns, Sales Return Items, Stock Movements |
-| Sales Return Refund | Sales Return Refunds, Account Transactions, Customer Transactions; Sales Returns updated |
-| Refund Cancel | Reverse Customer and Account Transactions; Sales Return Refunds and Sales Returns updated |
+| Sales Return | Sales Returns, Sales Return Items; Stock Movements (Product Return lines only) |
+| Sales Return Cancel | Stock Movements (Product Return lines only); Sales Returns, Sales Return Items, and linked Sales Items updated; status set to Cancel |
+| Sales Return Refund | Sales Return Refunds, Sales Return Refund Adjustments, Customer Transactions; Sales Returns and Sales Invoices updated; Account Transactions (Cash Refund Amount only, when Cash Refund Amount > 0) |
+| Refund Cancel | Reverse Customer Transactions; reverse Account Transactions (when Cash Refund Amount was posted); Sales Return Refunds and Sales Returns updated; Sales Invoices restored |
 
 ---
 
@@ -605,16 +653,47 @@ The invoice is marked as cancelled.
 ---
 
 ## 6. Sales Return Workflow
+
+**Status:** All Product Return and Service Return rules in this section are **FROZEN CONSTITUTION RULES**. Modification requires explicit Business Owner approval.
+
 Validate Financial Year
 
 Return Date must comply with the official Financial Year Standard.
-This is the official sequence for returning sold products against an existing invoice.
+
+Sales Return consists of two official workflows:
+
+- **Product Return Workflow**
+- **Service Return Workflow**
+
+Both workflows return sold invoice lines against an existing sales invoice. Shared steps apply to both. Stock handling differs by workflow.
+
+### Shared Return Sequence
 
 ```
 Select Invoice
     ↓
 Available Qty
     Sales Qty − Previous Return Qty = Available Qty
+    ↓
+Calculate Return Total
+    ↓
+refund_amount = Grand Total
+    ↓
+NO Customer Ledger
+    ↓
+NO Account Ledger
+```
+
+### Product Return Workflow
+
+Product Return references an existing **Product Sales Line** on the selected Sales Invoice.
+
+```
+Select Invoice
+    ↓
+Select Product Sales Line
+    ↓
+Available Qty
     ↓
 Increase Stock
     ↓
@@ -627,6 +706,44 @@ NO Customer Ledger
 NO Account Ledger
 ```
 
+**Product Return rules (FROZEN):**
+
+- Must reference an existing Product Sales Line.
+- Available Quantity validation is mandatory on every line.
+- Stock IN is **mandatory** for every returned product line.
+- Return totals must be calculated.
+- Refund Balance must be created (`refund_amount` = return Grand Total).
+- Must **not** create Customer Ledger or Account Ledger entries.
+
+### Service Return Workflow
+
+Service Return references an existing **Service Sales Line** on the selected Sales Invoice.
+
+```
+Select Invoice
+    ↓
+Select Service Sales Line
+    ↓
+Available Qty
+    ↓
+Calculate Return Total
+    ↓
+refund_amount = Grand Total
+    ↓
+NO Customer Ledger
+    ↓
+NO Account Ledger
+```
+
+**Service Return rules (FROZEN):**
+
+- Must reference an existing Service Sales Line.
+- Available Quantity validation is mandatory on every line.
+- **No** stock movement is allowed. **No** inventory movement is allowed.
+- Return totals must be calculated.
+- Refund Balance must be created (`refund_amount` = return Grand Total).
+- Must **not** create Customer Ledger or Account Ledger entries.
+
 ### Available Quantity Formula
 
 ```
@@ -638,29 +755,35 @@ Where:
 - **Sales Qty** = original quantity sold on the invoice line
 - **Previous Return Qty** = total quantity already returned against that line on the same invoice through active (non-cancelled) returns
 
-Return quantity entered must be greater than zero and must not exceed Available Qty.
+Return quantity entered must be greater than zero and must not exceed Available Qty. This rule applies to **both** Product Return and Service Return lines.
 
 ### Why Available Qty Validation Is Mandatory
 
-**Prevent over-return:** A customer cannot return more units than were sold and not already returned. Over-return would inflate stock and refund liability beyond what was originally transacted.
+**Prevent over-return:** A customer cannot return more units than were sold and not already returned. Over-return would inflate stock (Product Return) or refund liability (both workflows) beyond what was originally transacted.
 
-**Protect refund integrity:** `refund_amount` is derived from returned goods. If return quantity is wrong, refund eligibility becomes wrong.
+**Protect refund integrity:** `refund_amount` is derived from returned lines. If return quantity is wrong, refund eligibility becomes wrong.
 
 **Maintain invoice accuracy:** Each invoice line has a finite returnable balance. The formula ensures cumulative returns never exceed the original sale.
 
 **Audit compliance:** Every returned unit must trace back to a sold unit. Available Qty enforces that traceability.
 
-### Why Stock Increases
+### Product Return — Why Stock Increases
 
-Returned goods physically re-enter inventory. Stock must increase at the moment of return so inventory reflects goods back on hand.
+Returned products physically re-enter inventory. Stock must increase at the moment of Product Return so inventory reflects goods back on hand.
 
-Stock increase happens at **Sales Return**, not at refund. Goods and money are separate events.
+Stock increase happens at **Product Return**, not at refund. Goods and money are separate events.
+
+### Service Return — Why Stock Does Not Change
+
+Services are not physical inventory. Service Return records the reversal of a sold service line for refund eligibility only. No stock movement occurs.
 
 ### Why Customer Ledger Is NOT Created
 
-Sales Return records the **return of goods**, not the **return of money**.
+Sales Return records the **return of invoice lines**, not the **return of money**.
 
-Creating a customer ledger entry at return would prematurely adjust the customer balance before any refund is actually paid. The customer balance must only change when money moves (payment or refund), not when goods move.
+Creating a customer ledger entry at return would prematurely adjust the customer balance before any refund is actually paid. The customer balance must only change when money moves (payment or refund), not when a return is recorded.
+
+This rule applies to **both** Product Return and Service Return.
 
 `refund_amount` on the sales return tracks refund eligibility separately until Sales Return Refund is processed.
 
@@ -670,57 +793,187 @@ No money leaves the business at return time. Account balance is unaffected until
 
 Creating an account entry at return would show cash outflow that has not occurred, corrupting cash position and bank reconciliation.
 
+This rule applies to **both** Product Return and Service Return.
+
+---
+
+## 6A. Sales Return Cancel Workflow
+
+**Status:** All Sales Return Cancel rules in this section are **FROZEN CONSTITUTION RULES**. Modification requires explicit Business Owner approval.
+
+Validate Financial Year
+
+Cancel Date must comply with the official Financial Year Standard.
+
+Sales Return Cancel voids an active Sales Return **only** when no Sales Return Refund has been posted.
+
+```
+Check Sales Return Status
+    ↓
+Check Total Refunded Amount = ZERO
+    ↓
+Check No Active Sales Return Refund
+    ↓
+If Any Refund Posted → REJECT Cancel
+    ↓
+Reverse Product Stock (Product Return lines only)
+    ↓
+No Stock Movement (Service Return lines)
+    ↓
+Restore Available Return Quantity
+    ↓
+Preserve Stored Financial Values for Audit
+    ↓
+Mark Sales Return Cancelled
+    ↓
+Preserve Audit History
+```
+
+### Cancellation Conditions (Mandatory)
+
+Sales Return Cancel is permitted **only** when **all** of the following are true:
+
+1. Sales Return status is **Active**.
+2. Total Refunded Amount is **ZERO**.
+3. No active Sales Return Refund transaction exists.
+
+If **any** Sales Return Refund has been posted, Sales Return Cancel is **STRICTLY PROHIBITED**.
+
+### Cancellation Effects
+
+| Effect | Product Return | Service Return |
+|--------|----------------|----------------|
+| Stock | Reverse product stock (Stock **OUT**) | **No** stock movement |
+| Available Return Quantity | Restored on linked sales item | Restored on linked sales item |
+| Stored financial values (`grand_total`, `adjust_amount`, `refund_amount`) | Preserved for audit — excluded from active processing | Preserved for audit — excluded from active processing |
+| Sales Return status | Set to **Cancel** | Set to **Cancel** |
+| Audit history | Preserved — no physical deletion | Preserved — no physical deletion |
+
+### Why Cancellation Is Restricted to Zero Refund
+
+Once money has been refunded through Sales Return Refund, cancelling the return would corrupt refund liability, customer balance, and account balance. Refund Cancel reverses payments; it does not replace Sales Return Cancel.
+
+### Why Status-Based Cancellation Only
+
+Sales Return Cancel must never physically delete records. Cancelled returns remain in the system for audit, history, investigation, viewing, and printing — consistent with the Financial Year Cancelled Record Rule.
+
+### Cancelled Sales Return — Stored Financial Values (FROZEN)
+
+Cancelled Sales Return records are audit records. They are **never** physically deleted. They preserve business history.
+
+The following stored values **SHALL** remain on the cancelled record and **SHALL NOT** be reset to zero:
+
+- `grand_total`
+- `adjust_amount`
+- `refund_amount`
+
+These values represent historical business values at the time of the return.
+
+**Status = Cancel** is sufficient to deactivate the record. Cancelled Sales Returns are permanently excluded from:
+
+- Refund workflow
+- Settlement workflow
+- Financial calculations
+- Available refund validation
+- Active business processing
+
+### Why Customer and Account Ledgers Are NOT Affected
+
+Sales Return Cancel reverses the return document and Product Return stock only. No money movement occurs. Customer and account ledgers are unaffected because no refund was posted.
+
+This behaviour is Business Approved and Frozen.
+
 ---
 
 ## 7. Sales Return Refund Workflow
 Validate Financial Year
 
 Refund Date must comply with the official Financial Year Standard.
-This is the official sequence for paying money back to a customer for a recorded sales return.
+This is the official sequence for settling a recorded sales return.
+
+### Settlement Model (FROZEN)
+
+Sales Return Refund Settlement consists of:
+
+1. **Invoice Adjustment Amount**
+2. **Cash Refund Amount** (optional)
+
+```
+Settlement Total = Invoice Adjustment Amount + Cash Refund Amount
+```
+
+### Account Transaction Rules (FROZEN)
+
+**Rule 1:** If Cash Refund Amount > 0 → Account Transaction **SHALL** be created.
+
+**Rule 2:** If Cash Refund Amount = 0 → Account Transaction **SHALL NOT** be created.
+
+**Rule 3 — Adjustment Only Refund:** Customer Ledger **SHALL** be updated. Sales Invoice **SHALL** be adjusted. Account Transaction **SHALL NOT** be created.
+
+**Rule 4 — Cash + Adjustment Refund:** Customer Ledger **SHALL** be updated. Sales Invoice **SHALL** be adjusted. Account Transaction **SHALL** be created **only** for the Cash Refund Amount.
 
 ```
 Check Remaining Refund
     ↓
-Check Account Balance
+Validate Settlement Total
+    Settlement Total = Adjustment Amount + Cash Refund Amount
     ↓
-Reduce Account Balance
+Adjust Sales Invoice(s) (if Adjustment Amount > 0)
     ↓
-Customer Credit
+Customer Credit (Settlement Total)
     ↓
-refund_amount −= refund
+If Cash Refund Amount > 0
+    Check Account Balance
+    Reduce Account Balance (Cash Refund Amount only)
+    ↓
+refund_amount −= Settlement Total
 ```
 
 ### Step-by-Step Explanation
 
 #### Check Remaining Refund
 
-Before processing, the system verifies that the requested refund amount does not exceed the remaining `refund_amount` on the sales return.
+Before processing, the system verifies that Settlement Total does not exceed the remaining `refund_amount` on the sales return.
 
-**Why:** A return may be refunded in one or more instalments, but total refunds must never exceed the return Grand Total. This prevents over-payment to the customer.
+**Why:** A return may be refunded in one or more instalments, but total settlements must never exceed the return Grand Total. This prevents over-payment to the customer.
 
-#### Check Account Balance
+#### Validate Settlement Total
 
-The paying account must have sufficient balance to cover the refund amount.
+Settlement Total equals Invoice Adjustment Amount plus Cash Refund Amount. Settlement Total must be greater than zero.
 
-**Why:** The business cannot refund money it does not have in the selected account. Insufficient balance would create negative cash position and broken bank records.
+**Why:** Every refund transaction must settle part of the remaining refund liability. Zero settlement has no business meaning.
 
-#### Reduce Account Balance
+#### Adjust Sales Invoice (when Adjustment Amount > 0)
 
-An Account Transaction credit is created for the refund amount. Account balance decreases.
+Outstanding sales invoice due is reduced by the Invoice Adjustment Amount. Sales Payment is **not** created.
 
-**Why:** Money is leaving the business. Cash or bank balance must decrease to reflect actual outflow.
+**Why:** Adjustment applies return value against existing customer receivables without cash movement.
 
 #### Customer Credit
 
-A Customer Transaction credit is created for the refund amount.
+A Customer Transaction credit is created for the Settlement Total (covering adjustment and cash components).
 
-**Why:** Refunding money to the customer reduces their net obligation to the business (or increases what the business owes them). The customer ledger must reflect this financial settlement.
+**Why:** Settlement reduces the customer's net obligation to the business (or increases what the business owes them). The customer ledger must reflect this settlement.
 
-#### refund_amount −= refund
+#### Check Account Balance (Cash Refund Amount > 0 only)
 
-The remaining refundable balance on the sales return is reduced by the amount just paid.
+When Cash Refund Amount is greater than zero, the paying account must have sufficient balance to cover the Cash Refund Amount.
 
-**Why:** `refund_amount` is the live tracker of how much refund is still owed. Every refund payment must reduce this balance so the business always knows remaining refund liability.
+**Why:** The business cannot pay cash it does not have in the selected account. Insufficient balance would create negative cash position and broken bank records.
+
+When Cash Refund Amount equals zero, account balance check does not apply. Adjustment-only settlement creates no account movement.
+
+#### Reduce Account Balance (Cash Refund Amount > 0 only)
+
+When Cash Refund Amount is greater than zero, an Account Transaction credit is created for the Cash Refund Amount only. Account balance decreases.
+
+**Why:** Cash is leaving the business. Cash or bank balance must decrease to reflect actual outflow. Adjustment-only settlement does not move cash.
+
+#### refund_amount −= Settlement Total
+
+The remaining refundable balance on the sales return is reduced by Settlement Total.
+
+**Why:** `refund_amount` is the live tracker of how much refund is still owed. Every settlement must reduce this balance so the business always knows remaining refund liability.
 
 When `refund_amount` reaches zero, the return is fully refunded.
 
@@ -733,7 +986,7 @@ This is the official sequence for voiding a previously recorded sales return ref
 ```
 Reverse Customer Ledger
     ↓
-Reverse Account Ledger
+Reverse Account Ledger (if Cash Refund Amount was posted)
     ↓
 refund_amount += refund
 ```
@@ -748,9 +1001,9 @@ The customer credit created by the refund is reversed.
 
 #### Reverse Account Ledger
 
-The account credit (balance reduction) created by the refund is reversed.
+When Cash Refund Amount was posted, the account credit (balance reduction) created for the cash portion is reversed.
 
-**Why:** The money outflow did not legitimately occur if the refund is cancelled. Account balance must be restored.
+**Why:** The cash outflow did not legitimately occur if the refund is cancelled. Account balance must be restored. Adjustment-only refunds have no account entry to reverse.
 
 #### refund_amount += refund
 
@@ -760,9 +1013,9 @@ The cancelled refund amount is added back to the remaining `refund_amount` on th
 
 ### Why Stock Is NOT Changed
 
-Stock was already adjusted during **Sales Return** when goods came back into inventory.
+Stock was already adjusted during **Product Return** when returned products came back into inventory. Service Return never affects stock.
 
-Refund and Refund Cancel are **financial events only**. They move money, not goods.
+Refund and Refund Cancel are **financial events only**. They move money, not goods or services.
 
 Changing stock during Refund Cancel would double-count or incorrectly reverse inventory that was correctly adjusted at return time.
 
@@ -776,8 +1029,8 @@ The customer ledger records all financial obligations between the customer and t
 |-------------|-------|-------------|
 | Sales Invoice | **Debit** | Customer owes the business the invoice amount |
 | Sales Payment | **Credit** | Customer paid; obligation reduced |
-| Sales Return | **NO ENTRY** | Goods returned; no money moved yet |
-| Sales Return Refund | **Credit** | Money returned to customer; obligation reduced |
+| Sales Return | **NO ENTRY** | Product or Service Return recorded; no money moved yet |
+| Sales Return Refund | **Credit** | Settlement recorded; customer obligation reduced (adjustment and/or cash) |
 | Refund Cancel | **Reverse Credit** | Refund voided; prior credit undone |
 
 ### Why Each Rule Exists
@@ -792,11 +1045,11 @@ Payment reduces what the customer owes. Credit decreases the outstanding balance
 
 **Sales Return — NO ENTRY**
 
-Return tracks goods and refund eligibility only. No money has changed hands. Posting a ledger entry would falsely adjust the customer balance before refund.
+Return tracks refund eligibility only. Product Return additionally restores inventory. Service Return does not affect stock. No money has changed hands. Posting a ledger entry would falsely adjust the customer balance before refund.
 
 **Sales Return Refund — Credit**
 
-Money is returned to the customer. Their net payable to the business decreases. Credit reflects this financial settlement.
+Settlement reduces the customer's net payable to the business. Credit reflects Invoice Adjustment Amount and Cash Refund Amount together.
 
 **Refund Cancel — Reverse Credit**
 
@@ -821,8 +1074,9 @@ The account ledger records all cash and bank movements linked to sales operation
 | Transaction | Effect | Explanation |
 |-------------|--------|-------------|
 | Sales Payment | **Increase Account** | Money received from customer |
-| Sales Return Refund | **Decrease Account** | Money paid back to customer |
-| Refund Cancel | **Reverse Account Transaction** | Refund voided; balance restored |
+| Sales Return Refund (Cash Refund Amount > 0) | **Decrease Account** | Cash paid back to customer |
+| Sales Return Refund (Cash Refund Amount = 0) | **NO Account** | Adjustment-only; no cash movement |
+| Refund Cancel | **Reverse Account Transaction** | Cash refund voided; balance restored (when cash was posted) |
 
 ### Why Each Rule Exists
 
@@ -830,13 +1084,17 @@ The account ledger records all cash and bank movements linked to sales operation
 
 Money enters the business. The cash or bank account balance must increase when payment is received.
 
-**Sales Return Refund — Decrease Account**
+**Sales Return Refund — Decrease Account (Cash Refund Amount > 0 only)**
 
-Money leaves the business. The cash or bank account balance must decrease when refund is paid.
+When Cash Refund Amount is greater than zero, cash leaves the business. The cash or bank account balance must decrease by the Cash Refund Amount only.
+
+**Sales Return Refund — NO Account (Cash Refund Amount = 0)**
+
+When settlement is adjustment-only, no cash moves. Account Transaction shall not be created.
 
 **Refund Cancel — Reverse Account Transaction**
 
-The refund payment is voided. The account must be restored to its pre-refund balance.
+When cash was posted, the cash refund is voided and the account must be restored to its pre-refund balance.
 
 ### Account Balance Principle
 
@@ -846,7 +1104,7 @@ Account Balance = Total Debits − Total Credits
 
 (active entries only)
 
-Sales Return does not create account entries because no money moves at return time. Only payment and refund workflows affect the account ledger.
+Product Return and Service Return do not create account entries because no money moves at return time. Account ledger is affected by Sales Payment and by Sales Return Refund **Cash Refund Amount only**.
 
 ---
 
@@ -857,9 +1115,12 @@ Stock reflects physical inventory. Only goods movement affects stock. Money move
 | Event | Stock Effect | Explanation |
 |-------|--------------|-------------|
 | Sales | **Stock OUT** | Goods leave inventory when sold |
-| Sales Return | **Stock IN** | Returned goods re-enter inventory |
-| Refund | **NO Stock** | Money event only; goods already returned |
-| Refund Cancel | **NO Stock** | Financial reversal only; goods unchanged |
+| Product Return | **Stock IN** | Returned products re-enter inventory |
+| Product Return Cancel | **Stock OUT** | Returned products removed from inventory on cancel |
+| Service Return | **NO Stock** | Service lines do not affect inventory |
+| Service Return Cancel | **NO Stock** | Service lines do not affect inventory |
+| Refund | **NO Stock** | Money event only; return already recorded |
+| Refund Cancel | **NO Stock** | Financial reversal only; inventory unchanged |
 
 ### Why Each Rule Exists
 
@@ -867,25 +1128,37 @@ Stock reflects physical inventory. Only goods movement affects stock. Money move
 
 Selling a product removes it from available inventory. Stock must decrease at sale time to prevent overselling and maintain accurate inventory valuation.
 
-**Sales Return — Stock IN**
+**Product Return — Stock IN**
 
 Returned products physically come back. Stock must increase so available quantity reflects goods on hand.
 
+**Service Return — NO Stock**
+
+Services are not inventory. Service Return must not create any stock movement.
+
+**Product Return Cancel — Stock OUT**
+
+Cancelling a Product Return reverses the original Stock IN. Product stock must decrease so inventory reflects goods no longer held as returned stock.
+
+**Service Return Cancel — NO Stock**
+
+Cancelling a Service Return is a document reversal only. No inventory movement occurs.
+
 **Refund — NO Stock**
 
-Refund pays money for goods already returned. Stock was adjusted at return time. Adjusting stock again would double-count inventory.
+Refund pays money for a return already recorded. Product Return stock was adjusted at return time. Adjusting stock again would double-count inventory.
 
 **Refund Cancel — NO Stock**
 
-Cancelling a refund reverses a payment, not a goods movement. Inventory remains as recorded after the original return.
+Cancelling a refund reverses a payment, not a return. Inventory and service records remain as recorded after the original return.
 
 ### Stock Control Principle
 
 ```
-Current Stock = Opening Stock − Sales OUT + Returns IN + Cancel Restore IN
+Current Stock = Opening Stock − Sales OUT + Product Returns IN − Product Return Cancel OUT + Cancel Restore IN
 ```
 
-Stock, customer ledger, and account ledger are independent but must remain consistent with their respective business events.
+Service Return never affects stock. Stock, customer ledger, and account ledger are independent but must remain consistent with their respective business events.
 
 ---
 
@@ -897,7 +1170,7 @@ Every sales document type has a fixed prefix. Prefix identifies document type. N
 |--------|---------------|---------|
 | **SI** | Sales Invoice | Identifies a sales invoice |
 | **SP** | Sales Payment | Identifies a payment receipt |
-| **SR** | Sales Return | Identifies a product return |
+| **SR** | Sales Return | Identifies a Product Return or Service Return |
 | **SRR** | Sales Return Refund | Identifies a refund payment |
 
 ### SI — Sales Invoice
@@ -910,11 +1183,11 @@ Assigned when payment is received — either at invoice time or through standalo
 
 ### SR — Sales Return
 
-Assigned when a sales return is processed. Links to stock inflow and return totals.
+Assigned when a Product Return or Service Return is processed. Links to return totals. Product Return additionally links to stock inflow.
 
 ### SRR — Sales Return Refund
 
-Assigned when refund money is paid to the customer. Links to account decrease and customer credit.
+Assigned when a Sales Return Refund settlement is processed. Links to customer credit. Links to account decrease **only when Cash Refund Amount is greater than zero**.
 
 ### Why SRR Format Must Never Change
 
@@ -997,7 +1270,7 @@ Every validation exists to protect stock, balances, and reporting integrity.
 - Available Qty = Sales Qty − Previous Return Qty.
 - Validation is mandatory and must never be skipped.
 
-**Why:** Prevents over-return, stock inflation, and excess refund liability.
+**Why:** Prevents over-return, Product Return stock inflation, and excess refund liability on both Product Return and Service Return lines.
 
 ### Payment Validation
 
@@ -1010,19 +1283,19 @@ Every validation exists to protect stock, balances, and reporting integrity.
 
 ### Refund Validation
 
-- Refund amount must be greater than zero.
-- Refund must not exceed remaining `refund_amount` on the sales return.
-- Refund account is mandatory.
+- Settlement Total must be greater than zero.
+- Settlement Total must not exceed remaining `refund_amount` on the sales return.
+- Refund account is mandatory **when Cash Refund Amount is greater than zero**.
 - Fully refunded returns must not accept further refund.
 
-**Why:** Prevents over-refund and uncontrolled cash outflow.
+**Why:** Prevents over-refund and uncontrolled cash outflow. Adjustment-only settlement does not require a refund account.
 
 ### Account Balance Validation
 
-- Account must have sufficient balance before refund is paid.
-- Account must be active.
+- Account must have sufficient balance before Cash Refund Amount is paid.
+- Account must be active when Cash Refund Amount is greater than zero.
 
-**Why:** Prevents negative cash position and refunds from invalid accounts.
+**Why:** Prevents negative cash position and refunds from invalid accounts. Not applicable when Cash Refund Amount equals zero.
 
 ### Financial Year Validation
 
@@ -1078,30 +1351,53 @@ All rules below are approved business policy. Every rule exists to protect finan
 
 ### Return Rules
 
-1. Return must always reference an existing Sales Invoice.
-2. Only product lines may be returned. Services are not returnable through stock return.
-3. Available Qty validation is mandatory on every return line.
-4. Return must increase stock for every returned product line.
-5. `refund_amount` must be set equal to return Grand Total at the time of return.
-6. Return must **not** create customer or account ledger entries.
-7. Every return must produce a unique **SR** number.
+**Status:** All Return Rules below are **FROZEN CONSTITUTION RULES**. Modification requires explicit Business Owner approval.
 
-**Why:** Returns handle goods and refund eligibility separately from money movement, preventing premature balance adjustment.
+1. Return must always reference an existing Sales Invoice.
+2. Sales Return consists of two official workflows: **Product Return Workflow** and **Service Return Workflow**.
+3. Product Return must reference an existing Product Sales Line. Service Return must reference an existing Service Sales Line.
+4. Available Quantity validation is mandatory on every return line (Product Return and Service Return).
+5. Product Return must increase stock for every returned product line. Stock IN is mandatory.
+6. Service Return must **not** affect stock. No stock movement and no inventory movement is allowed.
+7. Each Sales Return Item must contain **either** `product_id` **or** `service_id`. Exactly one must contain a value. Both cannot contain values. Both cannot be NULL.
+8. Refund Balance must be created at return time. `refund_amount` must be set equal to return Grand Total.
+9. Return must **not** create Customer Ledger or Account Ledger entries.
+10. Every return must produce a unique **SR** number.
+
+**Why:** Returns handle Refund Balance separately from money movement. Product Return additionally restores inventory. Service Return records service line reversal without stock effect. Both workflows prevent premature balance adjustment.
+
+### Sales Return Cancel Rules
+
+**Status:** All Sales Return Cancel Rules below are **FROZEN CONSTITUTION RULES**. Modification requires explicit Business Owner approval.
+
+1. Sales Return Cancel is permitted **only** when Sales Return status is **Active**.
+2. Total Refunded Amount must be **ZERO**.
+3. No active Sales Return Refund transaction may exist.
+4. If **any** Sales Return Refund has been posted, Sales Return Cancel is **STRICTLY PROHIBITED**.
+5. Product Return Cancel must reverse product stock (Stock **OUT**) for every cancelled product return line.
+6. Service Return Cancel must **not** affect stock. No stock or inventory movement is allowed.
+7. Available Return Quantity on the linked sales item must be restored.
+8. Stored financial values (`grand_total`, `adjust_amount`, `refund_amount`) **SHALL** be preserved for audit. They **SHALL NOT** be reset to zero. **Status = Cancel** excludes the record from refund workflow, settlement workflow, financial calculations, available refund validation, and active business processing.
+9. Sales Return must be marked with **Cancel** status. Status-based cancellation only.
+10. Sales Return Cancel must **never** physically delete records. Complete audit history must be preserved.
+11. Sales Return Cancel must **not** create customer or account ledger entries.
+
+**Why:** Sales Return Cancel reverses an unrefunded return only. Once refund money moves, cancellation must be blocked to protect ledger and refund integrity.
 
 ### Refund Rules
 
 1. Refund must reference an existing Sales Return with remaining `refund_amount`.
-2. Refund must reduce account balance and create customer credit.
-3. Refund must reduce `refund_amount` by the amount paid.
+2. Refund Settlement must create Customer Ledger credit. Account balance must decrease **only when Cash Refund Amount is greater than zero**.
+3. Refund must reduce `refund_amount` by Settlement Total.
 4. Refund must **not** change stock.
 5. Every refund must produce a unique **SRR** number.
 6. Multiple partial refunds are allowed until `refund_amount` reaches zero.
 
-**Why:** Refund rules ensure money outflow is controlled, traceable, and linked to prior return liability.
+**Why:** Refund rules ensure settlement is controlled, traceable, and linked to prior return liability. Cash movement is optional; adjustment-only settlement is permitted without account movement.
 
 ### Refund Cancel Rules
 
-1. Refund cancel must reverse customer and account ledger entries.
+1. Refund cancel must reverse customer ledger entries. Account ledger entries must be reversed **when Cash Refund Amount was posted**.
 2. Refund cancel must restore `refund_amount` by the cancelled refund amount.
 3. Refund cancel must **not** change stock.
 
@@ -1117,11 +1413,12 @@ All rules below are approved business policy. Every rule exists to protect finan
 
 ### Stock Integrity Rules
 
-1. Stock OUT occurs only on sale.
-2. Stock IN occurs on return and invoice cancel.
-3. Stock never changes on refund or refund cancel.
+1. Stock OUT occurs only on sale and Product Return Cancel.
+2. Stock IN occurs on **Product Return** and invoice cancel.
+3. Service Return and Service Return Cancel never affect stock.
+4. Stock never changes on refund or refund cancel.
 
-**Why:** Separating goods movement from money movement prevents inventory corruption.
+**Why:** Separating goods movement from money movement prevents inventory corruption. Service Return is a non-stock workflow. Product Return Cancel reverses Product Return stock only.
 
 ---
 
@@ -1133,7 +1430,7 @@ The following actions are **strictly forbidden**. Violation may cause irreversib
 
 **Forbidden:** Creating any stock OUT movement when processing Sales Return Refund.
 
-**Why:** Stock was already increased at Sales Return. Reducing stock at refund would remove returned goods from inventory that are physically present, creating negative or incorrect stock.
+**Why:** Stock was already increased at Product Return. Reducing stock at refund would remove returned products from inventory that are physically present, creating negative or incorrect stock.
 ❌ Cancel a Sales Invoice while Active Sales Payments exist.
 
 Why:
@@ -1156,7 +1453,7 @@ All active Sales Payments must be cancelled before cancelling the Sales Invoice.
 
 **Forbidden:** Posting any customer debit or credit when processing a sales return.
 
-**Why:** Return records goods, not money. A customer ledger entry would falsely change the customer balance before refund is paid, causing incorrect receivables and statements.
+**Why:** Return records invoice line reversal and refund eligibility, not money. A customer ledger entry would falsely change the customer balance before refund is paid, causing incorrect receivables and statements.
 
 ---
 
@@ -1172,15 +1469,31 @@ All active Sales Payments must be cancelled before cancelling the Sales Invoice.
 
 **Forbidden:** Processing a return line without verifying Available Qty.
 
-**Why:** Over-return inflates stock, creates excess refund liability, and breaks the link between sold and returned quantities.
+**Why:** Over-return inflates Product Return stock, creates excess refund liability, and breaks the link between sold and returned quantities on both Product Return and Service Return lines.
 
 ---
 
-### ❌ Modify refund_amount Manually
+### ❌ Cancel Sales Return after Refund Posted
 
-**Forbidden:** Directly editing `refund_amount` outside the approved Sales Return Refund and Refund Cancel workflows.
+**Forbidden:** Cancelling a Sales Return when Total Refunded Amount is greater than zero or when any active Sales Return Refund exists.
 
-**Why:** `refund_amount` is the system-controlled tracker of remaining refund obligation. Manual change bypasses audit trail and may cause over-refund or under-refund.
+**Why:** Refund money has already moved. Cancelling the return would corrupt refund liability, customer balance, account balance, and audit trail. Use Refund Cancel to reverse payments — not Sales Return Cancel.
+
+---
+
+### ❌ Physically Delete Sales Return Records
+
+**Forbidden:** Permanently deleting Sales Return or Sales Return Item records.
+
+**Why:** Cancelled returns must remain for audit, history, investigation, viewing, and printing. Only status-based cancellation is permitted.
+
+---
+
+### ❌ Modify adjust_amount or refund_amount Manually
+
+**Forbidden:** Directly editing `adjust_amount` or `refund_amount` outside the approved Sales Return Refund, Refund Cancel, and Sales Return Cancel workflows.
+
+**Why:** `adjust_amount` and `refund_amount` are system-controlled refund balance fields. Manual change bypasses audit trail and may cause over-refund or under-refund.
 
 ---
 
@@ -1233,9 +1546,38 @@ The following workflows are **BUSINESS APPROVED** and **FROZEN**.
 | 1 | Sales (Invoice Workflow) |
 | 2 | Sales Payment |
 | 3 | Sales Cancel |
-| 4 | Sales Return |
-| 5 | Sales Return Refund |
-| 6 | Refund Cancel |
+| 4 | Product Return Workflow |
+| 5 | Service Return Workflow |
+| 6 | Sales Return Cancel |
+| 7 | Sales Return Refund |
+| 8 | Refund Cancel |
+
+### Frozen Product Return and Service Return Rules
+
+All Product Return and Service Return rules defined in **§6 Sales Return Workflow** and **§15 Return Rules** are **FROZEN CONSTITUTION RULES**. This includes:
+
+- Product Return Workflow — invoice reference, Available Quantity validation, mandatory Stock IN, return totals, Refund Balance, no ledger entries, and Sales Return Item `product_id` line identity.
+- Service Return Workflow — invoice reference, Available Quantity validation, no stock or inventory movement, return totals, Refund Balance, no ledger entries, and Sales Return Item `service_id` line identity.
+
+Modification to any frozen Product Return or Service Return rule **requires explicit Business Owner approval** before implementation.
+
+### Frozen Sales Return Cancel Rules
+
+All Sales Return Cancel rules defined in **§6A Sales Return Cancel Workflow** and **§15 Sales Return Cancel Rules** are **FROZEN CONSTITUTION RULES**. Modification requires explicit Business Owner approval.
+
+### Frozen Refund Balance Storage Rules
+
+The following rules for `sales_returns.adjust_amount` and `sales_returns.refund_amount` are **FROZEN CONSTITUTION RULES**:
+
+1. `sales_returns.adjust_amount` **SHALL** be stored.
+2. `sales_returns.refund_amount` **SHALL** be stored.
+3. `adjust_amount` represents the **Total Refunded Amount**.
+4. `refund_amount` represents the **Remaining Refund Balance**.
+5. Both fields **SHALL** be maintained automatically by the system.
+6. Both fields **SHALL NOT** be edited manually.
+7. Remaining Refund validation **MAY** calculate values from active refund records for verification, but the official business fields remain `adjust_amount` and `refund_amount` stored on `sales_returns`.
+
+Modification requires explicit Business Owner approval.
 
 ### Approval Requirement
 
@@ -1256,7 +1598,7 @@ Developer convenience, performance optimisation, or UI improvement does **not** 
 
 ### Frozen Logic Principle
 
-These six workflows define the financial truth of the Sales Module. They are not implementation details. They are business law.
+These eight workflows define the financial truth of the Sales Module. They are not implementation details. They are business law.
 
 ---
 
@@ -1285,7 +1627,7 @@ This includes:
 - Ledger entry type and timing
 - Stock effect and timing
 - Balance formulas
-- `refund_amount` rules
+- `adjust_amount` and `refund_amount` rules
 - Invoice number formats (especially SRR)
 - Forbidden rules
 - Frozen workflows
@@ -1337,15 +1679,27 @@ Business Principle
 
 Sales Return is the Source Document.
 
-Sales Return amount NEVER changes.
+Sales Return Grand Return Amount NEVER changes.
 
-Sales Return NEVER stores Remaining Refund.
+sales_returns.adjust_amount SHALL be stored.
 
-Sales Return NEVER stores Running Balance.
+sales_returns.refund_amount SHALL be stored.
 
-Sales Return NEVER stores Refunded Amount.
+adjust_amount represents the Total Refunded Amount.
 
-Sales Return is immutable after posting.
+refund_amount represents the Remaining Refund Balance.
+
+Both fields SHALL be maintained automatically by the system.
+
+Both fields SHALL NOT be edited manually.
+
+Remaining Refund validation MAY calculate values from active refund records for verification, but the official business fields remain adjust_amount and refund_amount stored on sales_returns.
+
+Sales Return Cancel is permitted ONLY when Total Refunded Amount is ZERO and no active Sales Return Refund exists.
+
+If any Refund has been posted, Sales Return Cancel is STRICTLY PROHIBITED.
+
+Sales Return Cancel must never physically delete records. Status-based cancellation only.
 
 ====================================================
 
@@ -1373,27 +1727,21 @@ Grand Return Amount
 
 ====================================================
 
-Total Refunded
+Total Refunded Amount
 
-Total Refunded
+Stored on sales_returns.adjust_amount
 
-=
+The system maintains adjust_amount automatically from active Sales Return Refund settlements.
 
-SUM(
-
-sales_return_refunds.refund_amount
-
-)
-
-WHERE
-
-status = Active
+Verification MAY recalculate Total Refunded Amount from active refund records.
 
 ====================================================
 
-Remaining Refund
+Remaining Refund Balance
 
-Remaining Refund
+Stored on sales_returns.refund_amount
+
+Remaining Refund Balance
 
 =
 
@@ -1401,11 +1749,11 @@ Sales Return Grand Return Amount
 
 -
 
-Total Refunded
+Total Refunded Amount
 
-System must ALWAYS calculate Remaining Refund.
+The system maintains refund_amount automatically.
 
-Never trust stored remaining values.
+Verification MAY recalculate Remaining Refund Balance from active refund records for validation. The official business fields remain adjust_amount and refund_amount stored on sales_returns.
 
 ====================================================
 
@@ -1563,9 +1911,11 @@ Cancelled
 
 Business Rules
 
-✓ Sales Return never changes.
+✓ Sales Return Grand Return Amount never changes.
 
-✓ Remaining Refund is always calculated.
+✓ Sales Return Cancel permitted only when no Refund posted.
+
+✓ adjust_amount and refund_amount are stored on sales_returns and maintained automatically by the system.
 
 ✓ Multiple Refund Transactions are allowed.
 

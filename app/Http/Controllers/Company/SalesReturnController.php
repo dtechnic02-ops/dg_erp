@@ -92,7 +92,7 @@ class SalesReturnController extends Controller
             ? (int) $request->per_page
             : 20;
 
-        $totalsQuery = clone $query;
+        $totalsQuery = (clone $query)->where('status', 1);
 
         $totalSubtotal = (clone $totalsQuery)->sum('subtotal');
         $totalVat = (clone $totalsQuery)->sum('total_vat');

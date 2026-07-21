@@ -439,4 +439,50 @@ class ValidationService
 
         return $rule;
     }
+
+    /* =========================================================
+        CANCEL
+        ========================================================= */
+
+    /**
+     * Cancel Date Validation
+     *
+     * Mandatory cancel date used by invoice/payment/return/refund
+     * cancellation forms across Sales and Purchase modules.
+     */
+    public static function cancelDate(): string
+    {
+        return self::requiredDate();
+    }
+
+    /**
+     * Cancel Reason Validation
+     *
+     * Mandatory cancel reason text.
+     */
+    public static function cancelReason(int $max = 500): string
+    {
+        return self::requiredString($max);
+    }
+
+    /* =========================================================
+        COMPANY ISOLATION
+        ========================================================= */
+
+    /**
+     * Exists For Company Validation
+     *
+     * Ensures a referenced record belongs to the current company.
+     */
+    public static function existsForCompany(
+        string $table,
+        int $companyId,
+        string $column = 'id'
+    ) {
+        return Rule::exists($table, $column)->where(
+            function ($query) use ($companyId) {
+                $query->where('company_id', $companyId);
+            }
+        );
+    }
 }

@@ -27,6 +27,8 @@ $salesChart = SalesInvoice::
 
 where('company_id',$companyId)
 
+->where('status', 1)
+
 ->whereMonth(
 'created_at',
 now()->month
@@ -164,6 +166,8 @@ where(
 'company_id',
 $companyId
 )
+
+->where('status', 1)
 
 ->sum(
 'due_amount'

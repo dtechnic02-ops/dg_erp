@@ -3,1061 +3,722 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
-
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use App\Services\ValidationService;
+use App\Models\FinancialYear;
 use App\Models\Product;
-use App\Models\Supplier;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseItem;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
-use App\Models\FinancialYear;
-use App\Services\StockService;
+use App\Models\Supplier;
 use App\Services\InvoiceNumberService;
-use App\Models\SupplierTransaction;
-use App\Services\SupplierTransactionService;
+use App\Services\PurchaseReturnSyncService;
+use App\Services\StockService;
+use App\Services\ValidationService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PurchaseReturnController extends Controller
 {
-
-
     public function index(Request $request)
-{
-    $companyId =
-        auth()->user()->company_id;
-
-$activeFy = FinancialYear::where(
-    'company_id',
-    $companyId
-)
-->where(
-    'is_active',
-    1
-)
-->first();
-
-if (!$activeFy)
-{
-    return back()->with(
-        'error',
-        'Active Financial Year not found.'
-    );
-}
-
-$query = PurchaseReturn::with([
-    'supplier',
-    'purchaseInvoice',
-    'refunds'
-])
-->where(
-    'company_id',
-    $companyId
-);
-  
-if ($request->supplier_id)
-{
-    $query->where(
-        'supplier_id',
-        $request->supplier_id
-    );
-}
-if (!$request->filled('status'))
-{
-    $query->where('status',1);
-}
-elseif ($request->status == 'active')
-{
-    $query->where('status',1);
-}
-elseif ($request->status == 'cancelled')
-{
-    $query->where('status',0);
-}
-// all => कुनै filter छैन
-
-   $startDate = null;
-$endDate = null;
-
-if (!$request->has('financial_year_id'))
-{
-    if ($activeFy)
     {
-        $query->where(
-            'financial_year_id',
-            $activeFy->id
+        $companyId = auth()->user()->company_id;
+
+        $query = PurchaseReturn::with([
+            'supplier',
+            'invoice',
+        ])
+            ->where('company_id', $companyId);
+
+        $financialYears = FinancialYear::where('company_id', $companyId)
+            ->latest('id')
+            ->get();
+
+        $activeFy = FinancialYear::where('company_id', $companyId)
+            ->where('is_active', 1)
+            ->first();
+
+        $startDate = null;
+        $endDate = null;
+
+        if (!$request->has('financial_year_id')) {
+            if ($activeFy) {
+                $query->where('financial_year_id', $activeFy->id);
+                $startDate = $activeFy->start_date;
+                $endDate = $activeFy->end_date;
+            }
+        } else {
+            if ($request->financial_year_id) {
+                $query->where('financial_year_id', $request->financial_year_id);
+            }
+
+            $startDate = $request->start_date;
+            $endDate = $request->end_date;
+        }
+
+        if (!empty($startDate)) {
+            $query->whereDate('return_date', '>=', $startDate);
+        }
+
+        if (!empty($endDate)) {
+            $query->whereDate('return_date', '<=', $endDate);
+        }
+
+        if ($request->supplier_id) {
+            $query->where('supplier_id', $request->supplier_id);
+        }
+
+        if (!$request->has('status')) {
+            $query->where('status', 1);
+        } elseif ($request->status === '1') {
+            $query->where('status', 1);
+        } elseif ($request->status === '0') {
+            $query->where('status', 0);
+        }
+
+        if ($request->filled('refund_status')) {
+            if ($request->refund_status === 'unpaid') {
+                $query->where('adjust_amount', '<=', 0);
+            } elseif ($request->refund_status === 'paid') {
+                $query->where('adjust_amount', '>', 0)
+                    ->where('refund_amount', '<=', 0);
+            } elseif ($request->refund_status === 'partial') {
+                $query->where('adjust_amount', '>', 0)
+                    ->where('refund_amount', '>', 0);
+            }
+        }
+
+        $perPage = in_array((int) $request->per_page, [10, 20, 100, 200], true)
+            ? (int) $request->per_page
+            : 20;
+
+        $totalsQuery = (clone $query)->where('status', 1);
+
+        $totalSubtotal = (clone $totalsQuery)->sum('subtotal');
+        $totalVat = (clone $totalsQuery)->sum('total_vat');
+        $grandTotal = (clone $totalsQuery)->sum('grand_total');
+
+        $returns = $query
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $suppliers = Supplier::where('company_id', $companyId)->get();
+
+        return view(
+            'company.purchase-return.index',
+            compact(
+                'returns',
+                'suppliers',
+                'grandTotal',
+                'totalSubtotal',
+                'totalVat',
+                'financialYears',
+                'activeFy',
+                'startDate',
+                'endDate',
+                'perPage'
+            )
         );
-
-        $startDate = $activeFy->start_date;
-        $endDate   = $activeFy->end_date;
     }
-}
-else
-{
-   if (
-    $request->filled('financial_year_id') &&
-    $request->financial_year_id != 'all'
-)
-{
-    $query->where(
-        'financial_year_id',
-        $request->financial_year_id
-    );
-}
 
-   if ($request->filled('start_date'))
-{
-    $startDate = $request->start_date;
-}
+    public function printList(Request $request)
+    {
+        $request->merge(['print' => 1]);
 
-if ($request->filled('end_date'))
-{
-    $endDate = $request->end_date;
-}
-}
-
-if (!empty($startDate))
-{
-    $query->whereDate(
-        'return_date',
-        '>=',
-        $startDate
-    );
-}
-
-if (!empty($endDate))
-{
-    $query->whereDate(
-        'return_date',
-        '<=',
-        $endDate
-    );
-}
-$summaryQuery = clone $query;
-
-$totalRecords =
-    $summaryQuery->count();
-
-$totalCancelled =
-    (clone $query)
-    ->where('status',0)
-    ->count();
-
-
-$totalSubtotal =
-    $summaryQuery->sum(
-        'subtotal'
-    );
-
-$totalVat =
-    $summaryQuery->sum(
-        'total_vat'
-    );
-
-$totalGrandTotal =
-    $summaryQuery->sum(
-        'grand_total'
-    );
-
-    $returns = $query
-        ->latest()
-        ->paginate(20)
-        ->withQueryString();
-
-    $suppliers = Supplier::where(
-            'company_id',
-            $companyId
-        )
-        ->get();
-        $financialYears = FinancialYear::where(
-    'company_id',
-    $companyId
-)->get();
-
-return view(
-    'company.purchase-return.index',
-    compact(
-        'returns',
-        'suppliers',
-        'financialYears',
-        'startDate',
-        'endDate',
-        'totalRecords',
-        'totalCancelled',
-        'totalSubtotal',
-        'totalVat',
-        'totalGrandTotal'
-    )
-);
-}
-    /**
-     * 🔥 CREATE PAGE
-     */
+        return $this->index($request);
+    }
 
     public function create($id)
     {
+        $companyId = auth()->user()->company_id;
+
         $invoice = PurchaseInvoice::with([
-
-                'supplier',
-
-                'items.product',
-
-                'company'
-
-            ])
-
-
-    
-            
-            ->where(
-                'company_id',
-                auth()->user()->company_id
-                
-            )
-            
+            'supplier',
+            'items.product',
+            'items.service',
+        ])
+            ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        if ($invoice->status == 0)
-{
-    return back()->with(
-        'error',
-        'Cancelled purchase cannot be returned.'
-    );
-}
+        if ($invoice->status != 1) {
+            return redirect()
+                ->route('company.purchases.show', $invoice->id)
+                ->with('error', 'Cannot create return for a cancelled purchase invoice.');
+        }
 
-return view(
-    'company.purchase-return.create',
-    compact('invoice')
-);
-        
+        if ((float) $invoice->paid_amount > 0) {
+            return redirect()
+                ->route('company.purchases.show', $invoice->id)
+                ->with(
+                    'error',
+                    'This invoice has received payment. Cancel or reverse the payment before creating a Purchase Return.'
+                );
+        }
+
+        $activeFy = FinancialYear::where('company_id', $companyId)
+            ->where('is_active', 1)
+            ->first();
+
+        if (!$activeFy) {
+            return back()->with(
+                'error',
+                'Please activate financial year first.'
+            );
+        }
+
+        if ((int) $invoice->financial_year_id !== (int) $activeFy->id) {
+            return redirect()
+                ->route('company.purchases.show', $invoice->id)
+                ->with('error', 'Purchase Invoice belongs to another Financial Year.');
+        }
+
+        $availableQuantities = $this->calculateAvailableQuantities($invoice, $companyId);
+
+        if (!$this->invoiceHasReturnableQuantity($availableQuantities)) {
+            return redirect()
+                ->back()
+                ->with('error', 'This invoice has already been fully returned.');
+        }
+
+        $returnNo = InvoiceNumberService::generate(
+            'PR',
+            $companyId,
+            $activeFy->id,
+            PurchaseReturn::class,
+            'return_no'
+        );
+
+        return view(
+            'company.purchase-return.create',
+            compact(
+                'invoice',
+                'returnNo',
+                'availableQuantities'
+            )
+        );
     }
-
-    /**
-     * 🔥 STORE PURCHASE RETURN
-     */
 
     public function store(Request $request)
     {
-       $request->validate([
+        $companyId = auth()->user()->company_id;
 
-'purchase_invoice_id' =>
+        $request->validate([
+            'purchase_invoice_id' => 'required|exists:purchase_invoices,id,company_id,' . $companyId,
+            'supplier_id'         => 'required|exists:suppliers,id,company_id,' . $companyId,
+            'return_date'         => 'required|date',
+            'purchase_item_id'    => 'required|array|min:1',
+            'purchase_item_id.*'  => 'required|integer',
+            'quantity'            => 'required|array',
+            'quantity.*'          => 'nullable|numeric|min:0',
+            'note'                => 'nullable|string|max:1000',
+            'damage_photo'        => 'nullable|image|max:5120',
+        ]);
 
-'required|exists:purchase_invoices,id',
+        $safeMessages = [
+            'Please activate financial year first.',
+            'No active financial year found for selected return date.',
+            'Purchase Invoice belongs to another Financial Year.',
+            'Return qty exceeds available qty.',
+            'Please enter return qty.',
+            'Cannot return from a cancelled purchase invoice.',
+            'This invoice has received payment. Cancel or reverse the payment before creating a Purchase Return.',
+            'Invalid purchase item for this invoice.',
+            'Supplier does not match the selected purchase invoice.',
+            'Invalid quantity',
+            'Insufficient stock.',
+            'Financial Year is required for stock transaction.',
+        ];
 
-'return_date' =>
-ValidationService::requiredDate(),
+        try {
+            $return = DB::transaction(function () use ($request, $companyId) {
+                $activeFy = FinancialYear::where('company_id', $companyId)
+                    ->where('is_active', 1)
+                    ->first();
 
-'purchase_item_id' => 'required|array',
+                if (!$activeFy) {
+                    throw new \Exception('Please activate financial year first.');
+                }
 
-'purchase_item_id.*' =>
+                $returnDate = \Carbon\Carbon::parse($request->return_date);
+                $startDate = \Carbon\Carbon::parse($activeFy->start_date);
+                $endDate = \Carbon\Carbon::parse($activeFy->end_date);
 
-'required|exists:purchase_items,id',
+                if ($returnDate->lt($startDate) || $returnDate->gt($endDate)) {
+                    throw new \Exception(
+                        'No active financial year found for selected return date.'
+                    );
+                }
 
-'product_id' => 'required|array',
+                $invoice = PurchaseInvoice::with('items')
+                    ->where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($request->purchase_invoice_id);
 
-'product_id.*' =>
+                if ($invoice->status != 1) {
+                    throw new \Exception(
+                        'Cannot return from a cancelled purchase invoice.'
+                    );
+                }
 
-'required|exists:products,id',
+                if ((float) $invoice->paid_amount > 0) {
+                    throw new \Exception(
+                        'This invoice has received payment. Cancel or reverse the payment before creating a Purchase Return.'
+                    );
+                }
 
-'quantity' =>
-'required|array',
+                if ((int) $invoice->supplier_id !== (int) $request->supplier_id) {
+                    throw new \Exception(
+                        'Supplier does not match the selected purchase invoice.'
+                    );
+                }
 
-'quantity.*' =>
-'required|numeric|min:0.01|max:999999',
+                if ($invoice->financial_year_id != $activeFy->id) {
+                    throw new \Exception(
+                        'Purchase Invoice belongs to another Financial Year.'
+                    );
+                }
 
-'unit_price' =>
-'required|array',
-
-'unit_price.*' =>
-'required|numeric|min:0|max:999999999',
-
-
-]);
-try
-{
-$purchaseReturn = null;
-        DB::transaction(function () use ($request, &$purchaseReturn) {
-
-            $companyId =
-                auth()->user()->company_id;
-
-$activeFy = FinancialYear::where(
-    'company_id',
-    $companyId
-)
-->whereDate(
-    'start_date',
-    '<=',
-    $request->return_date
-)
-->whereDate(
-    'end_date',
-    '>=',
-    $request->return_date
-)
-->first();
-if (!$activeFy)
-{
-    throw new Exception(
-        'Financial Year not found for selected return date.'
-    );
-}
-            $invoice = PurchaseInvoice::with(
-                    'items'
-                )
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->findOrFail(
-                    $request->purchase_invoice_id
+                $returnNo = InvoiceNumberService::generate(
+                    'PR',
+                    $companyId,
+                    $activeFy->id,
+                    PurchaseReturn::class,
+                    'return_no'
                 );
 
+                $photo = null;
 
-/*
-|--------------------------------------------------------------------------
-| FINANCIAL YEAR CHECK
-|--------------------------------------------------------------------------
-*/
+                if ($request->hasFile('damage_photo')) {
+                    $photo = $request
+                        ->file('damage_photo')
+                        ->store(
+                            "companies/{$companyId}/returns",
+                            'public'
+                        );
+                }
 
-if (
-    $invoice->financial_year_id !=
-    $activeFy->id
-)
-{
-    throw new \Exception(
-        'Purchase Invoice belongs to another Financial Year.'
-    );
-}
-                
-
-            /**
-             * 🔥 RETURN NUMBER
-             */
-
-      $returnNo = InvoiceNumberService::generate(
-    'PR',
-    $companyId,
-    $activeFy->id,
-    PurchaseReturn::class,
-    'return_no'
-);
-    
-if ($invoice->status == 0)
-{
-    throw new \Exception(
-        'Cancelled purchase cannot be returned.'
-    );
-}
-
-            /**
-             * 🔥 TOTALS
-             */
-
-    
-            $subtotal = 0;
-
-            $totalVat = 0;
-
-            $grandTotal = 0;
-
-            $hasReturn = false;
-
-            /**
-             * 🔥 CREATE RETURN
-             */
-
-            $purchaseReturn =
-                PurchaseReturn::create([
-
-                    'created_by' =>
-                        auth()->id(),
-
-                    'company_id' =>
-                        $companyId,
-'financial_year_id' =>
-    $activeFy->id,
-                    'purchase_invoice_id' =>
-                        $invoice->id,
-
-                    'supplier_id' =>
-                        $invoice->supplier_id,
-
-                    'return_no' =>
-                        $returnNo,
-
-                    'return_date' =>
-                        $request->return_date,
-
-                    'subtotal' => 0,
-
-                    'total_vat' => 0,
-
-                    'grand_total' => 0,
-                    'refund_amount' => 0,
-
-                    'adjust_amount' => 0,
-
-                    'note' =>
-                        $request->note,
-
-                    'status' => 1,
-
+                $return = PurchaseReturn::create([
+                    'company_id'          => $companyId,
+                    'financial_year_id'   => $activeFy->id,
+                    'purchase_invoice_id' => $request->purchase_invoice_id,
+                    'supplier_id'         => $request->supplier_id,
+                    'return_no'           => $returnNo,
+                    'return_date'         => $request->return_date,
+                    'subtotal'            => 0,
+                    'total_vat'           => 0,
+                    'grand_total'         => 0,
+                    'note'                => $request->note,
+                    'damage_photo'        => $photo,
+                    'created_by'          => auth()->id(),
+                    'status'              => 1,
                 ]);
 
+                $totalSubtotal = 0;
+                $totalVat = 0;
+                $grandTotal = 0;
+                $hasReturn = false;
 
-            /**
-             * 🔥 RETURN ITEMS
-             */
+                foreach ($request->purchase_item_id as $key => $purchaseItemId) {
+                    $returnQty = (float) ($request->quantity[$key] ?? 0);
 
-            foreach (
-                $request->product_id as $key => $productId
-            ) {
+                    if ($returnQty <= 0) {
+                        continue;
+                    }
 
-                $qty =
-                    (float)
-                    ($request->quantity[$key] ?? 0);
+                    $hasReturn = true;
 
-                // SKIP EMPTY
+                    $purchaseItem = PurchaseItem::where('company_id', $companyId)
+                        ->lockForUpdate()
+                        ->findOrFail($purchaseItemId);
 
-                if ($qty <= 0)
-                {
-                    continue;
+                    if ((int) $purchaseItem->purchase_invoice_id !== (int) $invoice->id) {
+                        throw new \Exception(
+                            'Invalid purchase item for this invoice.'
+                        );
+                    }
+
+                    $availableQty = max(
+                        0,
+                        round(
+                            (float) $purchaseItem->quantity - (float) $purchaseItem->returned_qty,
+                            2
+                        )
+                    );
+
+                    if ($returnQty > $availableQty) {
+                        throw new \Exception(
+                            'Return qty exceeds available qty.'
+                        );
+                    }
+
+                    $subtotal = $returnQty * $purchaseItem->unit_price;
+
+                    $vatAmount = round(
+                        ($subtotal * $purchaseItem->vat_rate) / 100,
+                        2
+                    );
+
+                    $total = $subtotal + $vatAmount;
+
+                    $totalSubtotal += $subtotal;
+                    $totalVat += $vatAmount;
+                    $grandTotal += $total;
+
+                    $returnItemData = [
+                        'company_id'          => $companyId,
+                        'financial_year_id'   => $activeFy->id,
+                        'purchase_return_id'  => $return->id,
+                        'purchase_invoice_id' => $invoice->id,
+                        'purchase_item_id'    => $purchaseItem->id,
+                        'quantity'            => $returnQty,
+                        'unit_price'          => $purchaseItem->unit_price,
+                        'vat_rate'            => $purchaseItem->vat_rate,
+                        'vat_amount'          => $vatAmount,
+                        'total_price'         => $total,
+                        'created_by'          => auth()->id(),
+                        'status'              => 1,
+                    ];
+
+                    if ($purchaseItem->item_type === 'product') {
+                        if (!$purchaseItem->product_id) {
+                            throw new \Exception(
+                                'Invalid purchase item for this invoice.'
+                            );
+                        }
+
+                        $product = Product::where('company_id', $companyId)
+                            ->lockForUpdate()
+                            ->findOrFail($purchaseItem->product_id);
+
+                        $returnItemData['product_id'] = $product->id;
+                        $returnItemData['service_id'] = null;
+
+                        PurchaseReturnItem::create($returnItemData);
+
+                        $purchaseItem->update([
+                            'returned_qty' => round(
+                                (float) $purchaseItem->returned_qty + $returnQty,
+                                2
+                            ),
+                        ]);
+
+                        StockService::decrease(
+                            $product,
+                            $returnQty,
+                            'purchase_return',
+                            $return->return_no,
+                            $activeFy->id,
+                            $return->return_date,
+                            $purchaseItem->unit_price,
+                            'Purchase Return'
+                        );
+
+                        continue;
+                    }
+
+                    if ($purchaseItem->item_type !== 'service' || !$purchaseItem->service_id) {
+                        throw new \Exception(
+                            'Invalid purchase item for this invoice.'
+                        );
+                    }
+
+                    $returnItemData['product_id'] = null;
+                    $returnItemData['service_id'] = $purchaseItem->service_id;
+
+                    PurchaseReturnItem::create($returnItemData);
+
+                    $purchaseItem->update([
+                        'returned_qty' => round(
+                            (float) $purchaseItem->returned_qty + $returnQty,
+                            2
+                        ),
+                    ]);
                 }
 
-                $hasReturn = true;
-
-                /**
-                 * 🔥 PRODUCT
-                 */
-
-                $product = Product::where(
-                        'company_id',
-                        $companyId
-                    )
-                    ->findOrFail($productId);
-                    if ($product->status != 'active')
-{
-    throw new \Exception(
-        $product->name . ' is inactive.'
-    );
-}
-
-                /**
-                 * 🔥 PURCHASE ITEM
-                 */
-
-              $purchaseItem = PurchaseItem::where(
-
-    'company_id',
-
-    $companyId
-
-)
-->where(
-
-    'purchase_invoice_id',
-
-    $invoice->id
-
-)
-->findOrFail(
-
-    $request->purchase_item_id[$key]
-
-);
-
-if (
-
-    $purchaseItem->product_id !=
-
-    $productId
-
-)
-{
-    throw new \Exception(
-
-        'Purchase item mismatch.'
-
-    );
-}
-
-                /**
-                 * 🔥 ALREADY RETURNED
-                 */
-
-                $alreadyReturned =
-                    PurchaseReturnItem::where(
-                        'company_id',
-                        $companyId
-                    )
-                   ->where(
-    'purchase_item_id',
-    $purchaseItem->id
-)
-                   ->whereHas(
-    'purchaseReturn',
-    function ($q) use ($invoice) {
-
-        $q->where(
-            'purchase_invoice_id',
-            $invoice->id
-        )
-        ->where(
-            'status',
-            1
-        );
-
-    }
-)
-->sum('quantity');
-
-
-
-
-                /**
-                 * 🔥 REMAINING QTY
-                 */
-
-                $remainingQty =
-                    $purchaseItem->quantity
-                    - $alreadyReturned;
-
-                /**
-                 * 🔥 RETURN LIMIT
-                 */
-
-                if ($qty > $remainingQty)
-                {
+                if (!$hasReturn) {
                     throw new \Exception(
-
-                        $product->name .
-
-                        ' return qty exceeds available qty.'
-
+                        'Please enter return qty.'
                     );
                 }
 
-                /**
-                 * 🔥 STOCK CHECK
-                 */
+                $return->update([
+                    'subtotal'    => $totalSubtotal,
+                    'total_vat'   => $totalVat,
+                    'grand_total' => $grandTotal,
+                ]);
 
-                if (
-                    $product->current_stock < $qty
-                )
-                {
-                    throw new \Exception(
+                PurchaseReturnSyncService::sync($return, true);
 
-                        $product->name .
+                return $return;
+            });
 
-                        ' stock not enough.'
-
-                    );
-                }
-
-                /**
-                 * 🔥 CALCULATION
-                 */
-
-                $price =
-                    (float)
-                    ($request->unit_price[$key] ?? 0);
-
-                $vatRate =
-                    (float)
-                    ($request->vat_rate[$key] ?? 0);
-
-                $lineSubtotal =
-                    $qty * $price;
-
-                $vatAmount =
-                    ($lineSubtotal * $vatRate)
-                    / 100;
-
-                $totalPrice =
-                    $lineSubtotal
-                    + $vatAmount;
-
-                /**
-                 * 🔥 TOTALS
-                 */
-
-                $subtotal +=
-                    $lineSubtotal;
-
-                $totalVat +=
-                    $vatAmount;
-
-                $grandTotal +=
-                    $totalPrice;
-
-                /**
-                 * 🔥 CREATE RETURN ITEM
-                 */
-
-                PurchaseReturnItem::create([
-
-    'created_by' => auth()->id(),
-
-    'company_id' => $companyId,
-
-    'financial_year_id' => $activeFy->id,
-
-    'purchase_return_id' => $purchaseReturn->id,
-    'purchase_item_id' => $purchaseItem->id,
-
-    'product_id' => $productId,
-
-    'quantity' => $qty,
-
-    'unit_price' => $price,
-
-    'vat_rate' => $vatRate,
-
-    'vat_amount' => $vatAmount,
-
-    'total_price' => $totalPrice,
-
-    'status' => 1,
-
-]);
-                /**
-                 * 🔥 STOCK DECREASE
-                 */
-
-StockService::decrease(
-
-$product,
-
-$qty,
-
-'purchase_return',
-
-$purchaseReturn->return_no,
-
-$activeFy->id,
-
-$purchaseReturn->return_date,
-
-$price,
-
-'Purchase Return'
-
-);
-            }
-
-            /**
-             * 🔥 EMPTY RETURN BLOCK
-             */
-
-            if (!$hasReturn)
-            {
-                throw new \Exception(
-                    'Please enter return qty.'
-                );
-            }
-
-            /**
-             * 🔥 UPDATE RETURN TOTALS
-             */
-
-            $purchaseReturn->update([
-
-                'subtotal' =>
-                    $subtotal,
-
-                'total_vat' =>
-                    $totalVat,
-
-                'grand_total' =>
-                    $grandTotal,
-
+            return redirect()
+                ->route('company.purchase-return.show', $return->id)
+                ->with('success', 'Purchase return saved successfully.');
+        } catch (\Throwable $e) {
+            $this->logReturnException('Purchase return store failed.', $e, [
+                'purchase_invoice_id' => $request->purchase_invoice_id,
+                'supplier_id'         => $request->supplier_id,
             ]);
-$supplier = Supplier::where(
-    'company_id',
-    $companyId
-)
-->findOrFail(
-    $invoice->supplier_id
-);
 
+            $error = $this->resolveSafeExceptionMessage(
+                $e,
+                $safeMessages,
+                'Unable to save purchase return. Please try again.'
+            );
 
-
-$currentDue = max(
-    0,
-    abs($supplier->current_balance)
-);
-
-$adjustAmount = min(
-    $currentDue,
-    $grandTotal
-);
-
-$refundAmount =
-    $grandTotal -
-    $adjustAmount;
-
-    $purchaseReturn->update([
-
-    'refund_amount' => $refundAmount,
-
-    'adjust_amount' => $adjustAmount,
-
-]);
-// ==========================
-// PURCHASE RETURN TRANSACTION
-// ==========================
-
-
-SupplierTransactionService::createTransaction([
-
-    'company_id'        => $companyId,
-
-    'financial_year_id' => $activeFy->id,
-
-    'supplier_id'       => $invoice->supplier_id,
-
-    'transaction_date'  => $purchaseReturn->return_date,
-
-    'voucher_no'        => $purchaseReturn->return_no,
-
-    'reference_type'    => 'purchase_return',
-
-    'reference_id'      => $purchaseReturn->id,
-
-    'reference_no'      => $purchaseReturn->return_no,
-
-    'description'       => 'Purchase Return',
-
-    'debit'             => $purchaseReturn->grand_total,
-
-    'credit'            => 0,
-
-    'created_by'        => auth()->id(),
-
-    'status'            => 1,
-
-]);
-
-
-       
-          
-
-            
-
-        });
-
-       return redirect()
-    ->route(
-        'company.purchase-return.show',
-        $purchaseReturn->id
-    )
-    ->with(
-        'success',
-        'Purchase return created successfully.'
-    );
-}
-catch (\Exception $e)
-{
-    return back()
-        ->withInput()
-        ->with(
-            'error',
-            $e->getMessage()
-        );
-}
+            return back()
+                ->withInput()
+                ->with('error', $error);
         }
-         /**
-            * 🔥 SHOW PURCHASE RETURN
-      */
+    }
 
-            public function show($id)
-       {
-         $return = PurchaseReturn::with([
+    public function show($id)
+    {
+        $companyId = auth()->user()->company_id;
 
+        $return = PurchaseReturn::with([
             'supplier',
-
-            'purchaseInvoice',
-
+            'invoice',
             'items.product',
-
-            'refunds.account'
-
+            'items.purchaseItem.service',
+            'refunds',
+            'financialYear',
         ])
-        ->where(
-            'company_id',
-            auth()->user()->company_id
-        )
-        ->findOrFail($id);
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
-          return view(
-        'company.purchase-return.show',
-        compact('return')
-    );
-}
-public function print(Request $request)
-{
-    $companyId =
-        auth()->user()->company_id;
-
-    $activeFy = FinancialYear::where(
-        'company_id',
-        $companyId
-    )
-    ->where(
-        'is_active',
-        1
-    )
-    ->first();
-
-    $query = PurchaseReturn::with([
-        'supplier',
-        'purchaseInvoice',
-        'refunds'
-    ])
-    ->where(
-        'company_id',
-        $companyId
-    );
-
-    if ($request->supplier_id)
-    {
-        $query->where(
-            'supplier_id',
-            $request->supplier_id
+        return view(
+            'company.purchase-return.show',
+            compact('return')
         );
     }
 
-    $startDate = null;
-$endDate = null;
-
-if (!$request->has('financial_year_id'))
-{
-    if ($activeFy)
+    public function print($id)
     {
-        $query->where(
-            'financial_year_id',
-            $activeFy->id
-        );
+        $companyId = auth()->user()->company_id;
 
-        $startDate = $activeFy->start_date;
-        $endDate   = $activeFy->end_date;
-    }
-}
-else
-{
-    if (
-    $request->filled('financial_year_id') &&
-    $request->financial_year_id != 'all'
-)
-{
-    $query->where(
-        'financial_year_id',
-        $request->financial_year_id
-    );
-}
+        $return = PurchaseReturn::with([
+            'supplier',
+            'invoice',
+            'items.product',
+            'items.purchaseItem.service',
+            'financialYear',
+        ])
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
-   if ($request->filled('start_date'))
-{
-    $startDate = $request->start_date;
-}
-
-if ($request->filled('end_date'))
-{
-    $endDate = $request->end_date;
-}
-}
-if (!$request->filled('status'))
-{
-    $query->where('status',1);
-}
-elseif ($request->status == 'active')
-{
-    $query->where('status',1);
-}
-elseif ($request->status == 'cancelled')
-{
-    $query->where('status',0);
-}
-// all => कुनै filter छैन
-
-
-    if (!empty($startDate))
-    {
-        $query->whereDate(
-            'return_date',
-            '>=',
-            $startDate
+        return view(
+            'company.purchase-return.print',
+            compact('return')
         );
     }
 
-    if (!empty($endDate))
+    public function cancel(Request $request, $id)
     {
-        $query->whereDate(
-            'return_date',
-            '<=',
-            $endDate
+        $companyId = auth()->user()->company_id;
+
+        $request->validate([
+            'cancel_date'   => ValidationService::requiredDate(),
+            'cancel_reason' => ValidationService::requiredString(500),
+        ]);
+
+        $safeMessages = [
+            'Purchase return already cancelled.',
+            'Cannot cancel a purchase return with refund settlements.',
+            'Cancel date must belong to the active financial year.',
+        ];
+
+        try {
+            DB::transaction(function () use ($request, $id, $companyId) {
+                $activeFy = FinancialYear::where('company_id', $companyId)
+                    ->where('is_active', 1)
+                    ->firstOrFail();
+
+                $cancelDate = \Carbon\Carbon::parse($request->cancel_date);
+                $startDate  = \Carbon\Carbon::parse($activeFy->start_date);
+                $endDate    = \Carbon\Carbon::parse($activeFy->end_date);
+
+                if ($cancelDate->lt($startDate) || $cancelDate->gt($endDate)) {
+                    throw new \Exception(
+                        'Cancel date must belong to the active financial year.'
+                    );
+                }
+
+                $cancelBusinessDate = $cancelDate->toDateString();
+                $cancelReason = trim($request->cancel_reason);
+
+                $return = PurchaseReturn::with('items')
+                    ->where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($id);
+
+                if ((int) $return->status !== 1) {
+                    throw new \Exception('Purchase return already cancelled.');
+                }
+
+                $refundedAmount = PurchaseReturnSyncService::calculateRefundedAmount(
+                    $return,
+                    true
+                );
+
+                if ($refundedAmount > 0) {
+                    throw new \Exception('Cannot cancel a purchase return with refund settlements.');
+                }
+
+                foreach ($return->items as $item) {
+                    if ((int) $item->status !== 1) {
+                        continue;
+                    }
+
+                    if ($item->product_id) {
+                        $product = Product::where('company_id', $companyId)
+                            ->lockForUpdate()
+                            ->findOrFail($item->product_id);
+
+                        StockService::increase(
+                            $product,
+                            $item->quantity,
+                            'purchase_return_cancel',
+                            $return->return_no,
+                            $activeFy->id,
+                            $cancelBusinessDate,
+                            $item->unit_price,
+                            'Purchase Return Cancel: ' . $cancelReason
+                        );
+                    }
+
+                    if ($item->purchase_item_id) {
+                        $purchaseItem = PurchaseItem::where('company_id', $companyId)
+                            ->lockForUpdate()
+                            ->find($item->purchase_item_id);
+
+                        if ($purchaseItem) {
+                            $purchaseItem->update([
+                                'returned_qty' => max(
+                                    0,
+                                    round(
+                                        (float) $purchaseItem->returned_qty - (float) $item->quantity,
+                                        2
+                                    )
+                                ),
+                            ]);
+                        }
+                    }
+
+                    $item->update(['status' => 0]);
+                }
+
+                $return->update([
+                    'status' => 0,
+                    'note'   => trim(($return->note ?? '') . ' [Cancelled: ' . $cancelReason . ']'),
+                ]);
+
+                PurchaseReturnSyncService::sync($return, true);
+            });
+
+            return redirect()
+                ->route('company.purchase-return.index')
+                ->with('success', 'Purchase return cancelled successfully.');
+        } catch (\Throwable $e) {
+            $this->logReturnException('Purchase return cancel failed.', $e, [
+                'purchase_return_id' => $id,
+            ]);
+
+            $error = $this->resolveSafeExceptionMessage(
+                $e,
+                $safeMessages,
+                'Unable to cancel purchase return. Please try again.'
+            );
+
+            return back()->with('error', $error);
+        }
+    }
+
+    public function attachReturnableQuantityToInvoices($invoices, int $companyId): void
+    {
+        $invoiceCollection = $invoices->getCollection();
+
+        $invoiceCollection->loadMissing('items');
+
+        foreach ($invoiceCollection as $invoice) {
+            $availableQuantities = $this->calculateAvailableQuantities(
+                $invoice,
+                $companyId
+            );
+
+            $invoice->setAttribute(
+                'has_returnable_quantity',
+                $this->invoiceHasReturnableQuantity($availableQuantities)
+            );
+        }
+    }
+
+    public static function invoiceHasReturnableQuantityForInvoice(
+        PurchaseInvoice $invoice,
+        int $companyId
+    ): bool {
+        $invoice->loadMissing('items');
+
+        $controller = app(self::class);
+
+        return $controller->invoiceHasReturnableQuantity(
+            $controller->calculateAvailableQuantities($invoice, $companyId)
         );
     }
 
-    $returns = $query
-        ->latest()
-        ->get();
+    protected function calculateAvailableQuantities(
+        PurchaseInvoice $invoice,
+        int $companyId
+    ): array {
+        $availableQuantities = [];
 
-    return view(
-        'company.purchase-return.print-list',
-        compact('returns')
-    );
-}
-
-
-
-public function cancel($id)
-{
-   
-    DB::beginTransaction();
-
-    try {
-        
-
-$return = PurchaseReturn::with(
-    'supplier',
-    'purchaseInvoice',
-    'items.product',
-    'refunds.account'
-)
-->where(
-    'company_id',
-    auth()->user()->company_id
-)
-->findOrFail($id);
-if ($return->status == 0)
-{
-    return back()->with(
-        'error',
-        'Return already cancelled.'
-    );
-}
-$activeRefundAmount =
-    $return->refunds()
-        ->where(
-            'status',
-            1
-        )
-        ->sum(
-            'amount'
-        );
-
-if ($activeRefundAmount > 0)
-{
-    throw new \Exception(
-        'Refund exists. Cancel refund first.'
-    );
-}
-
-        /**
-         * 🔥 PURCHASE INVOICE
-         */
-
-        $invoice = $return->purchaseInvoice;
-
-if (!$invoice)
-{
-    throw new \Exception(
-        'Purchase invoice not found.'
-    );
-}
-
-        /**
-         * 🔥 STOCK RESTORE
-         */
-
-        foreach ($return->items as $item)
-        {
-StockService::increase(
-
-$item->product,
-
-$item->quantity,
-
-'purchase_return_cancel',
-
-$return->return_no,
-
-$return->financial_year_id,
-
-$return->return_date,
-
-$item->unit_price,
-
-'Purchase Return Cancel'
-
-);
+        foreach ($invoice->items as $item) {
+            $availableQuantities[$item->id] = max(
+                0,
+                (float) $item->quantity - (float) $item->returned_qty
+            );
         }
 
-// ==========================
-// PURCHASE RETURN TRANSACTION DELETE
-// ==========================
-$supplierTransaction = SupplierTransaction::where(
-    'company_id',
-    auth()->user()->company_id
-)
-->where(
-    'reference_type',
-    'purchase_return'
-)
-->where(
-    'reference_id',
-    $return->id
-)
-->where(
-    'status',
-    1
-)
-->firstOrFail();
-
-SupplierTransactionService::reverseTransaction(
-
-    $supplierTransaction,
-
-    'purchase_return_cancel',
-
-    'Purchase Return Cancel'
-
-);
-
-$return->update([
-
-    'status' => 0,
-
-    'note' =>
-        trim(
-            ($return->note ?? '')
-            .
-            ' [Cancelled]'
-        ),
-
-]);
-
-
-
-        DB::commit();
-
-        return back()->with(
-            'success',
-            'Purchase return cancelled successfully.'
-        );
-
+        return $availableQuantities;
     }
-    catch (\Exception $e)
+
+    protected function invoiceHasReturnableQuantity(array $availableQuantities): bool
     {
-        DB::rollBack();
+        foreach ($availableQuantities as $quantity) {
+            if ((float) $quantity > 0) {
+                return true;
+            }
+        }
 
-        return back()->with(
-            'error',
-            $e->getMessage()
-        );
+        return false;
     }
-}
+
+    protected function resolveSafeExceptionMessage(
+        \Throwable $e,
+        array $safeMessages,
+        string $fallback
+    ): string {
+        $message = $e->getMessage();
+
+        if (in_array($message, $safeMessages, true)) {
+            return $message;
+        }
+
+        return $fallback;
+    }
+
+    protected function logReturnException(
+        string $context,
+        \Throwable $e,
+        array $extra = []
+    ): void {
+        Log::error($context, array_merge([
+            'company_id' => auth()->user()->company_id ?? null,
+            'user_id'    => auth()->id(),
+            'exception'  => get_class($e),
+            'message'    => $e->getMessage(),
+        ], $extra));
+    }
 }

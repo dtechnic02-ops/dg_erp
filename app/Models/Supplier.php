@@ -26,6 +26,8 @@ class Supplier extends Model
 
     'opening_balance',
 
+    'credit_days',
+
     'current_balance',
 
     'bank_name',

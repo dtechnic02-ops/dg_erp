@@ -106,7 +106,9 @@ class SalesPaymentController extends Controller
             ? (int) $request->per_page
             : 20;
 
-        $totalPayment = (clone $query)->sum('paid_amount');
+        $totalsQuery = (clone $query)->where('status', 1);
+
+        $totalPayment = (clone $totalsQuery)->sum('paid_amount');
         $totalCount   = (clone $query)->count();
 
         $payments = $query
@@ -208,7 +210,7 @@ class SalesPaymentController extends Controller
             'account_id' =>
                 'required|exists:accounts,id,company_id,' . $companyId,
             'paid_amount' =>
-                ValidationService::requiredAmount(),
+                'required|numeric|gt:0',
             'payment_date' =>
                 ValidationService::requiredDate(),
             'reference_no' =>
@@ -648,7 +650,9 @@ class SalesPaymentController extends Controller
             $query->whereDate('payment_date', '<=', $endDate);
         }
 
-        $totalPayment   = (clone $query)->sum('paid_amount');
+        $totalsQuery = (clone $query)->where('status', 1);
+
+        $totalPayment   = (clone $totalsQuery)->sum('paid_amount');
         $totalCount     = (clone $query)->count();
         $activeCount    = (clone $query)->where('status', 1)->count();
         $cancelledCount = (clone $query)->where('status', 0)->count();
