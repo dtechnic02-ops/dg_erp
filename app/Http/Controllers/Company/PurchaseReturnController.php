@@ -17,9 +17,11 @@ use App\Services\ValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
 class PurchaseReturnController extends Controller
 {
+    use HandlesTransactionDocumentationEdit;
     public function index(Request $request)
     {
         $companyId = auth()->user()->company_id;
@@ -103,7 +105,7 @@ class PurchaseReturnController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        $suppliers = Supplier::where('company_id', $companyId)->get();
+        $suppliers = Supplier::where('company_id', $companyId)->active()->get();
 
         return view(
             'company.purchase-return.index',
@@ -369,7 +371,6 @@ class PurchaseReturnController extends Controller
                         'company_id'          => $companyId,
                         'financial_year_id'   => $activeFy->id,
                         'purchase_return_id'  => $return->id,
-                        'purchase_invoice_id' => $invoice->id,
                         'purchase_item_id'    => $purchaseItem->id,
                         'quantity'            => $returnQty,
                         'unit_price'          => $purchaseItem->unit_price,
@@ -493,6 +494,102 @@ class PurchaseReturnController extends Controller
             'company.purchase-return.show',
             compact('return')
         );
+    }
+
+    public function edit($id)
+    {
+        $companyId = auth()->user()->company_id;
+
+        $return = PurchaseReturn::with([
+            'supplier',
+            'invoice',
+            'financialYear',
+        ])
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
+        if ((int) $return->status === 0) {
+            return redirect()
+                ->route('company.purchase-return.show', $return->id)
+                ->with('error', 'Cancelled return cannot be edited.');
+        }
+
+        return view(
+            'company.purchase-return.edit',
+            compact('return')
+        );
+    }
+
+    public function update(Request $request, $id)
+    {
+        $companyId = auth()->user()->company_id;
+
+        $request->validate(
+            $this->documentationEditRules('return_date')
+        );
+
+        $safeMessages = [
+            'Cancelled return cannot be edited.',
+            'Please activate financial year first.',
+            'Purchase Return belongs to another Financial Year.',
+            'Selected date must fall within the active financial year.',
+            'Deleted transaction cannot be edited.',
+        ];
+
+        try {
+            DB::transaction(function () use ($request, $id, $companyId) {
+                $return = PurchaseReturn::where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($id);
+
+                $this->guardEditableTransaction(
+                    $return,
+                    'Cancelled return cannot be edited.'
+                );
+
+                $activeFy = $this->assertActiveFinancialYear($companyId);
+
+                $this->assertTransactionFinancialYear(
+                    $return,
+                    $activeFy,
+                    'Purchase Return belongs to another Financial Year.'
+                );
+
+                $this->assertDateWithinFinancialYear(
+                    $request->return_date,
+                    $activeFy
+                );
+
+                $return->update(
+                    $this->appendUpdatedBy([
+                        'return_date' => \Carbon\Carbon::parse($request->return_date)
+                            ->toDateString(),
+                        'note' => $request->note,
+                    ], $return)
+                );
+
+                $this->logDocumentationEdit(
+                    'Purchase return documentation updated.',
+                    $return
+                );
+            });
+        } catch (\Throwable $e) {
+            $this->logReturnException('Purchase return update failed.', $e, [
+                'purchase_return_id' => $id,
+            ]);
+
+            return back()
+                ->withInput()
+                ->with('error', $this->resolveSafeExceptionMessage(
+                    $e,
+                    $safeMessages,
+                    'Unable to update purchase return.'
+                ));
+        }
+
+        return redirect()
+            ->route('company.purchase-return.show', $id)
+            ->with('success', 'Purchase return updated successfully.');
     }
 
     public function print($id)

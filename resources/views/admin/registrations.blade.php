@@ -33,6 +33,7 @@
 
     <td>
 
+        @if($r->status === 'pending' && auth()->user()->hasPermission('approve_company'))
         <!-- APPROVE -->
         <form method="POST" action="{{ route('admin.approve', $r->id) }}" style="display:inline;">
             @csrf
@@ -44,6 +45,7 @@
             @csrf
             <button style="background:red;color:white;">Reject</button>
         </form>
+        @endif
 
     </td>
 

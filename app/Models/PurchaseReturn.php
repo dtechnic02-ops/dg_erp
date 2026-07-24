@@ -21,6 +21,7 @@ class PurchaseReturn extends Model
         'note',
         'damage_photo',
         'created_by',
+        'updated_by',
         'status',
     ];
 

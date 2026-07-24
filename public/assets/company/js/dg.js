@@ -12,6 +12,53 @@
 window.DG = window.DG || {};
 
 /* =========================================================
+   SHARED : INVOICE SUMMARY CALCULATION
+   Used by Sales Invoice and Purchase Invoice (mirror)
+   ========================================================= */
+
+DG.invoiceSummary = (function () {
+
+    'use strict';
+
+    function toNumber(value) {
+        var n = parseFloat(value);
+        return isNaN(n) ? 0 : n;
+    }
+
+    function isVatApplicable(vatRate) {
+        return toNumber(vatRate) > 0;
+    }
+
+    function lineBaseAmount(quantity, unitPrice) {
+        return toNumber(quantity) * toNumber(unitPrice);
+    }
+
+    function calculateTaxableAmountFromRows(rows, readRow) {
+        var taxableAmount = 0;
+
+        rows.forEach(function (row) {
+            var values = readRow(row);
+            var hasVat = toNumber(values.vatAmount) > 0 || isVatApplicable(values.vatRate);
+
+            if (!hasVat) {
+                return;
+            }
+
+            taxableAmount += lineBaseAmount(values.quantity, values.unitPrice);
+        });
+
+        return taxableAmount;
+    }
+
+    return {
+        isVatApplicable: isVatApplicable,
+        lineBaseAmount: lineBaseAmount,
+        calculateTaxableAmountFromRows: calculateTaxableAmountFromRows
+    };
+
+})();
+
+/* =========================================================
    MODULE : SALES BILLING (Create Sales Invoice)
    Screen : resources/views/company/sales/create.blade.php
    ========================================================= */
@@ -531,6 +578,28 @@ DG.salesBilling = (function () {
         return totalVat;
     }
 
+    function calculateTaxableAmount() {
+        var taxableAmount = 0;
+
+        qsa('tr.dg-row', itemsBody).forEach(function (row) {
+            var quantityField = qs('input[name="quantity[]"]', row);
+            var priceField = qs('input[name="unit_price[]"]', row);
+            var vatAmountField = qs('input[name="vat_amount[]"]', row);
+            var vatSelect = qs('select[name="vat_rate[]"]', row);
+            var lineVat = toNumber(vatAmountField ? vatAmountField.value : 0);
+            var vatRate = toNumber(vatSelect ? vatSelect.value : 0);
+
+            if (lineVat <= 0 && vatRate <= 0) {
+                return;
+            }
+
+            taxableAmount += toNumber(quantityField ? quantityField.value : 0)
+                * toNumber(priceField ? priceField.value : 0);
+        });
+
+        return taxableAmount;
+    }
+
     /* ---------------------------------------------------
        DISCOUNT VALIDATION
        ---------------------------------------------------
@@ -570,14 +639,14 @@ DG.salesBilling = (function () {
 
         var discountField = qs('#discount_amount');
         var discount = toNumber(discountField ? discountField.value : 0);
-        var taxableAmount = Math.max(0, subtotal - discount);
-        var grandTotal = taxableAmount + totalVat;
+        var displayTaxableAmount = calculateTaxableAmount();
+        var grandTotal = Math.max(0, subtotal - discount) + totalVat;
 
         var paidAmount = toNumber(qs('#paid_amount') ? qs('#paid_amount').value : 0);
         var dueAmount = Math.max(0, grandTotal - paidAmount);
 
         setValue('#subtotal', toMoney(subtotal));
-        setValue('#taxable_amount', toMoney(taxableAmount));
+        setValue('#taxable_amount', toMoney(displayTaxableAmount));
         setValue('#total_vat', toMoney(totalVat));
         setValue('#grand_total', toMoney(grandTotal));
         setValue('#summary_paid_amount', toMoney(paidAmount));
@@ -1511,6 +1580,28 @@ DG.purchaseBilling = (function () {
         return totalVat;
     }
 
+    function calculateTaxableAmount() {
+        var taxableAmount = 0;
+
+        qsa('tr.dg-row', itemsBody).forEach(function (row) {
+            var quantityField = qs('input[name="quantity[]"]', row);
+            var priceField = qs('input[name="unit_price[]"]', row);
+            var vatAmountField = qs('input[name="vat_amount[]"]', row);
+            var vatSelect = qs('select[name="vat_rate[]"]', row);
+            var lineVat = toNumber(vatAmountField ? vatAmountField.value : 0);
+            var vatRate = toNumber(vatSelect ? vatSelect.value : 0);
+
+            if (lineVat <= 0 && vatRate <= 0) {
+                return;
+            }
+
+            taxableAmount += toNumber(quantityField ? quantityField.value : 0)
+                * toNumber(priceField ? priceField.value : 0);
+        });
+
+        return taxableAmount;
+    }
+
     function clampDiscountToGrossTotal(grossTotal) {
         var discountField = qs('#discount_amount');
 
@@ -1544,13 +1635,13 @@ DG.purchaseBilling = (function () {
 
         var discountField = qs('#discount_amount');
         var discount = toNumber(discountField ? discountField.value : 0);
-        var taxableAmount = Math.max(0, subtotal - discount);
+        var displayTaxableAmount = calculateTaxableAmount();
         var grandTotal = Math.max(0, grossTotal - discount);
         var paidAmount = toNumber(qs('#paid_amount') ? qs('#paid_amount').value : 0);
         var dueAmount = Math.max(0, grandTotal - paidAmount);
 
         setValue('#subtotal', toMoney(subtotal));
-        setValue('#taxable_amount', toMoney(taxableAmount));
+        setValue('#taxable_amount', toMoney(displayTaxableAmount));
         setValue('#total_vat', toMoney(totalVat));
         setValue('#grand_total', toMoney(grandTotal));
         setValue('#summary_paid_amount', toMoney(paidAmount));

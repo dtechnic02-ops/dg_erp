@@ -2,6 +2,7 @@
 
 namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseReturn;
 class Supplier extends Model
@@ -9,6 +10,8 @@ class Supplier extends Model
     protected $fillable = [
 
     'company_id',
+
+    'created_by',
 
     'name',
     'authority_name',
@@ -68,5 +71,17 @@ public function transactions()
     );
 }
 
+public function creator()
+{
+    return $this->belongsTo(
+        User::class,
+        'created_by'
+    );
+}
+
+public function scopeActive($query)
+{
+    return $query->where('status', 'active');
+}
 
 }

@@ -121,23 +121,6 @@ Other
 
 </div>
 
-<div class="col-md-6 mb-3">
-
-<label>
-
-Opening Balance
-
-</label>
-
-<input
-type="number"
-step="0.01"
-name="opening_balance"
-value="0"
-class="form-control">
-
-</div>
-
 <div class="col-md-12 mb-3">
 
 <label>

@@ -20,6 +20,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' =>
                 \App\Http\Middleware\RoleMiddleware::class,
 
+            'subscription' =>
+                \App\Http\Middleware\CheckSubscription::class,
+
+            'subscription.module' =>
+                \App\Http\Middleware\EnsureSubscriptionModule::class,
+
+            'permission' =>
+                \App\Http\Middleware\EnsurePermission::class,
+
+            'company.user' =>
+                \App\Http\Middleware\EnsureCompanyUser::class,
+
         ]);
 
         // 🔥 ONLINE / OFFLINE

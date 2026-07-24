@@ -13,14 +13,44 @@ use App\Models\Account;
 use App\Models\SalesInvoice;
 
 use App\Models\PurchaseInvoice;
+use App\Models\Income;
+use App\Models\Expense;
+use App\Models\FinancialYear;
+use App\Services\HrPayrollSummaryService;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private HrPayrollSummaryService $hrPayrollSummaryService
+    ) {
+    }
 
 public function index()
 {
 
 $companyId = auth()->user()->company_id;
+
+$activeFy = FinancialYear::where('company_id', $companyId)
+    ->where('is_active', 1)
+    ->first();
+
+$incomeTotalQuery = Income::where('company_id', $companyId)
+    ->where('status', Income::STATUS_ACTIVE);
+
+if ($activeFy) {
+    $incomeTotalQuery->where('financial_year_id', $activeFy->id);
+}
+
+$incomeTotal = $incomeTotalQuery->sum('amount');
+
+$expenseTotalQuery = Expense::where('company_id', $companyId)
+    ->where('status', Expense::STATUS_ACTIVE);
+
+if ($activeFy) {
+    $expenseTotalQuery->where('financial_year_id', $activeFy->id);
+}
+
+$expenseTotal = $expenseTotalQuery->sum('amount');
 
 
 $salesChart = SalesInvoice::
@@ -273,7 +303,13 @@ $companyId
 'current_stock'
 ),
 
+'income_total' => $incomeTotal,
+
+'expense_total' => $expenseTotal,
+
 ];
+
+$hrSummary = $this->hrPayrollSummaryService->summary($companyId, $activeFy);
 
 return view(
 
@@ -282,6 +318,8 @@ return view(
 compact(
 
 'data',
+
+'hrSummary',
 
 'salesChart',
 

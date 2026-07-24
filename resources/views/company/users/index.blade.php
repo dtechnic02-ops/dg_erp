@@ -1,153 +1,286 @@
 @extends('company.layout')
 
+@section('title', 'Staff Management')
+
 @section('content')
 
-@if(session('success'))
-    <p style="color:#22c55e;">{{ session('success') }}</p>
-@endif
+@php
+    $canManage = auth()->user()->hasPermission('manage_users');
+    $canEdit = auth()->user()->hasPermission('edit_users');
+    $canBlock = auth()->user()->hasPermission('block_user');
+    $canDelete = auth()->user()->hasPermission('delete_user');
+    $canReset = auth()->user()->hasPermission('reset_password');
+@endphp
 
-@if($errors->any())
-    <div style="color:#ef4444; margin-bottom:9px;">
-        {{ $errors->first() }}
-    </div>
-@endif
+<div class="dg-page">
 
-<!-- HEADER -->
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px;">
-    <h3 style="color:#e2e8f0; margin:0;">👨‍💻 Staff Management</h3>
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="d-flex flex-nowrap align-items-center gap-2">
+                <div class="flex-shrink-0">
+                    <h1 class="h4 mb-0">Staff Management</h1>
+                </div>
+                <div class="flex-fill d-flex justify-content-end align-items-center gap-2 flex-nowrap">
+                    @if(auth()->user()->hasPermission('manage_users'))
+                        <a href="{{ route('company.permissions.index') }}" class="btn btn-outline-secondary dg-btn">Staff Permissions</a>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </header>
 
-    <a href="{{ route('company.permissions.index') }}">🔐 Permissions</a>
+    <main class="dg-container">
+        <div class="container-fluid">
 
-    <div style="color:#facc5;">
-        👥 {{ $users->count() }} / {{ auth()->user()->company->selected_user_limit }}
-    </div>
-</div>
-
-<!-- ADD STAFF -->
-<div style="background:#0f172a; padding:10px; border-radius:5px; margin-bottom:10px;">
-<form method="POST" action="{{ route('company.users.store') }}" style="display:flex; gap:10px;">
-    @csrf
-
-    <input type="text" name="name" placeholder="Name" required style="flex:1; padding:8px; border-radius:6px; border:none;">
-
-    <input type="email" name="email" placeholder="Email" required style="flex:1; padding:8px; border-radius:6px; border:none;">
-
-    <input type="password" name="password" placeholder="Password" required style="flex:1; padding:8px; border-radius:6px; border:none;">
-
-    <select name="job_role" required style="flex:1; padding:8px; border-radius:6px; border:none;">
-        <option value="">Select Role</option>
-        <option value="cashier">Cashier</option>
-        <option value="receiver">Receiver</option>
-        <option value="accountant">Accountant</option>
-        <option value="manager">Manager</option>
-    </select>
-
-    <button style="background:#3b82f6; color:white; padding:8px 20px; border:none; border-radius:6px;">
-        ➕ Add
-    </button>
-</form>
-</div>
-
-<!-- STAFF LIST -->
-<table width="100%" style="background:#0f172a; border-radius:10px; border-collapse:collapse;">
-
-<tr style="color:#94a3b8; border-bottom:1px solid #1e293b;">
-    <th style="padding:10px;">Name</th>
-    <th>Email</th>
-    <th>Status</th>
-    <th>Actions</th>
-    <th>Role</th>
-</tr>
-
-@foreach($users as $user)
-<tr style="text-align:center; border-bottom:1px solid #1e293b;">
-<td style="padding:10px;">
-
-@if($user->last_seen &&
-    \Carbon\Carbon::parse($user->last_seen)
-    ->gt(now()->subMinutes(2)))
-
-
-        <span style="
-            display:inline-block;
-            width:10px;
-            height:10px;
-            background:#22c55e;
-            border-radius:50%;
-            margin-right:6px;
-        "></span>
-
-    @else
-
-        <span style="
-            display:inline-block;
-            width:10px;
-            height:10px;
-            background:#ef4444;
-            border-radius:50%;
-            margin-right:6px;
-        "></span>
-
-    @endif
-
-
-</td>
-
-    <td style="padding:10px;">{{ $user->name }}</td>
-    <td>{{ $user->email }}</td>
-
-    <td>
-        @if($user->account_status == 'active')
-            <span style="color:#22c55e;">Active</span>
-        @else
-            <span style="color:#ef4444;">Blocked</span>
-        @endif
-    </td>
-
-    <td>
-
-        @if(auth()->user()->role_id == 2 || auth()->user()->hasPermission('block_user'))
-            @if($user->account_status == 'active')
-                <a href="{{ route('company.users.block', $user->id) }}" style="color:#facc15;">Block</a>
-            @else
-                <a href="{{ route('company.users.unblock', $user->id) }}" style="color:#22c55e;">Unblock</a>
+            @if(session('success'))
+                <div class="alert alert-success dg-alert" role="alert">{{ session('success') }}</div>
             @endif
-            |
-        @endif
 
-        @if(auth()->user()->role_id == 2 || auth()->user()->hasPermission('delete_user'))
-        <form action="{{ route('company.users.delete', $user->id) }}" method="POST" style="display:inline;">
-            @csrf
-            <button style="color:#ef4444; background:none; border:none; cursor:pointer;">
-                Delete
-            </button>
-        </form>
-        |
-        @endif
+            @if(session('error'))
+                <div class="alert alert-danger dg-alert" role="alert">{{ session('error') }}</div>
+            @endif
 
-        @if(auth()->user()->role_id == 2 || auth()->user()->hasPermission('reset_password'))
-            <a href="{{ route('company.users.reset', $user->id) }}" style="color:#3b82f6;">
-                Reset
-            </a>
-            |
-        @endif
+            @if($errors->any())
+                <div class="alert alert-danger dg-alert" role="alert">{{ $errors->first() }}</div>
+            @endif
 
-        <a href="{{ route('company.permissions.index') }}" style="color:#a855f7;">
-            Permission
-        </a>
-        |
+            <section class="dg-section">
+                <div class="dg-summary d-flex flex-row flex-nowrap justify-content-center align-items-center gap-3 mb-0 w-100">
+                    <div class="dg-summary-item mb-0 border-0 p-0">
+                        <span>Active Staff :</span>
+                        <span class="fw-bold">{{ $staffCount }}</span>
+                    </div>
+                    <span>|</span>
+                    <div class="dg-summary-item mb-0 border-0 p-0">
+                        <span>Plan Limit :</span>
+                        <span class="fw-bold">{{ $staffLimit }}</span>
+                    </div>
+                    <span>|</span>
+                    <div class="dg-summary-item mb-0 border-0 p-0">
+                        <span>Listed Records :</span>
+                        <span class="fw-bold">{{ $users->total() }}</span>
+                    </div>
+                </div>
+            </section>
 
-        <a href="{{ route('company.users.edit', $user->id) }}" style="color:#facc15;">
-            Edit
-        </a>
+            @if($canManage)
+            <section class="dg-section">
+                <article class="card dg-card">
+                    <header class="card-header dg-card-header">
+                        <h2 class="h6 mb-0">Add Staff</h2>
+                    </header>
+                    <div class="card-body dg-card-body">
+                        <form method="POST" action="{{ route('company.users.store') }}" class="row g-3">
+                            @csrf
+                            <div class="col-md-3">
+                                <label for="name" class="form-label">Name</label>
+                                <input type="text" name="name" id="name" class="form-control dg-input" value="{{ old('name') }}" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" name="email" id="email" class="form-control dg-input" value="{{ old('email') }}" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="password" class="form-label">Password</label>
+                                <input type="password" name="password" id="password" class="form-control dg-input" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="job_role" class="form-label">Job Role</label>
+                                <select name="job_role" id="job_role" class="form-select dg-select" required>
+                                    <option value="">Select</option>
+                                    <option value="cashier" @selected(old('job_role') === 'cashier')>Cashier</option>
+                                    <option value="receiver" @selected(old('job_role') === 'receiver')>Receiver</option>
+                                    <option value="accountant" @selected(old('job_role') === 'accountant')>Accountant</option>
+                                    <option value="manager" @selected(old('job_role') === 'manager')>Manager</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-success dg-btn w-100">Add Staff</button>
+                            </div>
+                        </form>
+                    </div>
+                </article>
+            </section>
+            @endif
 
-    </td>
+            <section class="dg-section dg-filter">
+                <article class="card dg-card">
+                    <header class="card-header dg-card-header">
+                        <h2 class="h6 mb-0">Filter</h2>
+                    </header>
+                    <div class="card-body dg-card-body dg-filter-card-body">
+                        <form method="GET" action="{{ route('company.users.index') }}" class="dg-filter-form">
+                            <div class="dg-filter-grid">
+                                <div class="dg-filter-field">
+                                    <label for="search" class="dg-filter-label">Search</label>
+                                    <input type="text" name="search" id="search" class="form-control dg-input dg-filter-control" value="{{ request('search') }}" placeholder="Name / Email">
+                                </div>
+                                <div class="dg-filter-field">
+                                    <label for="status" class="dg-filter-label">Status</label>
+                                    <select name="status" id="status" class="form-select dg-select dg-filter-control">
+                                        <option value="">All</option>
+                                        <option value="active" @selected(request('status') === 'active')>Active</option>
+                                        <option value="blocked" @selected(request('status') === 'blocked')>Blocked</option>
+                                    </select>
+                                </div>
+                                <div class="dg-filter-field">
+                                    <label for="job_role" class="dg-filter-label">Job Role</label>
+                                    <select name="job_role" id="job_role_filter" class="form-select dg-select dg-filter-control">
+                                        <option value="">All</option>
+                                        <option value="cashier" @selected(request('job_role') === 'cashier')>Cashier</option>
+                                        <option value="receiver" @selected(request('job_role') === 'receiver')>Receiver</option>
+                                        <option value="accountant" @selected(request('job_role') === 'accountant')>Accountant</option>
+                                        <option value="manager" @selected(request('job_role') === 'manager')>Manager</option>
+                                    </select>
+                                </div>
+                                <div class="dg-filter-actions">
+                                    <button type="submit" class="btn btn-primary dg-btn">Apply</button>
+                                    <a href="{{ route('company.users.index') }}" class="btn btn-outline-secondary dg-btn">Reset</a>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </article>
+            </section>
 
-    <td>{{ ucfirst($user->job_role ?? 'N/A') }}</td>
+            <section class="dg-section dg-list">
+                <article class="card dg-card">
+                    <header class="card-header dg-card-header d-flex justify-content-between align-items-center">
+                        <h2 class="h6 mb-0">Staff List</h2>
+                        <form method="GET" action="{{ route('company.users.index') }}" class="d-flex align-items-center gap-2 mb-0">
+                            @foreach(request()->except('per_page') as $key => $value)
+                                <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                            @endforeach
+                            <label for="per_page" class="dg-list-per-page-label">Show</label>
+                            <select name="per_page" id="per_page" class="form-select dg-select dg-list-per-page-select" onchange="this.form.submit()">
+                                @foreach([10, 20, 50, 100] as $size)
+                                    <option value="{{ $size }}" @selected((int) request('per_page', 10) === $size)>{{ $size }}</option>
+                                @endforeach
+                            </select>
+                        </form>
+                    </header>
+                    <div class="card-body dg-card-body dg-list-card-body">
+                        <div class="table-responsive">
+                            <table class="table dg-table">
+                                <thead class="dg-head">
+                                    <tr>
+                                        <th scope="col">#</th>
+                                        <th scope="col">Name</th>
+                                        <th scope="col">Email</th>
+                                        <th scope="col">Job Role</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col">Online</th>
+                                        <th scope="col" width="320">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="dg-body">
+                                    @forelse($users as $staff)
+                                        <tr class="dg-row">
+                                            <td>{{ $users->firstItem() + $loop->index }}</td>
+                                            <td>{{ $staff->name }}</td>
+                                            <td>{{ $staff->email }}</td>
+                                            <td>{{ ucfirst($staff->job_role ?? 'N/A') }}</td>
+                                            <td>
+                                                @if($staff->account_status === 'active')
+                                                    <span class="badge bg-success">Active</span>
+                                                @else
+                                                    <span class="badge bg-secondary">Blocked</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($staff->last_seen && \Carbon\Carbon::parse($staff->last_seen)->gt(now()->subMinutes(2)))
+                                                    <span class="badge bg-success">Online</span>
+                                                @else
+                                                    <span class="badge bg-secondary">Offline</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    @if($canEdit)
+                                                        <a href="{{ route('company.users.edit', $staff->id) }}" class="btn btn-sm btn-outline-warning dg-btn">Edit</a>
+                                                    @endif
 
-</tr>
-@endforeach
+                                                    @if($canBlock)
+                                                        @if($staff->account_status === 'active')
+                                                            <form method="POST" action="{{ route('company.users.block', $staff->id) }}" class="d-inline" onsubmit="return confirm('Block this staff member?');">
+                                                                @csrf
+                                                                <button type="submit" class="btn btn-sm btn-outline-secondary dg-btn">Block</button>
+                                                            </form>
+                                                        @else
+                                                            <form method="POST" action="{{ route('company.users.unblock', $staff->id) }}" class="d-inline" onsubmit="return confirm('Activate this staff member?');">
+                                                                @csrf
+                                                                <button type="submit" class="btn btn-sm btn-outline-success dg-btn">Unblock</button>
+                                                            </form>
+                                                        @endif
+                                                    @endif
 
-</table>
+                                                    @if($canReset)
+                                                        <button type="button" class="btn btn-sm btn-outline-primary dg-btn" data-bs-toggle="modal" data-bs-target="#resetModal{{ $staff->id }}">Reset Password</button>
+                                                    @endif
+
+                                                    @if($canDelete)
+                                                        <form method="POST" action="{{ route('company.users.delete', $staff->id) }}" class="d-inline" onsubmit="return confirm('Delete this staff member?');">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger dg-btn">Delete</button>
+                                                        </form>
+                                                    @endif
+                                                </div>
+
+                                                @if($canReset)
+                                                <div class="modal fade" id="resetModal{{ $staff->id }}" tabindex="-1" aria-labelledby="resetModalLabel{{ $staff->id }}" aria-hidden="true">
+                                                    <div class="modal-dialog">
+                                                        <div class="modal-content">
+                                                            <form method="POST" action="{{ route('company.users.reset', $staff->id) }}">
+                                                                @csrf
+                                                                <div class="modal-header">
+                                                                    <h5 class="modal-title" id="resetModalLabel{{ $staff->id }}">Reset Password — {{ $staff->name }}</h5>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                </div>
+                                                                <div class="modal-body">
+                                                                    <p class="small text-muted">Leave blank to generate a secure temporary password. Passwords are never shown on screen.</p>
+                                                                    <div class="mb-3">
+                                                                        <label for="new_password_{{ $staff->id }}" class="form-label">New Password</label>
+                                                                        <input type="password" name="new_password" id="new_password_{{ $staff->id }}" class="form-control dg-input" minlength="8">
+                                                                    </div>
+                                                                    <div class="mb-0">
+                                                                        <label for="new_password_confirmation_{{ $staff->id }}" class="form-label">Confirm Password</label>
+                                                                        <input type="password" name="new_password_confirmation" id="new_password_confirmation_{{ $staff->id }}" class="form-control dg-input" minlength="8">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-outline-secondary dg-btn" data-bs-dismiss="modal">Cancel</button>
+                                                                    <button type="submit" class="btn btn-primary dg-btn">Reset Password</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr class="dg-row">
+                                            <td colspan="7" class="text-center">No staff members found.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="dg-list-footer">
+                            <p class="dg-list-meta">
+                                Showing {{ $users->firstItem() ?? 0 }} to {{ $users->lastItem() ?? 0 }} of {{ $users->total() }} records
+                            </p>
+                            <div class="dg-pagination">
+                                {{ $users->withQueryString()->onEachSide(1)->links('pagination::bootstrap-5') }}
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </section>
+
+        </div>
+    </main>
+</div>
 
 @endsection

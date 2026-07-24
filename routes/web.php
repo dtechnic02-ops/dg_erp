@@ -7,11 +7,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 use App\Models\Company;
-use App\Models\Plan;
+use App\Services\SubscriptionService;
+use App\Services\LoginRedirectService;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Admin\CompanyApprovalController;
-use App\Http\Controllers\Admin\PaymentApprovalController;
-use App\Http\Controllers\Admin\PlanController;
+use App\Http\Controllers\Admin\SubscriptionPlanController;
+use App\Http\Controllers\Admin\SubscriptionController;
+use App\Http\Controllers\Admin\SubscriptionPaymentController;
+use App\Http\Controllers\Admin\SubscriptionReportController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\CompanyController;
@@ -30,11 +33,20 @@ use App\Http\Controllers\Company\CompanyDashboardController;
 
 use App\Http\Controllers\Company\SupplierController;
 use App\Http\Controllers\Company\AccountController;
-use App\Http\Controllers\StaffDashboardController;
 use App\Http\Controllers\Company\CashAccountController;
 use App\Http\Controllers\Company\PurchaseController;
 use App\Http\Controllers\Company\VatController;
 use App\Http\Controllers\Company\SalesController;
+use App\Http\Controllers\Company\DeliveryNoteController;
+use App\Http\Controllers\Company\CrmDashboardController;
+use App\Http\Controllers\Company\CrmLeadController;
+use App\Http\Controllers\Company\CrmOpportunityController;
+use App\Http\Controllers\Company\CrmFollowUpController;
+use App\Http\Controllers\Company\CrmMeetingController;
+use App\Http\Controllers\Company\CrmTaskController;
+use App\Http\Controllers\Company\CrmContactController;
+use App\Http\Controllers\Company\CrmNoteController;
+use App\Http\Controllers\Company\CrmAttachmentController;
 use App\Http\Controllers\Company\StockLedgerController;
 use App\Http\Controllers\Company\SalesReturnController;
 use App\Http\Controllers\Company\ServiceController;
@@ -51,6 +63,7 @@ use App\Http\Controllers\Company\ExpenseController;
 use App\Http\Controllers\Company\ExpenseCategoryController;
 use App\Http\Controllers\Company\PartyAccountController;
 use App\Http\Controllers\Company\LoanSavingWithdrawController;
+use App\Http\Controllers\Company\LoanSavingLedgerController;
 use App\Http\Controllers\Company\EmployeeAccountController;
 use App\Http\Controllers\Company\IncomeController;
 use App\Http\Controllers\Company\IncomeCategoryController;
@@ -59,6 +72,9 @@ use App\Http\Controllers\Company\FinancialYearController;
 use App\Http\Controllers\Company\ContraController;
 use App\Http\Controllers\Company\VatReportController;
 use App\Http\Controllers\Company\SalarySheetController;
+use App\Http\Controllers\Company\EmployeePaymentController;
+use App\Http\Controllers\Company\EmployeeLedgerController;
+use App\Http\Controllers\Company\PayrollRegisterController;
 use App\Http\Controllers\Company\AccountTransactionController;
 use App\Http\Controllers\Company\SupplierLedgerController;
 use App\Http\Controllers\Company\MaintenanceController;
@@ -81,37 +97,13 @@ Route::post('/login', function (Request $request) {
         $request->session()->regenerate();
         $user = Auth::user();
 
-        if ($user->account_status === 'blocked') {
+        if ($user->account_status !== 'active') {
             Auth::logout();
-            return back()->with('error', 'Account blocked');
+
+            return back()->with('error', 'Access denied');
         }
 
-        if (!$user->role_id) {
-            Auth::logout();
-            return back()->with('error', 'No role assigned');
-        }
-
-        if ($user->role_id == 2) {
-            $company = \App\Models\Company::find($user->company_id);
-
-            if ($company) {
-                if ($company->expiry_date && now()->gt($company->expiry_date)) {
-                    Auth::logout();
-                    return back()->with('error', 'Plan expired');
-                }
-
-                if ($company->status == 'blocked') {
-                    Auth::logout();
-                    return back()->with('error', 'Company blocked');
-                }
-            }
-        }
-
-        return match($user->role_id) {
-            1 => redirect('/admin/dashboard'),
-            2 => redirect('/company/dashboard'),
-            3 => redirect('/staff/dashboard'),
-        };
+        return app(LoginRedirectService::class)->redirectAfterLogin($user);
     }
 
     return back()->with('error','Invalid Credentials');
@@ -142,46 +134,70 @@ Route::middleware(['auth','role:1,4'])->prefix('admin')->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
 
-    Route::get('/companies', [CompanyController::class, 'index'])->name('admin.companies');
+    Route::get('/companies', [CompanyController::class, 'index'])->middleware('permission:view_company')->name('admin.companies');
 
-    Route::get('/company/block/{id}', [CompanyController::class, 'block'])->name('admin.company.block');
-    Route::get('/company/unblock/{id}', [CompanyController::class, 'unblock'])->name('admin.company.unblock');
-    Route::post('/company/delete/{id}', [CompanyController::class, 'delete'])->name('admin.company.delete');
+    Route::post('/company/block/{id}', [CompanyController::class, 'block'])->middleware('permission:block_company')->name('admin.company.block');
+    Route::post('/company/unblock/{id}', [CompanyController::class, 'unblock'])->middleware('permission:unblock_company')->name('admin.company.unblock');
+    Route::post('/company/delete/{id}', [CompanyController::class, 'delete'])->middleware('permission:delete_company')->name('admin.company.delete');
 
-    // 🔥 // Admin companis  Blande 
-    Route::post('/company/limit/{id}', [CompanyController::class, 'updateLimit'])->name('admin.company.limit');
-    Route::post('/company/customer-limit/{id}', [CompanyController::class, 'updateCustomerLimit'])->name('admin.company.customer.limit');
-    Route::get('/company/reset/{id}', [App\Http\Controllers\Admin\CompanyController::class, 'resetPassword'])->name('admin.company.reset');
+    Route::post('/company/limit/{id}', [CompanyController::class, 'updateLimit'])->middleware('permission:edit_company')->name('admin.company.limit');
+    Route::post('/company/customer-limit/{id}', [CompanyController::class, 'updateCustomerLimit'])->middleware('permission:edit_company')->name('admin.company.customer.limit');
+    Route::post('/company/reset/{id}', [App\Http\Controllers\Admin\CompanyController::class, 'resetPassword'])->middleware('permission:reset_company_password')->name('admin.company.reset');
 
 
-    // Plan & payment
-Route::post('/plans', [PlanController::class, 'store'])->name('admin.plans.store');
-Route::post('/plans/update/{id}', [PlanController::class, 'update'])->name('admin.plans.update');
- Route::get('/plans/delete/{id}', [PlanController::class, 'destroy'])->name('admin.plans.delete');
+    // Subscription Module
+    Route::prefix('subscription-plans')->name('admin.subscription-plans.')->controller(SubscriptionPlanController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::post('/update/{id}', 'update')->name('update');
+        Route::post('/activate/{id}', 'activate')->name('activate');
+        Route::post('/deactivate/{id}', 'deactivate')->name('deactivate');
+    });
+
+    Route::prefix('subscriptions')->name('admin.subscriptions.')->controller(SubscriptionController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/free-trial/{companyId}', 'assignFreeTrial')->name('free-trial');
+        Route::post('/renew/{companyId}', 'renew')->name('renew');
+        Route::post('/upgrade/{companyId}', 'upgrade')->name('upgrade');
+        Route::post('/downgrade/{companyId}', 'downgrade')->name('downgrade');
+        Route::post('/expire/{companyId}', 'expire')->name('expire');
+        Route::post('/cancel/{subscriptionId}', 'cancel')->name('cancel');
+    });
+
+    Route::prefix('subscription-payments')->name('admin.subscription-payments.')->controller(SubscriptionPaymentController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/manual', 'manualForm')->name('manual');
+        Route::post('/manual', 'manualStore')->name('manual.store');
+        Route::post('/verify/{id}', 'verify')->name('verify');
+        Route::post('/approve/{id}', 'approve')->name('approve');
+        Route::post('/reject/{id}', 'reject')->name('reject');
+        Route::get('/invoice/{id}', 'invoice')->name('invoice');
+    });
+
+    Route::get('/subscription-reports', [SubscriptionReportController::class, 'index'])->name('admin.subscription-reports.index');
+
+    // Legacy route aliases
+    Route::get('/plans', fn () => redirect()->route('admin.subscription-plans.index'))->name('admin.plans');
+    Route::get('/payments', fn () => redirect()->route('admin.subscription-payments.index'))->name('admin.payments');
+    Route::get('/manual-payment', fn () => redirect()->route('admin.subscription-payments.manual'))->name('admin.manual.payment');
+    Route::post('/manual-payment', [SubscriptionPaymentController::class, 'manualStore'])->name('admin.manual.payment.store');
+    Route::post('/payment/approve/{id}', [SubscriptionPaymentController::class, 'approve'])->name('admin.payment.approve');
+    Route::post('/payment/reject/{id}', [SubscriptionPaymentController::class, 'reject'])->name('admin.payment.reject');
+    Route::get('/invoice/{id}', [SubscriptionPaymentController::class, 'invoice'])->name('admin.invoice');
+
      //company Rgistetion
          Route::get('/registrations', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'index'])
+        ->middleware('permission:view_company')
         ->name('admin.registrations');
 
-    // 🔥 Rajistetion Menejment
-    Route::post('/approve/{id}', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'approve'])->name('admin.approve');
-    Route::post('/reject/{id}', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'reject'])->name('admin.reject');
+    Route::post('/approve/{id}', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'approve'])->middleware('permission:approve_company')->name('admin.approve');
+    Route::post('/reject/{id}', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'reject'])->middleware('permission:approve_company')->name('admin.reject');
     
-        //Payments
-       Route::get('/payments', [App\Http\Controllers\Admin\PaymentApprovalController::class, 'index'])->name('admin.payments');
-       Route::post( '/payment/approve/{id}', [App\Http\Controllers\Admin\PaymentApprovalController::class, 'approve'] )->name('admin.payment.approve');
-       Route::post( '/payment/reject/{id}', [App\Http\Controllers\Admin\PaymentApprovalController::class, 'reject'] )->name('admin.payment.reject');
+        //Payments legacy removed — use subscription-payments routes
+
        //Admin Users
         Route::get('/users', [App\Http\Controllers\Admin\UserController::class, 'index'])->name('admin.users');
 
-        //Manual Payment
-    Route::get('/manual-payment', [App\Http\Controllers\Admin\PaymentApprovalController::class, 'manualForm'])->name('admin.manual.payment');
-    Route::post('/manual-payment', [App\Http\Controllers\Admin\PaymentApprovalController::class, 'manualStore'])->name('admin.manual.payment.store');
-   
-    Route::get('/plans', [App\Http\Controllers\Admin\PlanController::class, 'index'])->name('admin.plans');
-
-     // Admin companis  Blande 
-      Route::get('/invoice/{id}', [PaymentApprovalController::class, 'invoice'])->name('admin.invoice');
-    
       Route::get('/user/block/{id}', [UserController::class, 'block'])->name('admin.user.block');
      Route::get('/user/unblock/{id}', [UserController::class, 'unblock'])->name('admin.user.unblock');
       Route::post('/user/delete/{id}', [UserController::class, 'delete'])->name('admin.user.delete');
@@ -189,7 +205,7 @@ Route::post('/plans/update/{id}', [PlanController::class, 'update'])->name('admi
 });
 
 
-Route::middleware(['auth','role:2',\App\Http\Middleware\UpdateLastSeen::class])->prefix('company')->name('company.')->group(function () {
+Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::class,'subscription'])->prefix('company')->name('company.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
@@ -197,9 +213,12 @@ Route::middleware(['auth','role:2',\App\Http\Middleware\UpdateLastSeen::class])-
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/profile',[\App\Http\Controllers\Company\CompanyClientController::class, 'profile'])->name('profile');
+    Route::get('/profile',[\App\Http\Controllers\Company\CompanyClientController::class, 'profile'])->middleware('permission:view_company_profile')->name('profile');
 
-    Route::post('/profile/update',[\App\Http\Controllers\Company\CompanyClientController::class, 'update'])->name('profile.update');
+    Route::post('/profile/update',[\App\Http\Controllers\Company\CompanyClientController::class, 'update'])->middleware('permission:edit_company_profile')->name('profile.update');
+
+    Route::get('/subscription', [\App\Http\Controllers\Company\SubscriptionController::class, 'index'])->name('subscription.index');
+    Route::post('/subscription/payment', [\App\Http\Controllers\Company\PaymentController::class, 'store'])->name('subscription.payment.store');
     
   
     /*
@@ -218,14 +237,37 @@ Route::middleware(['auth','role:2',\App\Http\Middleware\UpdateLastSeen::class])-
 
     Route::prefix('users')->name('users.')->group(function () {
 
-        Route::get('/',[UserController::class, 'index'])->name('index');
-        Route::post('/store',[UserController::class, 'store'])->name('store');
-        Route::get('/edit/{id}',[UserController::class, 'edit'])->name('edit');
-        Route::post('/update/{id}',[UserController::class, 'update'])->name('update');
-        Route::get('/block/{id}',[UserController::class, 'block'])->name('block');
-        Route::get('/unblock/{id}',[UserController::class, 'unblock'] )->name('unblock');
-        Route::post('/delete/{id}',[UserController::class, 'destroy'])->name('delete');
-        Route::get('/reset/{id}',[UserController::class, 'resetPassword'])->name('reset');
+        Route::get('/', [UserController::class, 'index'])
+            ->middleware('permission:view_users')
+            ->name('index');
+
+        Route::post('/store', [UserController::class, 'store'])
+            ->middleware('permission:manage_users')
+            ->name('store');
+
+        Route::get('/edit/{id}', [UserController::class, 'edit'])
+            ->middleware('permission:edit_users')
+            ->name('edit');
+
+        Route::post('/update/{id}', [UserController::class, 'update'])
+            ->middleware('permission:edit_users')
+            ->name('update');
+
+        Route::post('/block/{id}', [UserController::class, 'block'])
+            ->middleware('permission:block_user')
+            ->name('block');
+
+        Route::post('/unblock/{id}', [UserController::class, 'unblock'])
+            ->middleware('permission:block_user')
+            ->name('unblock');
+
+        Route::post('/delete/{id}', [UserController::class, 'destroy'])
+            ->middleware('permission:delete_user')
+            ->name('delete');
+
+        Route::post('/reset/{id}', [UserController::class, 'resetPassword'])
+            ->middleware('permission:reset_password')
+            ->name('reset');
 
     });
 
@@ -235,8 +277,13 @@ Route::middleware(['auth','role:2',\App\Http\Middleware\UpdateLastSeen::class])-
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/permissions',[UserController::class, 'permissionPage'])->name('permissions.index');
-    Route::post('/permissions',[UserController::class, 'updateRolePermission'])->name('permissions.update');
+    Route::get('/permissions', [UserController::class, 'permissionPage'])
+        ->middleware('permission:manage_users')
+        ->name('permissions.index');
+
+    Route::post('/permissions', [UserController::class, 'updateRolePermission'])
+        ->middleware('permission:manage_users')
+        ->name('permissions.update');
 
     /*
     |--------------------------------------------------------------------------
@@ -272,6 +319,11 @@ Route::middleware(['auth','role:2',\App\Http\Middleware\UpdateLastSeen::class])-
             '/recalculate-customer-statement',
             [MaintenanceController::class, 'recalculateCustomerStatement']
         )->name('recalculate.customer.statement');
+
+        Route::post(
+            '/recalculate-supplier-statement',
+            [MaintenanceController::class, 'recalculateSupplierStatement']
+        )->name('recalculate.supplier.statement');
 
     });
 
@@ -730,6 +782,110 @@ Route::prefix('vat-reports')
 
     });
 
+    Route::middleware('subscription.module:delivery')->group(function () {
+    Route::prefix('delivery-notes')
+        ->name('delivery-notes.')
+        ->controller(DeliveryNoteController::class)
+        ->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/create', 'create')->name('create');
+            Route::post('/store', 'store')->name('store');
+            Route::get('/show/{id}', 'show')->name('show');
+            Route::get('/process/{id}', 'process')->name('process');
+            Route::post('/complete/{id}', 'complete')->name('complete');
+            Route::get('/print/{id}', 'print')->name('print');
+            Route::post('/cancel/{id}', 'cancel')->name('cancel');
+        });
+    });
+
+    Route::middleware('subscription.module:crm')->group(function () {
+    Route::prefix('crm')->name('crm.')->controller(CrmDashboardController::class)->group(function () {
+        Route::get('/dashboard', 'index')->name('dashboard.index');
+    });
+
+    Route::prefix('crm-leads')->name('crm-leads.')->controller(CrmLeadController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/store', 'store')->name('store');
+        Route::get('/show/{id}', 'show')->name('show');
+        Route::get('/edit/{id}', 'edit')->name('edit');
+        Route::post('/update/{id}', 'update')->name('update');
+        Route::post('/close/{id}', 'close')->name('close');
+        Route::post('/archive/{id}', 'archive')->name('archive');
+        Route::post('/cancel/{id}', 'cancel')->name('cancel');
+    });
+
+    Route::prefix('crm-opportunities')->name('crm-opportunities.')->controller(CrmOpportunityController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/store', 'store')->name('store');
+        Route::get('/show/{id}', 'show')->name('show');
+        Route::get('/edit/{id}', 'edit')->name('edit');
+        Route::post('/update/{id}', 'update')->name('update');
+        Route::post('/close/{id}', 'close')->name('close');
+        Route::post('/won/{id}', 'won')->name('won');
+        Route::post('/lost/{id}', 'lost')->name('lost');
+        Route::post('/archive/{id}', 'archive')->name('archive');
+        Route::post('/cancel/{id}', 'cancel')->name('cancel');
+    });
+
+    Route::prefix('crm-contacts')->name('crm-contacts.')->controller(CrmContactController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/store', 'store')->name('store');
+        Route::get('/show/{id}', 'show')->name('show');
+        Route::get('/edit/{id}', 'edit')->name('edit');
+        Route::post('/update/{id}', 'update')->name('update');
+        Route::post('/archive/{id}', 'archive')->name('archive');
+        Route::post('/cancel/{id}', 'cancel')->name('cancel');
+    });
+
+    Route::prefix('crm-follow-ups')->name('crm-follow-ups.')->controller(CrmFollowUpController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/store', 'store')->name('store');
+        Route::get('/edit/{id}', 'edit')->name('edit');
+        Route::post('/update/{id}', 'update')->name('update');
+        Route::post('/archive/{id}', 'archive')->name('archive');
+        Route::post('/cancel/{id}', 'cancel')->name('cancel');
+    });
+
+    Route::prefix('crm-meetings')->name('crm-meetings.')->controller(CrmMeetingController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/store', 'store')->name('store');
+        Route::get('/edit/{id}', 'edit')->name('edit');
+        Route::post('/update/{id}', 'update')->name('update');
+        Route::post('/complete/{id}', 'complete')->name('complete');
+        Route::post('/archive/{id}', 'archive')->name('archive');
+        Route::post('/cancel/{id}', 'cancel')->name('cancel');
+    });
+
+    Route::prefix('crm-tasks')->name('crm-tasks.')->controller(CrmTaskController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/store', 'store')->name('store');
+        Route::get('/edit/{id}', 'edit')->name('edit');
+        Route::post('/update/{id}', 'update')->name('update');
+        Route::post('/complete/{id}', 'complete')->name('complete');
+        Route::post('/archive/{id}', 'archive')->name('archive');
+        Route::post('/cancel/{id}', 'cancel')->name('cancel');
+    });
+
+    Route::prefix('crm-notes')->name('crm-notes.')->controller(CrmNoteController::class)->group(function () {
+        Route::post('/store', 'store')->name('store');
+        Route::post('/update/{id}', 'update')->name('update');
+        Route::post('/archive/{id}', 'archive')->name('archive');
+    });
+
+    Route::prefix('crm-attachments')->name('crm-attachments.')->controller(CrmAttachmentController::class)->group(function () {
+        Route::post('/store', 'store')->name('store');
+        Route::get('/download/{id}', 'download')->name('download');
+        Route::get('/preview/{id}', 'preview')->name('preview');
+        Route::post('/archive/{id}', 'archive')->name('archive');
+    });
+    });
+
     /*
     |--------------------------------------------------------------------------
     | STOCK LEDGER
@@ -790,6 +946,16 @@ Route::prefix('vat-reports')
         '/show/{id}',
         [SalesReturnController::class, 'show']
     )->name('show');
+
+    Route::get(
+        '/edit/{id}',
+        [SalesReturnController::class, 'edit']
+    )->name('edit');
+
+    Route::post(
+        '/update/{id}',
+        [SalesReturnController::class, 'update']
+    )->name('update');
 
     Route::get(
         '/print/{id}',
@@ -964,6 +1130,14 @@ Route::prefix('purchase-payments')
         [PurchaseReturnController::class, 'show']
         )->name('show');
 
+               Route::get('/edit/{id}',
+        [PurchaseReturnController::class, 'edit']
+        )->name('edit');
+
+               Route::post('/update/{id}',
+        [PurchaseReturnController::class, 'update']
+        )->name('update');
+
         Route::get(
             '/print-list',
             [PurchaseReturnController::class, 'printList']
@@ -1006,6 +1180,14 @@ Route::post(
     Route::get('/show/{id}',
         [PurchaseReturnRefundController::class, 'show']
     )->name('show');
+
+    Route::get('/edit/{id}',
+        [PurchaseReturnRefundController::class, 'edit']
+    )->name('edit');
+
+    Route::post('/update/{id}',
+        [PurchaseReturnRefundController::class, 'update']
+    )->name('update');
 
         Route::get(
             '/print-list',
@@ -1106,6 +1288,16 @@ Route::prefix('sales-return-refunds')
     )->name('show');
 
     Route::get(
+        '/edit/{id}',
+        [SalesReturnRefundController::class, 'edit']
+    )->name('edit');
+
+    Route::post(
+        '/update/{id}',
+        [SalesReturnRefundController::class, 'update']
+    )->name('update');
+
+    Route::get(
         '/print/{id}',
         [SalesReturnRefundController::class, 'print']
     )->name('print');
@@ -1142,6 +1334,16 @@ Route::prefix('sales-payments')
     )->name('show');
 
     Route::get(
+        '/edit/{id}',
+        [SalesPaymentController::class, 'edit']
+    )->name('edit');
+
+    Route::post(
+        '/update/{id}',
+        [SalesPaymentController::class, 'update']
+    )->name('update');
+
+    Route::get(
         '/print-list',
         [SalesPaymentController::class, 'printList']
     )->name('print-list');
@@ -1164,33 +1366,15 @@ Route::prefix('sales-payments')
 |--------------------------------------------------------------------------
 */
 
-Route::prefix(
-'expense-categories'
-)
-
-->name(
-'expense-category.'
-)
-
-->group(function(){
-
-Route::get(
-'/',
-[ExpenseCategoryController::class,'index']
-)->name('index');
-
-Route::get(
-'/create',
-[ExpenseCategoryController::class,'create']
-)->name('create');
-
-Route::post(
-'/store',
-[ExpenseCategoryController::class,'store']
-)->name('store');
-
+Route::prefix('expense-categories')->name('expense-category.')->controller(ExpenseCategoryController::class)
+->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::get('/create', 'create')->name('create');
+    Route::post('/store', 'store')->name('store');
+    Route::get('/edit/{id}', 'edit')->name('edit');
+    Route::post('/update/{id}', 'update')->name('update');
+    Route::post('/delete/{id}', 'destroy')->name('delete');
 });
-
 
 /*
 |--------------------------------------------------------------------------
@@ -1198,16 +1382,16 @@ Route::post(
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('expenses')->name('expense.')->group(function(){
-Route::get('/',[ExpenseController::class,'index'])->name('index');
-Route::get('/create',[ExpenseController::class,'create'])->name('create');
-Route::post('/store',[ExpenseController::class,'store'])->name('store');
-Route::get('/show/{id}',[ExpenseController::class,'show'])->name('show');
-Route::get('/print',[ExpenseController::class,'print'])->name('print');
-Route::get('/edit/{id}',[ExpenseController::class,'edit'])->name('edit');
-Route::post('/update/{id}',[ExpenseController::class,'update'])->name('update');
-Route::delete('/delete/{id}',[ExpenseController::class,'destroy'])->name('delete');
-
+Route::prefix('expenses')->name('expense.')->controller(ExpenseController::class)->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::get('/create', 'create')->name('create');
+    Route::post('/store', 'store')->name('store');
+    Route::get('/show/{id}', 'show')->name('show');
+    Route::get('/edit/{id}', 'edit')->name('edit');
+    Route::post('/update/{id}', 'update')->name('update');
+    Route::post('/cancel/{id}', 'cancel')->name('cancel');
+    Route::get('/print', 'print')->name('print');
+    Route::get('/print/{id}', 'printVoucher')->name('print-voucher');
 });
 
 /*
@@ -1216,11 +1400,15 @@ Route::delete('/delete/{id}',[ExpenseController::class,'destroy'])->name('delete
 |--------------------------------------------------------------------------
 */
 
+Route::middleware('subscription.module:loan')->group(function () {
 Route::prefix('loan-accounts')->name('loan-account.')->group(function(){
       Route::get('/',[LoanAccountController::class,'index'])->name('index');
       Route::get('/create',[LoanAccountController::class,'create'])->name('create');
       Route::post('/store',[LoanAccountController::class,'store'])->name('store');
       Route::get('/show/{id}',[LoanAccountController::class,'show'])->name('show');
+      Route::get('/edit/{id}',[LoanAccountController::class,'edit'])->name('edit');
+      Route::post('/update/{id}',[LoanAccountController::class,'update'])->name('update');
+      Route::post('/cancel/{id}',[LoanAccountController::class,'cancel'])->name('cancel');
 });
 
 /*
@@ -1234,7 +1422,10 @@ Route::prefix('loan-payments')->name('loan-payment.')->group(function(){
     Route::get('/create/{id}',[LoanPaymentController::class,'create'])->name('create');
     Route::post('/store',[LoanPaymentController::class,'store'])->name('store');
     Route::get('/show/{id}',[LoanPaymentController::class,'show'])->name('show');
-
+    Route::get('/edit/{id}',[LoanPaymentController::class,'edit'])->name('edit');
+    Route::post('/update/{id}',[LoanPaymentController::class,'update'])->name('update');
+    Route::post('/cancel/{id}',[LoanPaymentController::class,'cancel'])->name('cancel');
+    Route::get('/print/{id}',[LoanPaymentController::class,'print'])->name('print');
 });
 
 /*
@@ -1242,13 +1433,25 @@ Route::prefix('loan-payments')->name('loan-payment.')->group(function(){
 | PARTY ACCOUNTS
 |--------------------------------------------------------------------------
 */
-    Route::prefix('party-accounts')->name('party-account.')->group(function(){
-        Route::get('/',[PartyAccountController::class,'index'])->name('index');
-        Route::get('/create',[PartyAccountController::class,'create'])->name('create');
-        Route::post('/store',[PartyAccountController::class,'store'])->name('store');
-        Route::get('/show/{id}',[PartyAccountController::class,'show'])->name('show');
-
+    Route::prefix('party-accounts')->name('party-account.')->group(function () {
+        Route::get('/', [PartyAccountController::class, 'index'])->name('index');
+        Route::get('/create', [PartyAccountController::class, 'create'])->name('create');
+        Route::post('/store', [PartyAccountController::class, 'store'])->name('store');
+        Route::post('/update/{id}', [PartyAccountController::class, 'update'])->name('update');
+        Route::post('/delete/{id}', [PartyAccountController::class, 'destroy'])->name('delete');
+        Route::get('/show/{id}', [PartyAccountController::class, 'show'])->name('show');
     });
+/*
+|--------------------------------------------------------------------------
+| LOAN SAVING LEDGER
+|--------------------------------------------------------------------------
+*/
+
+    Route::prefix('loan-saving-ledgers')->name('loan-saving-ledger.')->group(function () {
+        Route::get('/', [LoanSavingLedgerController::class, 'index'])->name('index');
+        Route::get('/show/{id}', [LoanSavingLedgerController::class, 'show'])->name('show');
+    });
+
 /*
 |--------------------------------------------------------------------------
 | LOAN SAVING WITHDRAW
@@ -1259,19 +1462,23 @@ Route::prefix('loan-payments')->name('loan-payment.')->group(function(){
           Route::get('/create/{id}',[LoanSavingWithdrawController::class,'create'])->name('create');
           Route::post('/store',[LoanSavingWithdrawController::class,'store'])->name('store');
     });
+});
 
 /*
 |--------------------------------------------------------------------------
 | Empulay Account
 |--------------------------------------------------------------------------
 */
+    Route::middleware('subscription.module:hr')->group(function () {
     Route::prefix('employee-accounts')->name('employee-account.')->group(function(){
         Route::get('/',[EmployeeAccountController::class,'index'])->name('index');
+        Route::get('/print',[EmployeeAccountController::class,'print'])->name('print');
         Route::get('/create',[EmployeeAccountController::class,'create'])->name('create');
         Route::post('/store',[EmployeeAccountController::class,'store'])->name('store');
         Route::get('/show/{id}',[EmployeeAccountController::class,'show'])->name('show');
         Route::get('/edit/{id}',[EmployeeAccountController::class,'edit'])->name('edit');
         Route::post('/update/{id}',[EmployeeAccountController::class,'update'])->name('update');
+        Route::post('/toggle-status/{id}',[EmployeeAccountController::class,'toggleStatus'])->name('toggle-status');
         Route::post('/delete/{id}',[EmployeeAccountController::class,'destroy'])->name('delete');
     });
 
@@ -1282,26 +1489,13 @@ Route::prefix('loan-payments')->name('loan-payment.')->group(function(){
 |--------------------------------------------------------------------------
 */
 Route::prefix('income-categories')->name('income-category.')->controller(IncomeCategoryController::class)
-->group(function(){
-Route::get('/','index')->name('index');Route::get('/create','create'
-)->name(
-'create'
-);
-
-Route::post(
-'/store',
-'store'
-)->name(
-'store'
-);
-
-Route::post(
-'/delete/{id}',
-'destroy'
-)->name(
-'delete'
-);
-
+->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::get('/create', 'create')->name('create');
+    Route::post('/store', 'store')->name('store');
+    Route::get('/edit/{id}', 'edit')->name('edit');
+    Route::post('/update/{id}', 'update')->name('update');
+    Route::post('/delete/{id}', 'destroy')->name('delete');
 });
 
 
@@ -1316,66 +1510,29 @@ Route::post(
 Route::prefix('income')
 ->name('income.')
 ->controller(IncomeController::class)
-->group(function(){
-
-Route::get(
-'/',
-'index'
-)->name(
-'index'
-);
-
-Route::get(
-'/create',
-'create'
-)->name(
-'create'
-);
-
-Route::post(
-'/store',
-'store'
-)->name(
-'store'
-);
-
-Route::get(
-'/show/{id}',
-'show'
-)->name(
-'show'
-);
-
-Route::post(
-'/delete/{id}',
-'destroy'
-)->name(
-'delete'
-);
-Route::get(
-'/edit/{id}',
-'edit'
-)->name('edit');
-
-Route::post(
-'/update/{id}',
-'update'
-)->name('update');
-
-Route::get(
-'/print',
-'print'
-)->name('print');
-
-    });
+->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::get('/create', 'create')->name('create');
+    Route::post('/store', 'store')->name('store');
+    Route::get('/show/{id}', 'show')->name('show');
+    Route::get('/edit/{id}', 'edit')->name('edit');
+    Route::post('/update/{id}', 'update')->name('update');
+    Route::post('/cancel/{id}', 'cancel')->name('cancel');
+    Route::get('/print', 'print')->name('print');
+    Route::get('/print/{id}', 'printVoucher')->name('print-voucher');
+});
 
 
           // janjorl Final
-    Route::prefix('journals')->name('journal.')->controller(JournalController::class)->group(function(){
-         Route::get('/','index')->name('index');Route::get('/create','create')->name('create');
-         Route::post('/store','store')->name('store');Route::get('/show/{id}','show')->name('show');
-         Route::get('/edit/{id}','edit')->name('edit');Route::post('/update/{id}','update')->name('update');
-         Route::post('/delete/{id}','destroy')->name('delete');Route::get('/print','print')->name('print');
+    Route::prefix('journals')->name('journal.')->controller(JournalController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/store', 'store')->name('store');
+        Route::get('/show/{id}', 'show')->name('show');
+        Route::get('/edit/{id}', 'edit')->name('edit');
+        Route::post('/update/{id}', 'update')->name('update');
+        Route::get('/print', 'print')->name('print');
+        Route::get('/print/{id}', 'printVoucher')->name('print-voucher');
     });
 
     Route::prefix(
@@ -1458,15 +1615,72 @@ Route::prefix('salary-sheets')
         [SalarySheetController::class, 'update']
     )->name('update');
 
-    Route::post('/delete/{id}',
-        [SalarySheetController::class, 'destroy']
-    )->name('delete');
+    Route::post('/cancel/{id}',
+        [SalarySheetController::class, 'cancel']
+    )->name('cancel');
 
     Route::get('/print',
         [SalarySheetController::class, 'print']
     )->name('print');
 
 });
+
+Route::prefix('employee-payments')
+    ->name('employee-payment.')
+    ->group(function () {
+
+    Route::get('/',
+        [EmployeePaymentController::class, 'index']
+    )->name('index');
+
+    Route::get('/print-list',
+        [EmployeePaymentController::class, 'printList']
+    )->name('print-list');
+
+    Route::get('/create',
+        [EmployeePaymentController::class, 'create']
+    )->name('create');
+
+    Route::post('/store',
+        [EmployeePaymentController::class, 'store']
+    )->name('store');
+
+    Route::get('/show/{id}',
+        [EmployeePaymentController::class, 'show']
+    )->name('show');
+
+    Route::get('/edit/{id}',
+        [EmployeePaymentController::class, 'edit']
+    )->name('edit');
+
+    Route::post('/update/{id}',
+        [EmployeePaymentController::class, 'update']
+    )->name('update');
+
+    Route::post('/cancel/{id}',
+        [EmployeePaymentController::class, 'cancel']
+    )->name('cancel');
+
+    Route::get('/print/{id}',
+        [EmployeePaymentController::class, 'print']
+    )->name('print');
+
+});
+
+Route::prefix('employee-ledger')
+    ->name('employee-ledger.')
+    ->group(function () {
+        Route::get('/{id}', [EmployeeLedgerController::class, 'show'])->name('show');
+    });
+
+Route::prefix('payroll-register')
+    ->name('payroll-register.')
+    ->group(function () {
+        Route::get('/', [PayrollRegisterController::class, 'index'])->name('index');
+        Route::get('/print', [PayrollRegisterController::class, 'print'])->name('print');
+    });
+    });
+
 Route::get(
     '/account-transaction',
     [AccountTransactionController::class,'index']
@@ -1484,24 +1698,3 @@ Route::get(
 });
 
 
-
-
-
-//STAFF ROUTES
-Route::middleware(['auth','role:3'])->prefix('staff')->group(function () {
-
-    Route::get('/staff/dashboard', [StaffDashboardController::class, 'index']);
-
-    // Example modules (permission-based later)
-    Route::get('/invoice', function () {
-        return view('staff.invoice');
-    });
-
-    Route::get('/inventory', function () {
-        return view('staff.inventory');
-    });
-    // SERVICES
-
-
-
-});

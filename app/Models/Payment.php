@@ -2,28 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-class Payment extends Model
+/** @deprecated Use SubscriptionPayment instead */
+class Payment extends SubscriptionPayment
 {
-    protected $fillable = [
-        'company_id',
-        'plan_id',
-        'amount',
-        'method',
-        'screenshot',
-        'status',
-        'note'
-    ];
-
-    // 🔥 RELATIONS
-    public function company()
-    {
-        return $this->belongsTo(\App\Models\Company::class);
-    }
-
     public function plan()
     {
-        return $this->belongsTo(\App\Models\Plan::class);
+        return $this->belongsTo(SubscriptionPlan::class, 'subscription_plan_id');
     }
 }

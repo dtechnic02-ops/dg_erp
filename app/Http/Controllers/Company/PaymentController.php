@@ -3,39 +3,37 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Models\BillingCycle;
+use App\Models\SubscriptionPlan;
+use App\Services\SubscriptionService;
 use Illuminate\Http\Request;
-use App\Models\Payment;
-use App\Models\Plan;
+use RuntimeException;
 
 class PaymentController extends Controller
 {
+    public function __construct(private SubscriptionService $subscriptionService)
+    {
+    }
+
     public function store(Request $request)
     {
         $request->validate([
-            'plan_id' => 'required',
-            'screenshot' => 'required|image'
+            'subscription_plan_id' => 'required|exists:subscription_plans,id',
+            'billing_cycle_id' => 'required|exists:billing_cycles,id',
+            'screenshot' => 'required|image',
         ]);
 
-        // 🔥 plan find
-        $plan = Plan::find($request->plan_id);
-
-        if (!$plan) {
-            return back()->with('error', 'Plan not found');
+        try {
+            $this->subscriptionService->submitPayment([
+                'subscription_plan_id' => $request->subscription_plan_id,
+                'billing_cycle_id' => $request->billing_cycle_id,
+                'payment_method' => 'manual',
+                'payment_date' => now()->toDateString(),
+                'proof_path' => $request->file('screenshot')->store('subscription-payments', 'public'),
+            ], auth()->user());
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
         }
-
-        // 🔥 amount auto
-        $amount = $plan->price_monthly;
-
-        $path = $request->file('screenshot')->store('payments', 'public');
-
-        Payment::create([
-            'company_id' => auth()->user()->company_id,
-            'plan_id' => $plan->id,
-            'amount' => $amount,
-            'method' => 'manual',
-            'screenshot' => $path,
-            'status' => 'pending'
-        ]);
 
         return back()->with('success', 'Payment submitted. Waiting for approval.');
     }

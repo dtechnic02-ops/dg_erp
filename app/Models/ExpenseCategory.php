@@ -6,26 +6,29 @@ use Illuminate\Database\Eloquent\Model;
 
 class ExpenseCategory extends Model
 {
+    public const STATUS_INACTIVE = 0;
 
-protected $fillable = [
+    public const STATUS_ACTIVE = 1;
 
-'company_id',
+    protected $fillable = [
+        'company_id',
+        'name',
+        'description',
+        'status',
+        'created_by',
+    ];
 
-'name',
+    protected $casts = [
+        'status' => 'integer',
+    ];
 
-'description',
+    public function expenses()
+    {
+        return $this->hasMany(Expense::class, 'expense_category_id');
+    }
 
-'status'
-
-];
-
-public function expenses()
-{
-
-return $this->hasMany(
-Expense::class
-);
-
-}
-
+    public function isActive(): bool
+    {
+        return (int) $this->status === self::STATUS_ACTIVE;
+    }
 }

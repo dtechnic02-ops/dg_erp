@@ -76,3 +76,24 @@ if (!function_exists('numberToWords'))
         return number_format($number, 0) . ' only';
     }
 }
+
+if (!function_exists('invoice_taxable_amount'))
+{
+    function invoice_taxable_amount(iterable $items): float
+    {
+        return \App\Services\InvoiceSummaryService::calculateTaxableAmount($items);
+    }
+}
+
+if (!function_exists('userCan')) {
+    function userCan(string $permission): bool
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasPermission($permission);
+    }
+}

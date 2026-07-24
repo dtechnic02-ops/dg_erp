@@ -2,16 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-class Plan extends Model
+/** @deprecated Use SubscriptionPlan instead */
+class Plan extends SubscriptionPlan
 {
-protected $fillable = [
-    'name',
-    'user_limit',
-    'price',
-    'customer_limit',
-    'duration_days',
-    'type',
-];
+    //
 }

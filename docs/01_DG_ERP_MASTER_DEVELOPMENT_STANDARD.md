@@ -148,6 +148,46 @@ Business Requirement
 Approved Change
 
 =========================================================
+PROTECTED ARCHITECTURE
+=========================================================
+
+The following architecture is part of DG ERP Constitution.
+
+Never redesign.
+
+Never replace.
+
+Never simplify.
+
+Never bypass.
+
+Customer = MASTER
+
+Supplier = MIRROR
+
+Sales = MASTER
+
+Purchase = MIRROR
+
+Income = MASTER
+
+Expense = MIRROR
+
+Business Date = Financial Truth
+
+Cancel = Never Delete
+
+Financial Documents are immutable.
+
+Role & Permission Architecture = FROZEN
+Reference: docs/12_DG_ERP_ROLE_PERMISSION_STANDARD.md
+Version 4.0 — Platform + Company two-level permission model
+Platform: Module + Action (individual per Super Staff)
+Company: Module + Action (individual per Company Staff)
+Never authorize by role_id
+
+Only approved business requirements may change the architecture.
+=========================================================
 FRAMEWORK
 =========================================================
 
@@ -194,6 +234,35 @@ Module Specific Component
 Module Specific Naming
 
 Everything must be reusable.
+=========================================================
+DELETE POLICY
+=========================================================
+
+Delete is prohibited.
+
+DG ERP never deletes financial or business documents.
+
+Instead use
+
+Cancel Workflow.
+
+Cancel must preserve
+
+History
+
+Audit Trail
+
+Financial Integrity
+
+Reports
+
+Ledger Integrity
+
+Stock Integrity
+
+Every module must implement Cancel.
+
+Never implement Delete unless explicitly approved by the Constitution.
 
 =========================================================
 NAMING RULE
@@ -350,6 +419,45 @@ dg-status
 dg-icon
 
 dg-print
+=========================================================
+ICON RULE
+=========================================================
+
+Use one icon library across the ERP.
+
+Never mix multiple icon libraries.
+
+Icons must represent actions consistently.
+
+Example:
+
+Add
+Edit
+Cancel
+Print
+Search
+Filter
+
+must use the same icon everywhere.
+=========================================================
+COMPONENT REUSE RULE
+=========================================================
+
+Before creating any new component
+
+Search existing DG components.
+
+If an existing component can be reused,
+
+reuse it.
+
+Never create duplicate reusable components.
+
+If a new component is genuinely required,
+
+add it to the Approved Components list first.
+
+Only after approval may it be used throughout DG ERP.
 
 =========================================================
 BOOTSTRAP RULE
@@ -441,8 +549,46 @@ calculator.js
 Every reusable function
 belongs inside dg.js.
 
-Business specific logic
-stays inside module JS.
+Business specific UI interaction
+may stay inside module JavaScript.
+
+Financial calculations,
+
+Validation,
+
+Business rules,
+
+Database logic,
+
+must never exist inside JavaScript.
+
+They belong to
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Database.
+JS
+↓
+
+Route
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Response
 
 =========================================================
 BLADE RULE
@@ -459,6 +605,44 @@ Reusable Tables.
 Reusable Forms.
 
 Never redesign approved UI.
+Database
+
+↓
+
+Controller
+
+↓
+
+Blade
+
+↓
+
+User
+=========================================================
+FORM RULE
+=========================================================
+
+Forms must use the approved DG layout.
+
+Label
+
+↓
+
+Input
+
+↓
+
+Validation Message
+
+↓
+
+Help Text (Optional)
+
+↓
+
+Action Buttons
+
+Field order must remain consistent across all modules.
 
 =========================================================
 RESPONSIVE RULE
@@ -491,7 +675,48 @@ Mobile Blade
 Desktop Blade
 
 Tablet Blade
+Summary
 
+↓
+
+Filter
+
+↓
+
+Table
+
+↓
+
+Pagination
+
+Toolbar
+
+↓
+
+Form
+
+↓
+
+Section
+
+↓
+
+Action Buttons
+=========================================================
+UI PERFORMANCE RULE
+=========================================================
+
+Avoid unnecessary DOM elements.
+
+Avoid duplicate CSS.
+
+Avoid duplicate JavaScript.
+
+Reuse Bootstrap components whenever possible.
+
+Minimize page rendering complexity.
+
+UI consistency is more important than visual effects.
 =========================================================
 PRINT RULE
 =========================================================
@@ -507,6 +732,37 @@ Reusable Header.
 Reusable Footer.
 
 Reusable Summary.
+Print Layout must remain identical
+across every module.
+
+Only business data changes.
+
+Never redesign print layouts per module.
+=========================================================
+REPORT RULE
+=========================================================
+
+All reports must use
+
+Business Date.
+
+Never use
+
+created_at
+
+updated_at
+
+for financial reports.
+
+Sorting
+
+Filtering
+
+Searching
+
+Printing
+
+must follow Business Date.
 
 =========================================================
 RESPONSE RULE
@@ -537,6 +793,35 @@ Remove
 
 Exact Location
 
+
+AI DEVELOPMENT RULE
+=========================================================
+CODE MODIFICATION RULE
+=========================================================
+
+When changing code,
+
+always specify
+
+File
+
+Method
+
+Search
+
+Replace
+
+Add Below
+
+Remove
+
+Reason
+
+Never tell developers
+
+"change this"
+
+without an exact location.
 =========================================================
 VERSION RULE
 =========================================================
@@ -560,7 +845,42 @@ Create
 DG ERP Version 2 Suggestion
 
 Version 1 remains unchanged.
+UI Rule
 
+↓
+
+UI Document
+
+Financial Rule
+
+↓
+
+Financial Document
+
+Business Rule
+
+↓
+
+Business Module Document
+=========================================================
+CONSTITUTION FIRST RULE
+=========================================================
+
+Before writing code
+
+Read the Constitution.
+
+If the Constitution conflicts with AI suggestions,
+
+the Constitution always wins.
+
+Never invent new architecture.
+
+Always reuse existing DG ERP architecture.
+
+Architecture First.
+
+Code Second.
 =========================================================
 FINAL GOLDEN RULE
 =========================================================
@@ -617,6 +937,35 @@ dg-card-body
         ↓
 
 dg-card-footer
+=========================================================
+WORKFLOW RULE
+=========================================================
+
+UI must never change the business workflow.
+
+UI follows
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Business Logic
+
+↓
+
+Database
+
+Never move business logic into Blade.
+
+Never move financial calculation into JavaScript.
+
+JavaScript is only for user interaction.
+
+All financial calculations must be performed on the server.
 
 =========================================================
 =========================================================

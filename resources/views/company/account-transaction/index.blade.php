@@ -194,7 +194,6 @@
                                             <td class="text-end">{{ number_format($transaction->balance, 2) }}</td>
                                             <td class="text-center d-print-none">
                                                 <div class="btn-group" role="group" aria-label="Transaction actions for {{ $transaction->voucher_no }}">
-                                                    <a href="{{ route('company.account-transaction.show', $transaction->id) }}" class="btn btn-sm btn-outline-success dg-btn">Edit</a>
                                                     <a href="{{ route('company.account-transaction.show', $transaction->id) }}" class="btn btn-sm btn-outline-info dg-btn">View</a>
                                                 </div>
                                             </td>

@@ -1,95 +1,208 @@
 <?php
 
+
+
 namespace App\Http\Controllers\Admin;
 
+
+
+use App\Http\Controllers\Concerns\AuthorizesAdminCompany;
+
 use App\Http\Controllers\Controller;
+
 use App\Models\CompanyRegistration;
+
 use App\Models\Company;
+
 use App\Models\User;
+
+use App\Services\SubscriptionService;
+
+use Illuminate\Support\Facades\DB;
+
 use Illuminate\Support\Facades\File;
+
 use Illuminate\Support\Facades\Hash;
 
+use RuntimeException;
+
+
+
 class CompanyApprovalController extends Controller
+
 {
-    // 🔥 LIST (Admin + Super Staff)
-    public function index()
+
+    use AuthorizesAdminCompany;
+
+
+
+    public function __construct(private SubscriptionService $subscriptionService)
+
     {
-        abort_unless(auth()->check(), 403);
-        abort_unless(in_array(auth()->user()->role_id, [1,4]), 403);
+
+    }
+
+
+
+    public function index()
+
+    {
+
+        $this->authorizeViewCompany();
+
+
 
         $registrations = CompanyRegistration::latest()->paginate(10);
 
+
+
         return view('admin.registrations', compact('registrations'));
+
     }
 
-    // 🔥 APPROVE
+
+
     public function approve($id)
+
     {
-        abort_unless(in_array(auth()->user()->role_id, [1,4]), 403);
+
+        $this->authorizeApproveCompany();
+
+
 
         $reg = CompanyRegistration::findOrFail($id);
 
-        // ❗ already processed
+
+
         if ($reg->status !== 'pending') {
+
             return back()->with('error', 'Already processed!');
+
         }
 
-        // ❗ mobile check
-        if (!$reg->mobile_no) {
+
+
+        if (! $reg->mobile_no) {
+
             return back()->with('error', 'Mobile number missing.');
+
         }
 
-        // ✅ COMPANY CREATE
-        $company = Company::firstOrCreate(
-            ['email' => $reg->email],
-            [
-                'company_name' => $reg->company_name,
-                'mobile' => $reg->mobile_no,
-                'status' => 'active'
-            ]
-        );
 
-        // 🔥 FOLDER CREATE
-        $folderPath = public_path('companies/' . $company->id);
 
-        if (File::exists($folderPath)) {
-            return back()->with('error', 'Folder already exists!');
+        try {
+
+            DB::transaction(function () use ($reg) {
+
+                $company = Company::firstOrCreate(
+
+                    ['email' => $reg->email],
+
+                    [
+
+                        'company_name' => $reg->company_name,
+
+                        'mobile' => $reg->mobile_no,
+
+                        'status' => 'active',
+
+                    ]
+
+                );
+
+
+
+                $folderPath = public_path('companies/' . $company->id);
+
+
+
+                if (File::exists($folderPath)) {
+
+                    throw new RuntimeException('Folder already exists!');
+
+                }
+
+
+
+                $passwordHash = $reg->password ?: Hash::make('123456');
+
+
+
+                $user = User::firstOrNew(['email' => $reg->email]);
+
+                $user->fill([
+
+                    'company_id' => $company->id,
+
+                    'name' => $reg->full_name,
+
+                    'role_id' => 2,
+
+                    'password' => $passwordHash,
+
+                ]);
+
+                $user->save();
+
+
+
+                File::makeDirectory($folderPath, 0755, true);
+
+
+
+                $this->subscriptionService->startRegisterTrial($company, auth()->user());
+
+
+
+                $reg->update(['status' => 'approved']);
+
+            });
+
+        } catch (RuntimeException $e) {
+
+            return back()->with('error', $e->getMessage());
+
         }
 
-        File::makeDirectory($folderPath, 0755, true);
 
-        // ✅ USER CREATE
-        User::firstOrCreate(
-            ['email' => $reg->email],
-            [
-                'company_id' => $company->id,
-                'name' => $reg->full_name,
-                'password' => Hash::make($reg->password ?? '123456'),
-                'role_id' => 2
-            ]
-        );
-
-        // ✅ UPDATE REGISTRATION
-        $reg->update(['status' => 'approved']);
 
         return redirect()->route('admin.registrations')
+
             ->with('success', 'Company Approved Successfully');
+
     }
 
-    // 🔥 REJECT
+
+
     public function reject($id)
+
     {
-        abort_unless(in_array(auth()->user()->role_id, [1,4]), 403);
+
+        $this->authorizeApproveCompany();
+
+
 
         $reg = CompanyRegistration::findOrFail($id);
 
+
+
         if ($reg->status !== 'pending') {
+
             return back()->with('error', 'Already processed!');
+
         }
+
+
 
         $reg->update(['status' => 'rejected']);
 
+
+
         return redirect()->route('admin.registrations')
+
             ->with('success', 'Company Rejected');
+
     }
+
 }
+

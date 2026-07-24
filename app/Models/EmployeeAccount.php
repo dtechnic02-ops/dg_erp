@@ -3,141 +3,152 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class EmployeeAccount extends Model
 {
+    public const STATUS_INACTIVE = 0;
 
-protected $fillable = [
+    public const STATUS_ACTIVE = 1;
 
-'company_id',
+    protected $fillable = [
+        'company_id',
+        'employee_code',
+        'first_name',
+        'middle_name',
+        'last_name',
+        'phone',
+        'email',
+        'address',
+        'gender',
+        'dob',
+        'joining_date',
+        'designation',
+        'department',
+        'post',
+        'employment_type',
+        'basic_salary',
+        'salary_type',
+        'opening_due_salary',
+        'bank_name',
+        'bank_account_no',
+        'account_holder_name',
+        'cit_no',
+        'pan_no',
+        'emergency_contact',
+        'emergency_phone',
+        'photo',
+        'cv_attachment',
+        'id_document',
+        'contract_document',
+        'note',
+        'created_by',
+        'updated_by',
+        'status',
+    ];
 
-'employee_code',
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
-'first_name',
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
-'middle_name',
+    public function updater()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 
-'last_name',
+    public function salarySheets()
+    {
+        return $this->hasMany(SalarySheet::class, 'employee_id');
+    }
 
-'phone',
+    public function employeePayments()
+    {
+        return $this->hasMany(EmployeePayment::class, 'employee_account_id');
+    }
 
-'email',
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_ACTIVE);
+    }
 
-'address',
+    public function isActive(): bool
+    {
+        return (int) $this->status === self::STATUS_ACTIVE;
+    }
 
-'gender',
+    public function getFullNameAttribute(): string
+    {
+        return trim(
+            $this->first_name
+            . ' '
+            . ($this->middle_name ?? '')
+            . ' '
+            . ($this->last_name ?? '')
+        );
+    }
 
-'dob',
+    public function hasHrDependencies(): bool
+    {
+        if ($this->salarySheets()->exists()) {
+            return true;
+        }
 
-'joining_date',
+        if (DB::table('employee_payments')->where('employee_account_id', $this->id)->exists()) {
+            return true;
+        }
 
-'designation',
+        if (class_exists(\App\Models\Attendance::class)) {
+            if (\App\Models\Attendance::where('employee_id', $this->id)->exists()) {
+                return true;
+            }
+        }
 
-'department',
+        if (class_exists(\App\Models\Leave::class)) {
+            if (\App\Models\Leave::where('employee_id', $this->id)->exists()) {
+                return true;
+            }
+        }
 
-'post',
+        return false;
+    }
 
-'employment_type',
+    public function dependencySummary(): array
+    {
+        $dependencies = [];
 
-'basic_salary',
+        $salarySheetCount = $this->salarySheets()->count();
+        if ($salarySheetCount > 0) {
+            $dependencies[] = $salarySheetCount . ' salary sheet(s)';
+        }
 
-'salary_type',
+        $paymentCount = (int) DB::table('employee_payments')
+            ->where('employee_account_id', $this->id)
+            ->count();
+        if ($paymentCount > 0) {
+            $dependencies[] = $paymentCount . ' employee payment(s)';
+        }
 
-'opening_due_salary',
+        if (class_exists(\App\Models\Attendance::class)) {
+            $attendanceCount = \App\Models\Attendance::where('employee_id', $this->id)->count();
+            if ($attendanceCount > 0) {
+                $dependencies[] = $attendanceCount . ' attendance record(s)';
+            }
+        }
 
-'bank_name',
+        if (class_exists(\App\Models\Leave::class)) {
+            $leaveCount = \App\Models\Leave::where('employee_id', $this->id)->count();
+            if ($leaveCount > 0) {
+                $dependencies[] = $leaveCount . ' leave record(s)';
+            }
+        }
 
-'bank_account_no',
-
-'account_holder_name',
-
-'cit_no',
-
-'pan_no',
-
-'emergency_contact',
-
-'emergency_phone',
-
-'photo',
-
-'cv_attachment',
-
-'id_document',
-
-'contract_document',
-
-'note',
-
-'created_by',
-
-'status'
-
-];
-
-/*
-|--------------------------------------------------------------------------
-| COMPANY
-|--------------------------------------------------------------------------
-*/
-
-public function company()
-{
-
-return $this->belongsTo(
-
-Company::class
-
-);
-
-}
-
-/*
-|--------------------------------------------------------------------------
-| CREATOR
-|--------------------------------------------------------------------------
-*/
-
-public function creator()
-{
-
-return $this->belongsTo(
-
-User::class,
-
-'created_by'
-
-);
-
-}
-
-/*
-|--------------------------------------------------------------------------
-| FULL NAME
-|--------------------------------------------------------------------------
-*/
-
-public function getFullNameAttribute()
-{
-
-return trim(
-
-$this->first_name
-
-.' '
-
-.
-
-$this->middle_name
-
-.' '
-
-.
-
-$this->last_name
-
-);
-
-}
-
+        return $dependencies;
+    }
 }

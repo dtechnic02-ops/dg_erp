@@ -62,6 +62,17 @@ class User extends Authenticatable
             return false;
         }
 
+        if ($this->role->name === Role::STAFF && $this->company_id) {
+            $companyHasPermission = $this->company
+                ?->staffPermissions()
+                ->where('permissions.name', $permission)
+                ->exists();
+
+            if ($companyHasPermission) {
+                return true;
+            }
+        }
+
         return $this->role->permissions()
             ->where('name', $permission)
             ->exists();

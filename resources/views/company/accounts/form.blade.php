@@ -16,6 +16,17 @@
     </div>
 
     <div class="col-lg-4 col-md-6 col-12">
+        <label for="sub_ledger_type" class="dg-label">Sub Ledger Type</label>
+        <select name="sub_ledger_type" id="sub_ledger_type" class="form-select dg-select">
+            <option value="">None</option>
+            <option value="customer" {{ optional($account)->sub_ledger_type == 'customer' ? 'selected' : '' }}>Accounts Receivable (Customer)</option>
+            <option value="supplier" {{ optional($account)->sub_ledger_type == 'supplier' ? 'selected' : '' }}>Accounts Payable (Supplier)</option>
+            <option value="employee" {{ optional($account)->sub_ledger_type == 'employee' ? 'selected' : '' }}>Salary Payable (Employee)</option>
+            <option value="party" {{ optional($account)->sub_ledger_type == 'party' ? 'selected' : '' }}>Party Ledger (Party)</option>
+        </select>
+    </div>
+
+    <div class="col-lg-4 col-md-6 col-12">
         <label for="bank_name" class="dg-label">Bank Name</label>
         <input type="text" name="bank_name" id="bank_name" value="{{ optional($account)->bank_name }}" class="form-control dg-input">
     </div>

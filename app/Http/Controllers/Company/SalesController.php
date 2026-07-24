@@ -26,9 +26,11 @@ use App\Models\CustomerTransaction;
 use App\Models\StockMovement;
 
 use App\Services\ValidationService;
-class SalesController extends Controller
+use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
+class SalesController extends Controller
 {
+    use HandlesTransactionDocumentationEdit;
 
 public function index(Request $request)
 {
@@ -1468,8 +1470,8 @@ public function update(Request $request, $id)
     $companyId = auth()->user()->company_id;
 
     $request->validate([
-        'sale_date' => 'required|date',
-        'note' => 'nullable|string',
+        'sale_date' => ValidationService::requiredDate(),
+        'note'      => ValidationService::text(),
     ]);
 
     try {
@@ -1515,43 +1517,42 @@ public function update(Request $request, $id)
                     );
                 }
 
-                $invoice->update([
-                    'note' => $request->note,
-                ]);
+                $invoice->update(
+                    $this->appendUpdatedBy([
+                        'note' => $request->note,
+                    ], $invoice)
+                );
+
+                $this->logDocumentationEdit(
+                    'Sales invoice documentation updated (note only).',
+                    $invoice
+                );
 
                 return;
             }
 
             $saleDate = \Carbon\Carbon::parse($request->sale_date);
-            $startDate = \Carbon\Carbon::parse($activeFy->start_date);
-            $endDate = \Carbon\Carbon::parse($activeFy->end_date);
 
-            if ($saleDate->lt($startDate) || $saleDate->gt($endDate)) {
-                throw new \Exception('No active financial year found for selected sale date.');
-            }
-
-            $customer = Customer::where('company_id', $companyId)
-                ->findOrFail($invoice->customer_id);
+            $this->assertDateWithinFinancialYear(
+                $request->sale_date,
+                $activeFy,
+                'No active financial year found for selected sale date.'
+            );
 
             $newSaleDate = $saleDate->toDateString();
-            $currentSaleDate = $invoice->sale_date?->format('Y-m-d');
 
-            $invoice->update([
-                'sale_date' => $newSaleDate,
-                'due_date' => $this->calculateInvoiceDueDate(
-                    $newSaleDate,
-                    $customer
-                ),
-                'note' => $request->note,
-            ]);
+            $invoice->update(
+                $this->appendUpdatedBy([
+                    'sale_date' => $newSaleDate,
+                    'note'      => $request->note,
+                ], $invoice)
+            );
 
-            if ($newSaleDate !== $currentSaleDate) {
-                $this->syncInvoiceSaleBusinessDate(
-                    $invoice,
-                    $newSaleDate,
-                    $companyId
-                );
-            }
+            $this->logDocumentationEdit(
+                'Sales invoice documentation updated.',
+                $invoice,
+                ['sale_date' => $newSaleDate]
+            );
         });
     } catch (\Throwable $e) {
         return back()->with(

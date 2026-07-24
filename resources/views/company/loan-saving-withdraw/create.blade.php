@@ -2,6 +2,11 @@
 
 @section('content')
 
+@php
+    $canViewAccount = userCan('view_loan_account');
+    $canViewSavingLedger = userCan('view_loan_saving_ledger');
+@endphp
+
 <div class="container-fluid">
 
 <div class="card border-0 shadow-sm">
@@ -18,6 +23,14 @@ Loan Saving Withdraw
 
 <div class="card-body">
 
+@if (session('error'))
+    <div class="alert alert-danger">{{ session('error') }}</div>
+@endif
+
+@unless ($activeFy ?? null)
+    <div class="alert alert-warning">Please activate a financial year before saving withdraw.</div>
+@endunless
+
 <form
 method="POST"
 action="{{ route(
@@ -26,10 +39,10 @@ action="{{ route(
 
 @csrf
 
-<input
-type="hidden"
-name="loan_account_id"
-value="{{ $loan->id }}">
+<input type="hidden" name="loan_account_id" value="{{ $loan->id }}">
+@if ($activeFy ?? null)
+    <input type="hidden" name="financial_year_id" value="{{ $activeFy->id }}">
+@endif
 
 <div class="row">
 
@@ -181,18 +194,23 @@ class="form-control"></textarea>
 
 </div>
 
-<button
-class="btn btn-primary">
+<button type="submit" class="btn btn-primary" @disabled(!($activeFy ?? null))>
 
 Withdraw Saving
 
 </button>
 
 <a
+@if ($canViewAccount)
 href="{{ route(
 'company.loan-account.show',
 $loan->id
 ) }}"
+@elseif ($canViewSavingLedger)
+href="{{ route('company.loan-saving-ledger.index') }}"
+@else
+href="{{ route('company.dashboard') }}"
+@endif
 class="btn btn-dark">
 
 Back

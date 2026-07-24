@@ -1,37 +1,80 @@
 @extends('company.layout')
 
+@section('title', 'Staff Permissions')
+
 @section('content')
 
-<h2 style="color:#e2e8f0; margin-bottom:20px;">🔐 Staff Permission Control</h2>
+<div class="dg-page">
 
-@if(session('success'))
-    <p style="color:#22c55e;">{{ session('success') }}</p>
-@endif
-
-<form action="{{ route('company.permissions.update') }}" method="POST">
-    @csrf
-
-    <div style="background:#0f172a; padding:20px; border-radius:10px;">
-
-        @foreach($permissions as $perm)
-            <div style="margin-bottom:10px;">
-                <label style="color:#e2e8f0;">
-                    <input type="checkbox" name="permissions[]" value="{{ $perm->id }}"
-                        {{ in_array($perm->id, $rolePermissions) ? 'checked' : '' }}>
-                    
-                    {{ $perm->name }}
-                </label>
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="d-flex flex-nowrap align-items-center gap-2">
+                <div class="flex-shrink-0">
+                    <h1 class="h4 mb-0">Staff Permissions</h1>
+                </div>
+                <div class="flex-fill d-flex justify-content-end">
+                    <a href="{{ route('company.users.index') }}" class="btn btn-outline-secondary dg-btn">Back to Staff</a>
+                </div>
             </div>
-        @endforeach
+        </div>
+    </header>
 
-        <br>
+    <main class="dg-container">
+        <div class="container-fluid">
 
-        <button style="background:#3b82f6; color:white; padding:10px 20px; border:none; border-radius:6px;">
-            💾 Save Permissions
-        </button>
+            @if(session('success'))
+                <div class="alert alert-success dg-alert" role="alert">{{ session('success') }}</div>
+            @endif
 
-    </div>
+            @if($errors->any())
+                <div class="alert alert-danger dg-alert" role="alert">{{ $errors->first() }}</div>
+            @endif
 
-</form>
+            <section class="dg-section">
+                <article class="card dg-card">
+                    <header class="card-header dg-card-header">
+                        <h2 class="h6 mb-0">Company Staff Permission Template</h2>
+                    </header>
+                    <div class="card-body dg-card-body">
+                        <p class="text-muted small">Only company-scope permissions are shown. Platform permissions are never assignable from this screen.</p>
+
+                        <form method="POST" action="{{ route('company.permissions.update') }}">
+                            @csrf
+
+                            <div class="row">
+                                @forelse($permissions as $permission)
+                                    <div class="col-md-4 mb-2">
+                                        <div class="form-check">
+                                            <input
+                                                class="form-check-input"
+                                                type="checkbox"
+                                                name="permissions[]"
+                                                value="{{ $permission->id }}"
+                                                id="permission_{{ $permission->id }}"
+                                                @checked(in_array($permission->id, $assignedPermissionIds, true))
+                                            >
+                                            <label class="form-check-label" for="permission_{{ $permission->id }}">
+                                                {{ $permission->name }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                @empty
+                                    <div class="col-12">
+                                        <p class="mb-0">No company permissions are configured.</p>
+                                    </div>
+                                @endforelse
+                            </div>
+
+                            <div class="mt-3">
+                                <button type="submit" class="btn btn-primary dg-btn">Save Permissions</button>
+                            </div>
+                        </form>
+                    </div>
+                </article>
+            </section>
+
+        </div>
+    </main>
+</div>
 
 @endsection

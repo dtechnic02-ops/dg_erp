@@ -24,6 +24,8 @@ class PurchaseInvoice extends Model
 
         'created_by',
 
+        'updated_by',
+
         'company_id',
 
         'financial_year_id',

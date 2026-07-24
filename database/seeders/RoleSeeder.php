@@ -7,10 +7,11 @@ use App\Models\Role;
 
 class RoleSeeder extends Seeder
 {
-    public function run(): void
+    public function run()
     {
-        Role::create(['name' => 'super_admin']);
-        Role::create(['name' => 'company_admin']);
-        Role::create(['name' => 'staff']);
+        Role::firstOrCreate(['name' => 'super_admin']);
+        Role::firstOrCreate(['name' => 'company_admin']);
+        Role::firstOrCreate(['name' => 'staff']);
+        Role::firstOrCreate(['name' => 'super_staff']);
     }
 }

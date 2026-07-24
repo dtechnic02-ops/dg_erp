@@ -18,8 +18,6 @@ class PurchaseReturnItem extends Model
      'purchase_return_id',
      'purchase_item_id',
 
-    'purchase_invoice_id',
-
      'product_id',
 
     'service_id',

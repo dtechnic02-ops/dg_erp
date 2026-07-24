@@ -8,7 +8,8 @@ class Customer extends Model
 {
     protected $fillable = [
         'company_id',
-         'created_by',
+        'crm_lead_id',
+        'created_by',
         'name',
         'authority_name',
         'mobile',
@@ -58,5 +59,10 @@ public function creator()
         'created_by'
 
     );
-} 
+}
+
+public function crmLeads()
+{
+    return $this->hasMany(CrmLead::class, 'customer_id');
+}
 }

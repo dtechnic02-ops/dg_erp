@@ -346,7 +346,7 @@
                             </div>
                             <div class="dg-summary-item">
                                 <span class="dg-summary-label">Taxable Amount</span>
-                                <span class="dg-summary-value">{{ number_format(max(0, (float) $invoice->subtotal - (float) $invoice->discount), 2) }}</span>
+                                <span class="dg-summary-value">{{ number_format(invoice_taxable_amount($invoice->items), 2) }}</span>
                             </div>
                             <div class="dg-summary-item">
                                 <span class="dg-summary-label">VAT</span>

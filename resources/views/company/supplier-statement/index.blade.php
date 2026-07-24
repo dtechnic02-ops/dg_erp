@@ -654,7 +654,10 @@
                             <td>
 
                                 <a
-                                    href="#"
+                                    href="{{ \App\Services\VoucherRouteService::url(
+                                        $transaction->reference_type,
+                                        $transaction->reference_id
+                                    ) }}"
                                     class="
                                         text-decoration-none
                                         fw-semibold

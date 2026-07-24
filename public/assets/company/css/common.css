@@ -1847,6 +1847,164 @@ body.dg-payment-print .dg-container
 
 
 /*=========================================================
+16c. VAT REPORT PRINT — Invoice-standard portrait layout
+=========================================================*/
+
+.dg-vat-report-print .dg-vat-report-summary-section
+{
+    margin-bottom:10px;
+}
+
+.dg-vat-report-print .dg-vat-report-summary-table
+{
+    width:100%;
+    max-width:420px;
+    margin:0 auto;
+    table-layout:fixed;
+}
+
+.dg-vat-report-print .dg-vat-report-summary-highlight td
+{
+    background:#f8fafc;
+    font-weight:600;
+}
+
+.dg-vat-report-print .dg-vat-report-summary-total td
+{
+    background:#eef2f7;
+    font-weight:800;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table
+{
+    width:100%;
+    table-layout:fixed;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table th,
+.dg-vat-report-print .dg-vat-report-transactions-table td
+{
+    padding:5px 6px;
+    font-size:9px;
+    line-height:1.3;
+    border:1px solid #c8d0da;
+    vertical-align:middle;
+    word-wrap:break-word;
+    overflow-wrap:anywhere;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table thead th
+{
+    background:#eef2f7;
+    font-weight:700;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table .dg-col-num
+{
+    width:6%;
+    text-align:right;
+    white-space:nowrap;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table .dg-col-date
+{
+    width:11%;
+    text-align:center;
+    white-space:nowrap;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table .dg-col-voucher
+{
+    width:14%;
+    text-align:left;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table .dg-col-type
+{
+    width:13%;
+    text-align:left;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table .dg-col-party
+{
+    width:28%;
+    text-align:left;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table thead .dg-col-num,
+.dg-vat-report-print .dg-vat-report-transactions-table tbody .dg-col-num
+{
+    text-align:right;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table thead .dg-col-status,
+.dg-vat-report-print .dg-vat-report-transactions-table tbody .dg-col-status
+{
+    width:10%;
+    text-align:center;
+}
+
+.dg-vat-report-print .dg-vat-report-transactions-table .dg-badge-status
+{
+    font-size:8px;
+    padding:2px 6px;
+}
+
+.dg-vat-report-print .dg-vat-report-print-footer
+{
+    margin-top:14px;
+    padding-top:8px;
+    border-top:1px solid #d8dee6;
+}
+
+.dg-vat-report-print .dg-vat-report-signature-table
+{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+    margin-top:8px;
+}
+
+.dg-vat-report-print .dg-vat-report-signature-table td
+{
+    width:33.33%;
+    padding:0 10px;
+    vertical-align:top;
+}
+
+.dg-vat-report-print .dg-vat-report-signature-table .dg-signature-line
+{
+    height:44px;
+    margin-bottom:5px;
+    border-top:1px solid #555;
+}
+
+.dg-vat-report-print .dg-vat-report-signature-table .dg-signature-label
+{
+    font-size:10px;
+    font-weight:600;
+}
+
+.dg-vat-report-print .dg-vat-report-meta-footer
+{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:flex-end;
+    gap:6px;
+    margin-top:8px;
+    font-size:9px;
+    line-height:1.35;
+    color:#333;
+}
+
+.dg-vat-report-print .dg-vat-report-meta-sep
+{
+    color:#888;
+}
+
+
+/*=========================================================
 11. ALERTS
 =========================================================*/
 
@@ -2686,6 +2844,12 @@ body.dg-payment-print .dg-container
     color:inherit;
     border-radius:5px;
     background:rgba(13,110,253,.08);
+}
+
+.dg-sidebar-icon .bi
+{
+    font-size:13px;
+    line-height:1;
 }
 
 .dg-sidebar-link.dg-sidebar-active .dg-sidebar-icon,
@@ -3947,6 +4111,93 @@ body.dg-sidebar-collapsed .dg-sidebar-button
         page:dg-invoice-print;
     }
 
+    body:has(.dg-vat-report-print) .dg-vat-report-print
+    {
+        page:dg-invoice-print;
+    }
+
+    body:has(.dg-vat-report-print) *,
+    body:has(.dg-vat-report-print) .dg-vat-report-print,
+    body:has(.dg-vat-report-print) .dg-vat-report-print *
+    {
+        visibility:visible !important;
+    }
+
+    body:has(.dg-vat-report-print)
+    {
+        background:#fff !important;
+        overflow:visible !important;
+    }
+
+    body:has(.dg-vat-report-print) .dg-layout > .dg-sidebar,
+    body:has(.dg-vat-report-print) .dg-header,
+    body:has(.dg-vat-report-print) .dg-footer,
+    body:has(.dg-vat-report-print) .dg-alert,
+    body:has(.dg-vat-report-print) .alert
+    {
+        display:none !important;
+    }
+
+    body:has(.dg-vat-report-print) .dg-main,
+    body:has(.dg-vat-report-print) .dg-main-content
+    {
+        margin:0 !important;
+        padding:0 !important;
+    }
+
+    .dg-vat-report-print .dg-invoice-print-header,
+    .dg-vat-report-print .dg-vat-report-summary-section,
+    .dg-vat-report-print .dg-vat-report-print-footer
+    {
+        break-inside:avoid;
+        page-break-inside:avoid;
+    }
+
+    .dg-vat-report-print .dg-vat-report-transactions-table thead
+    {
+        display:table-header-group;
+    }
+
+    .dg-vat-report-print .dg-vat-report-transactions-table tbody tr
+    {
+        break-inside:avoid;
+        page-break-inside:avoid;
+    }
+
+    .dg-vat-report-print .dg-vat-print-page-number::after
+    {
+        content: counter(page);
+    }
+
+    .dg-vat-report-print .dg-vat-report-transactions-table .dg-col-voucher,
+    .dg-vat-report-print .dg-vat-report-transactions-table .dg-col-type,
+    .dg-vat-report-print .dg-vat-report-transactions-table .dg-col-party
+    {
+        text-align:left !important;
+    }
+
+    .dg-vat-report-print .dg-vat-report-transactions-table thead .dg-col-num,
+    .dg-vat-report-print .dg-vat-report-transactions-table tbody .dg-col-num
+    {
+        text-align:right !important;
+    }
+
+    .dg-vat-report-print .dg-vat-report-transactions-table thead .dg-col-status,
+    .dg-vat-report-print .dg-vat-report-transactions-table tbody .dg-col-status
+    {
+        text-align:center !important;
+    }
+
+    .dg-vat-report-print .dg-vat-report-signature-table .dg-signature-line
+    {
+        height:48px;
+    }
+
+    .dg-vat-report-print .dg-vat-report-meta-footer
+    {
+        justify-content:flex-end;
+    }
+
     body:has(.dg-invoice) *,
     body:has(.dg-invoice) .dg-invoice,
     body:has(.dg-invoice) .dg-invoice *
@@ -4473,4 +4724,200 @@ body.dg-sidebar-collapsed .dg-sidebar-button
 
     }
 
+}
+
+/*=========================================================
+19. MASTER ADMIN LAYOUT — Super Admin shell
+=========================================================*/
+
+.dg-admin-body
+{
+    margin:0;
+    background:var(--content);
+}
+
+.dg-admin-sidebar-collapse-toggle
+{
+    position:absolute;
+    width:1px;
+    height:1px;
+    padding:0;
+    margin:-1px;
+    overflow:hidden;
+    clip:rect(0,0,0,0);
+    white-space:nowrap;
+    border:0;
+}
+
+.dg-admin-layout
+{
+    min-height:100vh;
+}
+
+.dg-admin-layout .dg-admin-brand-card
+{
+    padding:12px 10px;
+}
+
+.dg-admin-layout .dg-admin-brand-logo
+{
+    width:40px;
+    height:40px;
+}
+
+.dg-admin-layout .dg-sidebar-company-name
+{
+    font-size:15px;
+}
+
+.dg-admin-layout .dg-sidebar-company-meta
+{
+    font-size:11px;
+}
+
+.dg-admin-nav-group > .dg-sidebar-parent
+{
+    list-style:none;
+}
+
+.dg-admin-nav-group > .dg-sidebar-parent::-webkit-details-marker
+{
+    display:none;
+}
+
+.dg-admin-nav-group[open] > .dg-sidebar-parent
+{
+    background:var(--dg-sidebar-hover-bg);
+    color:var(--primary);
+}
+
+.dg-admin-nav-group[open] > .dg-sidebar-parent .dg-sidebar-chevron::before
+{
+    transform:rotate(90deg);
+}
+
+.dg-admin-nav-group[open] > .dg-sidebar-submenu
+{
+    max-height:720px;
+}
+
+.dg-admin-main
+{
+    min-width:0;
+}
+
+.dg-admin-header
+{
+    background:#ffffff;
+}
+
+.dg-admin-page-meta
+{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    min-width:0;
+}
+
+.dg-admin-page-title
+{
+    font-size:20px;
+}
+
+.dg-admin-content
+{
+    padding:0;
+    background:var(--content);
+}
+
+.dg-admin-user-menu .dg-header-user-menu
+{
+    min-width:220px;
+}
+
+.dg-admin-user-menu-meta
+{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    padding:10px 14px;
+    border-bottom:1px solid var(--border);
+    font-size:13px;
+    color:var(--muted);
+}
+
+.dg-admin-user-menu-meta strong
+{
+    color:var(--dark);
+    font-size:14px;
+}
+
+.dg-admin-collapse-toggle
+{
+    display:none;
+    align-items:center;
+    justify-content:center;
+    width:40px;
+    height:40px;
+    margin:0;
+    border:1px solid var(--border);
+    border-radius:var(--dg-radius);
+    background:#ffffff;
+    color:var(--dark);
+    cursor:pointer;
+    transition:background var(--dg-transition),border-color var(--dg-transition);
+}
+
+.dg-admin-collapse-toggle:hover,
+.dg-admin-collapse-toggle:focus-visible
+{
+    background:var(--dg-sidebar-hover-bg);
+    border-color:#b6d4fe;
+    outline:none;
+}
+
+body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout > .dg-sidebar
+{
+    flex-basis:var(--dg-sidebar-width-collapsed);
+    width:var(--dg-sidebar-width-collapsed);
+}
+
+body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-label,
+body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-company,
+body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-company-name,
+body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-company-meta,
+body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-chevron,
+body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-submenu,
+body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-admin-nav-group
+{
+    display:none;
+}
+
+body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-link,
+body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-parent
+{
+    justify-content:center;
+    padding-left:8px;
+    padding-right:8px;
+}
+
+@media (min-width:1200px)
+{
+    .dg-admin-collapse-toggle
+    {
+        display:inline-flex;
+    }
+}
+
+@media (max-width:1199.98px)
+{
+    .dg-admin-collapse-toggle
+    {
+        display:none;
+    }
+
+    .dg-admin-mobile-toggle
+    {
+        display:inline-flex;
+    }
 }

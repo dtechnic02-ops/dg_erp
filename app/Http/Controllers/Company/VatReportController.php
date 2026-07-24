@@ -3,230 +3,233 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Models\FinancialYear;
+use App\Models\PurchaseInvoice;
+use App\Models\PurchaseReturn;
+use App\Models\SalesInvoice;
+use App\Models\SalesReturn;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-use App\Models\SalesInvoice;
-use App\Models\SalesReturn;
-use App\Models\PurchaseInvoice;
-use App\Models\PurchaseReturn;
-use App\Models\FinancialYear;
 class VatReportController extends Controller
 {
-    /**
-     * VAT REPORT
-     */
     public function index(Request $request)
+    {
+        $report = $this->buildReport($request);
+
+        if ($report instanceof \Illuminate\Http\RedirectResponse) {
+            return $report;
+        }
+
+        return view(
+            'company.vat-report.index',
+            $report
+        );
+    }
+
+    public function print(Request $request)
+    {
+        return redirect()->route(
+            'company.vat-report.index',
+            array_merge(
+                $request->query(),
+                ['print' => 1]
+            )
+        );
+    }
+
+    protected function buildReport(Request $request): array|\Illuminate\Http\RedirectResponse
     {
         $companyId = Auth::user()->company_id;
         $type = $request->type;
-        
-$financialYear = FinancialYear::where('company_id', $companyId)
-    ->where('is_active', 1)
-    ->first();
 
-if (!$financialYear) {
-    return back()->with('error', 'Active Financial Year not found.');
-}
-     $fromDate = $request->from_date
-    ?? $financialYear->start_date;
+        $activeFy = FinancialYear::where('company_id', $companyId)
+            ->where('is_active', 1)
+            ->first();
 
-$toDate = $request->to_date
-    ?? $financialYear->end_date;
-        /*
-        |--------------------------------------------------------------------------
-        | SALES VAT
-        |--------------------------------------------------------------------------
-        */
+        $financialYears = FinancialYear::where('company_id', $companyId)
+            ->latest('id')
+            ->get();
+
+        if (!$request->has('financial_year_id')) {
+            if (!$activeFy) {
+                return back()->with('error', 'Active Financial Year not found.');
+            }
+
+            $financialYear = $activeFy;
+            $fromDate = $request->from_date ?? $activeFy->start_date;
+            $toDate = $request->to_date ?? $activeFy->end_date;
+        } else {
+            if ($request->filled('financial_year_id')) {
+                $financialYear = FinancialYear::where('company_id', $companyId)
+                    ->find($request->financial_year_id);
+
+                if (!$financialYear) {
+                    return back()->with('error', 'Selected financial year not found.');
+                }
+            } else {
+                $financialYear = null;
+            }
+
+            $fromDate = $request->from_date;
+            $toDate = $request->to_date;
+        }
 
         $salesInvoices = SalesInvoice::with('customer')
             ->where('company_id', $companyId)
-              ->where('financial_year_id', $financialYear->id)
-            ->when($fromDate, function ($q) use ($fromDate) {
-                $q->whereDate('sale_date', '>=', $fromDate);
+            ->when($financialYear, function (Builder $query) use ($financialYear) {
+                $query->where('financial_year_id', $financialYear->id);
             })
-            ->when($toDate, function ($q) use ($toDate) {
-                $q->whereDate('sale_date', '<=', $toDate);
+            ->when($fromDate, function (Builder $query) use ($fromDate) {
+                $query->whereDate('sale_date', '>=', $fromDate);
             })
-            ->get();
+            ->when($toDate, function (Builder $query) use ($toDate) {
+                $query->whereDate('sale_date', '<=', $toDate);
+            });
 
-        /*
-        |--------------------------------------------------------------------------
-        | SALES RETURN VAT
-        |--------------------------------------------------------------------------
-        */
+        $this->applyDocumentStatusFilter($salesInvoices, $request);
+        $salesInvoices = $salesInvoices->get();
 
         $salesReturns = SalesReturn::with('customer')
             ->where('company_id', $companyId)
-            ->where('financial_year_id', $financialYear->id)
-            ->when($fromDate, function ($q) use ($fromDate) {
-                $q->whereDate('return_date', '>=', $fromDate);
+            ->when($financialYear, function (Builder $query) use ($financialYear) {
+                $query->where('financial_year_id', $financialYear->id);
             })
-            ->when($toDate, function ($q) use ($toDate) {
-                $q->whereDate('return_date', '<=', $toDate);
+            ->when($fromDate, function (Builder $query) use ($fromDate) {
+                $query->whereDate('return_date', '>=', $fromDate);
             })
-            ->get();
+            ->when($toDate, function (Builder $query) use ($toDate) {
+                $query->whereDate('return_date', '<=', $toDate);
+            });
 
-        /*
-        |--------------------------------------------------------------------------
-        | PURCHASE VAT
-        |--------------------------------------------------------------------------
-        */
+        $this->applyDocumentStatusFilter($salesReturns, $request);
+        $salesReturns = $salesReturns->get();
 
         $purchaseInvoices = PurchaseInvoice::with('supplier')
             ->where('company_id', $companyId)
-            ->where('financial_year_id', $financialYear->id)
-            ->when($fromDate, function ($q) use ($fromDate) {
-                $q->whereDate('purchase_date', '>=', $fromDate);
+            ->when($financialYear, function (Builder $query) use ($financialYear) {
+                $query->where('financial_year_id', $financialYear->id);
             })
-            ->when($toDate, function ($q) use ($toDate) {
-                $q->whereDate('purchase_date', '<=', $toDate);
+            ->when($fromDate, function (Builder $query) use ($fromDate) {
+                $query->whereDate('purchase_date', '>=', $fromDate);
             })
-            ->get();
+            ->when($toDate, function (Builder $query) use ($toDate) {
+                $query->whereDate('purchase_date', '<=', $toDate);
+            });
 
-        /*
-        |--------------------------------------------------------------------------
-        | PURCHASE RETURN VAT
-        |--------------------------------------------------------------------------
-        */
+        $this->applyDocumentStatusFilter($purchaseInvoices, $request);
+        $purchaseInvoices = $purchaseInvoices->get();
 
         $purchaseReturns = PurchaseReturn::with('supplier')
             ->where('company_id', $companyId)
-            ->where('financial_year_id', $financialYear->id)
-            ->when($fromDate, function ($q) use ($fromDate) {
-                $q->whereDate('return_date', '>=', $fromDate);
+            ->when($financialYear, function (Builder $query) use ($financialYear) {
+                $query->where('financial_year_id', $financialYear->id);
             })
-            ->when($toDate, function ($q) use ($toDate) {
-                $q->whereDate('return_date', '<=', $toDate);
+            ->when($fromDate, function (Builder $query) use ($fromDate) {
+                $query->whereDate('return_date', '>=', $fromDate);
             })
-            ->get();
+            ->when($toDate, function (Builder $query) use ($toDate) {
+                $query->whereDate('return_date', '<=', $toDate);
+            });
 
-        /*
-        |--------------------------------------------------------------------------
-        | SUMMARY
-        |--------------------------------------------------------------------------
-        */
+        $this->applyDocumentStatusFilter($purchaseReturns, $request);
+        $purchaseReturns = $purchaseReturns->get();
 
         $salesVat = $salesInvoices->sum('total_vat');
-
         $salesReturnVat = $salesReturns->sum('total_vat');
-
         $purchaseVat = $purchaseInvoices->sum('total_vat');
-
         $purchaseReturnVat = $purchaseReturns->sum('total_vat');
-
         $netOutputVat = $salesVat - $salesReturnVat;
-
         $netInputVat = $purchaseVat - $purchaseReturnVat;
-
         $vatPayable = $netOutputVat - $netInputVat;
-
-        /*
-        |--------------------------------------------------------------------------
-        | DETAIL REPORT
-        |--------------------------------------------------------------------------
-        */
 
         $transactions = collect();
 
-if (!$type || $type == 'sale') {
+        if (!$type || $type === 'sale') {
+            foreach ($salesInvoices as $row) {
+                $transactions->push([
+                    'date'       => $row->sale_date,
+                    'voucher_no' => $row->invoice_no,
+                    'type'       => 'Sale',
+                    'party'      => $row->customer->name ?? '',
+                    'vat_amount' => $row->total_vat,
+                    'status'     => (int) $row->status === 1 ? 'Active' : 'Cancelled',
+                ]);
+            }
+        }
 
-    foreach ($salesInvoices as $row) {
+        if (!$type || $type === 'sales_return') {
+            foreach ($salesReturns as $row) {
+                $transactions->push([
+                    'date'       => $row->return_date,
+                    'voucher_no' => $row->return_no,
+                    'type'       => 'Sales Return',
+                    'party'      => $row->customer->name ?? '',
+                    'vat_amount' => $row->total_vat,
+                    'status'     => (int) $row->status === 1 ? 'Active' : 'Cancelled',
+                ]);
+            }
+        }
 
-        $transactions->push([
-            'date'       => $row->sale_date,
-            'voucher_no' => $row->invoice_no,
-            'type'       => 'Sale',
-            'party'      => $row->customer->name ?? '',
-            'vat_amount' => $row->total_vat,
-        ]);
-    }
-}
+        if (!$type || $type === 'purchase') {
+            foreach ($purchaseInvoices as $row) {
+                $transactions->push([
+                    'date'       => $row->purchase_date,
+                    'voucher_no' => $row->invoice_no,
+                    'type'       => 'Purchase',
+                    'party'      => $row->supplier->name ?? '',
+                    'vat_amount' => $row->total_vat,
+                    'status'     => (int) $row->status === 1 ? 'Active' : 'Cancelled',
+                ]);
+            }
+        }
 
-    if (!$type || $type == 'sales_return') {
+        if (!$type || $type === 'purchase_return') {
+            foreach ($purchaseReturns as $row) {
+                $transactions->push([
+                    'date'       => $row->return_date,
+                    'voucher_no' => $row->return_no,
+                    'type'       => 'Purchase Return',
+                    'party'      => $row->supplier->name ?? '',
+                    'vat_amount' => $row->total_vat,
+                    'status'     => (int) $row->status === 1 ? 'Active' : 'Cancelled',
+                ]);
+            }
+        }
 
-    foreach ($salesReturns as $row) {
-
-        $transactions->push([
-            'date'       => $row->return_date,
-            'voucher_no' => $row->return_no,
-            'type'       => 'Sales Return',
-            'party'      => $row->customer->name ?? '',
-            'vat_amount' => $row->total_vat,
-        ]);
-    }
-}
-
-       if (!$type || $type == 'purchase') {
-
-    foreach ($purchaseInvoices as $row) {
-
-        $transactions->push([
-            'date'       => $row->purchase_date,
-            'voucher_no' => $row->invoice_no,
-            'type'       => 'Purchase',
-            'party'      => $row->supplier->name ?? '',
-            'vat_amount' => $row->total_vat,
-        ]);
-    }
-}
-        if (!$type || $type == 'purchase_return') {
-
-    foreach ($purchaseReturns as $row) {
-
-        $transactions->push([
-            'date'       => $row->return_date,
-            'voucher_no' => $row->return_no,
-            'type'       => 'Purchase Return',
-            'party'      => $row->supplier->name ?? '',
-            'vat_amount' => $row->total_vat,
-        ]);
-    }
-}
         $transactions = $transactions
             ->sortBy('date')
             ->values();
 
-       return view(
-    'company.vat-report.index',
-    compact(
-        'transactions',
-        'type',
-        'fromDate',
-        'toDate',
-        'salesVat',
-        'salesReturnVat',
-        'purchaseVat',
-        'purchaseReturnVat',
-        'netOutputVat',
-        'netInputVat',
-        'vatPayable'
-    )
-);
+        return compact(
+            'transactions',
+            'type',
+            'fromDate',
+            'toDate',
+            'salesVat',
+            'salesReturnVat',
+            'purchaseVat',
+            'purchaseReturnVat',
+            'netOutputVat',
+            'netInputVat',
+            'vatPayable',
+            'financialYears',
+            'activeFy',
+            'financialYear'
+        );
     }
 
-    /**
-     * PRINT
-     */
-    public function print(Request $request)
+    protected function applyDocumentStatusFilter(Builder $query, Request $request): void
     {
-        $companyId = Auth::user()->company_id;
+        if (!$request->has('status')) {
+            $query->where('status', 1);
 
-$financialYear = FinancialYear::where('company_id', $companyId)
-    ->where('is_active', 1)
-    ->first();
-if (!$financialYear) {
-    return back()->with('error', 'Active Financial Year not found.');
-}
-$toDate = $request->to_date
-    ?? $financialYear->end_date;
+            return;
+        }
 
-$toDate = $request->to_date
-    ?? $financialYear->end_date;
-
-        // Index को logic जस्तै राख्ने
-        // वा private function बनाएर reuse गर्न सकिन्छ
-
-        return view('company.vat-report.print');
+        if ($request->filled('status')) {
+            $query->where('status', (int) $request->status);
+        }
     }
 }

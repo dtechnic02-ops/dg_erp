@@ -19,9 +19,11 @@ use App\Services\ValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
 class PurchasePaymentController extends Controller
 {
+    use HandlesTransactionDocumentationEdit;
     public function index(Request $request)
     {
         $companyId = auth()->user()->company_id;
@@ -104,6 +106,7 @@ class PurchasePaymentController extends Controller
             ->withQueryString();
 
         $suppliers = Supplier::where('company_id', $companyId)
+            ->active()
             ->orderBy('name')
             ->get();
 
@@ -558,6 +561,7 @@ class PurchasePaymentController extends Controller
             ->get();
 
         $suppliers = Supplier::where('company_id', $companyId)
+            ->active()
             ->orderBy('name')
             ->get();
 
@@ -604,19 +608,21 @@ class PurchasePaymentController extends Controller
 
     public function edit($id)
     {
+        $companyId = auth()->user()->company_id;
+
         $payment = PurchasePayment::with([
                 'supplier',
                 'invoice',
                 'account',
+                'financialYear',
             ])
-            ->where('company_id', auth()->user()->company_id)
+            ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        if ($payment->status == 0) {
-            return back()->with(
-                'error',
-                'Cancelled payment cannot be edited.'
-            );
+        if ((int) $payment->status === PurchasePayment::STATUS_CANCELLED) {
+            return redirect()
+                ->route('company.purchase-payments.show', $payment->id)
+                ->with('error', 'Cancelled payment cannot be edited.');
         }
 
         return view(
@@ -627,58 +633,75 @@ class PurchasePaymentController extends Controller
 
     public function update(Request $request, $id)
     {
-        $request->validate([
-            'receipt_file' =>
-                ValidationService::document(),
-            'payment_method' =>
-                'nullable|string|max:50',
-            'reference_no' =>
-                'nullable|string|max:100',
-            'note' =>
-                'nullable|string',
-        ]);
+        $companyId = auth()->user()->company_id;
+
+        $request->validate(
+            $this->documentationEditRules('payment_date')
+        );
+
+        $safeMessages = [
+            'Cancelled payment cannot be edited.',
+            'Please activate financial year first.',
+            'Purchase Payment belongs to another Financial Year.',
+            'Selected date must fall within the active financial year.',
+            'Deleted transaction cannot be edited.',
+        ];
 
         try {
-            $payment = PurchasePayment::where(
-                    'company_id',
-                    auth()->user()->company_id
-                )
-                ->findOrFail($id);
+            DB::transaction(function () use ($request, $id, $companyId) {
+                $payment = PurchasePayment::where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($id);
 
-            if ($payment->status == 0) {
-                return back()->with(
-                    'error',
-                    'Cancelled payment cannot be edited.'
+                $this->guardEditableTransaction(
+                    $payment,
+                    'Cancelled payment cannot be edited.',
+                    PurchasePayment::STATUS_CANCELLED
                 );
-            }
 
-            $receiptFile = $payment->receipt_file;
+                $activeFy = $this->assertActiveFinancialYear($companyId);
 
-            if ($request->hasFile('receipt_file')) {
-                $receiptFile = FileUploadService::replaceFile(
-                    $request,
-                    'receipt_file',
-                    $payment->receipt_file,
-                    'companies/' . auth()->user()->company_id . '/purchase-payments'
+                $this->assertTransactionFinancialYear(
+                    $payment,
+                    $activeFy,
+                    'Purchase Payment belongs to another Financial Year.'
                 );
-            }
 
-            $payment->update([
-                'payment_method' => $request->payment_method,
-                'reference_no'   => $request->reference_no,
-                'note'           => $request->note,
-                'receipt_file'   => $receiptFile,
-                'updated_by'     => auth()->id(),
+                $this->assertDateWithinFinancialYear(
+                    $request->payment_date,
+                    $activeFy
+                );
+
+                $payment->update(
+                    $this->appendUpdatedBy([
+                        'payment_date' => \Carbon\Carbon::parse($request->payment_date)
+                            ->toDateString(),
+                        'note' => $request->note,
+                    ], $payment)
+                );
+
+                $this->logDocumentationEdit(
+                    'Purchase payment documentation updated.',
+                    $payment
+                );
+            });
+        } catch (\Throwable $e) {
+            $this->logPaymentException('Purchase payment update failed.', $e, [
+                'payment_id' => $id,
             ]);
 
-            return redirect()
-                ->route('company.purchase-payments.show', $payment->id)
-                ->with('success', 'Payment updated successfully.');
-        } catch (\Throwable $e) {
             return back()
                 ->withInput()
-                ->with('error', $e->getMessage());
+                ->with('error', $this->resolveSafeExceptionMessage(
+                    $e,
+                    $safeMessages,
+                    'Unable to update purchase payment.'
+                ));
         }
+
+        return redirect()
+            ->route('company.purchase-payments.show', $id)
+            ->with('success', 'Payment updated successfully.');
     }
 
     protected function resolveSafeExceptionMessage(

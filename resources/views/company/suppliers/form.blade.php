@@ -138,6 +138,21 @@
                 </div>
 
                 <div class="col-lg-4 col-md-6 col-12">
+                    <label for="credit_days" class="form-label dg-label">
+                        Credit Days
+                    </label>
+
+                    <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        name="credit_days"
+                        id="credit_days"
+                        class="form-control dg-input"
+                        value="{{ old('credit_days', $supplier->credit_days ?? 0) }}">
+                </div>
+
+                <div class="col-lg-4 col-md-6 col-12">
                     <label for="opening_balance" class="form-label dg-label">
                         Opening Balance
                     </label>

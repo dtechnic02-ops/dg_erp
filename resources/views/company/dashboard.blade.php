@@ -445,6 +445,197 @@ Dashboard
 
 <div class="stat-title">
 
+💰 Active Income (FY)
+
+</div>
+
+<div class="stat-value">
+
+{{ number_format($data['income_total'],2) }}
+
+</div>
+
+</div>
+
+
+<div class="stat-card">
+
+<div class="stat-title">
+
+💸 Active Expense (FY)
+
+</div>
+
+<div class="stat-value">
+
+{{ number_format($data['expense_total'],2) }}
+
+</div>
+
+</div>
+
+
+@if (isset($hrSummary) && userCan('salary.view'))
+
+<div class="stat-card">
+
+<div class="stat-title">
+
+👥 Total Employees
+
+</div>
+
+<div class="stat-value">
+
+{{ $hrSummary['total_employees'] }}
+
+</div>
+
+</div>
+
+
+<div class="stat-card">
+
+<div class="stat-title">
+
+📋 Salary Generated (FY)
+
+</div>
+
+<div class="stat-value">
+
+{{ number_format($hrSummary['salary_generated'],2) }}
+
+</div>
+
+</div>
+
+
+<div class="stat-card">
+
+<div class="stat-title">
+
+✅ Salary Paid (FY)
+
+</div>
+
+<div class="stat-value">
+
+{{ number_format($hrSummary['salary_paid'],2) }}
+
+</div>
+
+</div>
+
+
+<div class="stat-card">
+
+<div class="stat-title">
+
+⏳ Salary Due (FY)
+
+</div>
+
+<div class="stat-value">
+
+{{ number_format($hrSummary['salary_due'],2) }}
+
+</div>
+
+</div>
+
+
+<div class="stat-card">
+
+<div class="stat-title">
+
+🟢 Paid Employees
+
+</div>
+
+<div class="stat-value">
+
+{{ $hrSummary['paid_employees'] }}
+
+</div>
+
+</div>
+
+
+<div class="stat-card">
+
+<div class="stat-title">
+
+🟡 Partial Employees
+
+</div>
+
+<div class="stat-value">
+
+{{ $hrSummary['partial_employees'] }}
+
+</div>
+
+</div>
+
+
+<div class="stat-card">
+
+<div class="stat-title">
+
+🔴 Unpaid Employees
+
+</div>
+
+<div class="stat-value">
+
+{{ $hrSummary['unpaid_employees'] }}
+
+</div>
+
+</div>
+
+
+<div class="stat-card">
+
+<div class="stat-title">
+
+❌ Cancelled Salary Sheets
+
+</div>
+
+<div class="stat-value">
+
+{{ $hrSummary['cancelled_salary_sheets'] }}
+
+</div>
+
+</div>
+
+
+<div class="stat-card">
+
+<div class="stat-title">
+
+📅 Current Month Due
+
+</div>
+
+<div class="stat-value">
+
+{{ number_format($hrSummary['current_month']['due'],2) }}
+
+</div>
+
+</div>
+
+@endif
+
+
+<div class="stat-card">
+
+<div class="stat-title">
+
 🏦 Bank Wallet
 
 </div>

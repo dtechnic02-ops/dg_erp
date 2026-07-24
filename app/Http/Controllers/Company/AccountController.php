@@ -94,6 +94,9 @@ $request->validate([
     'account_type' =>
         'required',
 
+    'sub_ledger_type' =>
+        'nullable|in:customer,supplier,employee,party',
+
     'account_name' => [
 
         'required',
@@ -160,6 +163,9 @@ try{
 
     'account_type' =>
         $request->account_type,
+
+    'sub_ledger_type' =>
+        $request->sub_ledger_type ?: null,
 
     'bank_name' =>
         $request->bank_name,
@@ -310,6 +316,9 @@ catch(\Exception $e){
 'account_type' =>
     'required',
 
+'sub_ledger_type' =>
+    'nullable|in:customer,supplier,employee,party',
+
 'account_name' => [
 
     'required',
@@ -353,6 +362,10 @@ catch(\Exception $e){
             'account_type' =>
 
                 $request->account_type,
+
+            'sub_ledger_type' =>
+
+                $request->sub_ledger_type ?: null,
 
             'bank_name' =>
 

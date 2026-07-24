@@ -21,9 +21,11 @@ use App\Services\ValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
 class SalesReturnRefundController extends Controller
 {
+    use HandlesTransactionDocumentationEdit;
     public function index(Request $request)
     {
         $companyId = auth()->user()->company_id;
@@ -459,6 +461,108 @@ class SalesReturnRefundController extends Controller
             'company.sales-return-refund.show',
             compact('refund', 'remainingRefund', 'customerTransactions', 'accountTransaction')
         );
+    }
+
+    public function edit($id)
+    {
+        $companyId = auth()->user()->company_id;
+
+        $refund = SalesReturnRefund::with([
+            'salesReturn',
+            'customer',
+            'account',
+            'financialYear',
+        ])
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
+        if (!$refund->isActive()) {
+            return redirect()
+                ->route('company.sales-return-refund.show', $refund->id)
+                ->with('error', 'Cancelled refund cannot be edited.');
+        }
+
+        return view(
+            'company.sales-return-refund.edit',
+            compact('refund')
+        );
+    }
+
+    public function update(Request $request, $id)
+    {
+        $companyId = auth()->user()->company_id;
+
+        $request->validate(
+            $this->documentationEditRules('refund_date')
+        );
+
+        $safeMessages = [
+            'Cancelled refund cannot be edited.',
+            'Please activate financial year first.',
+            'Sales Return Refund belongs to another Financial Year.',
+            'Selected date must fall within the active financial year.',
+            'Deleted transaction cannot be edited.',
+        ];
+
+        try {
+            DB::transaction(function () use ($request, $id, $companyId) {
+                $refund = SalesReturnRefund::where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($id);
+
+                $this->guardActiveRefund(
+                    $refund,
+                    'Cancelled refund cannot be edited.'
+                );
+                $this->guardEditableTransaction(
+                    $refund,
+                    'Cancelled refund cannot be edited.',
+                    SalesReturnRefund::STATUS_CANCELLED
+                );
+
+                $activeFy = $this->assertActiveFinancialYear($companyId);
+
+                $this->assertTransactionFinancialYear(
+                    $refund,
+                    $activeFy,
+                    'Sales Return Refund belongs to another Financial Year.'
+                );
+
+                $this->assertDateWithinFinancialYear(
+                    $request->refund_date,
+                    $activeFy
+                );
+
+                $refund->update(
+                    $this->appendUpdatedBy([
+                        'refund_date' => \Carbon\Carbon::parse($request->refund_date)
+                            ->toDateString(),
+                        'note' => $request->note,
+                    ], $refund)
+                );
+
+                $this->logDocumentationEdit(
+                    'Sales return refund documentation updated.',
+                    $refund
+                );
+            });
+        } catch (\Throwable $e) {
+            $this->logRefundException('Sales return refund update failed.', $e, [
+                'refund_id' => $id,
+            ]);
+
+            return back()
+                ->withInput()
+                ->with('error', $this->resolveSafeExceptionMessage(
+                    $e,
+                    $safeMessages,
+                    'Unable to update sales return refund.'
+                ));
+        }
+
+        return redirect()
+            ->route('company.sales-return-refund.show', $id)
+            ->with('success', 'Sales return refund updated successfully.');
     }
 
     public function print($id)

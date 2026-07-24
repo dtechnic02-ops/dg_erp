@@ -72,6 +72,10 @@
 
                     <a href="{{ route('company.sales-return.print', $return->id) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
 
+                    @if ((int) $return->status === 1)
+                        <a href="{{ route('company.sales-return.edit', $return->id) }}" class="btn btn-outline-primary dg-btn">Edit</a>
+                    @endif
+
                     @if ($invoice)
 
                         <a href="{{ route('company.sales.show', $invoice->id) }}" class="btn btn-outline-primary dg-btn">View Invoice</a>

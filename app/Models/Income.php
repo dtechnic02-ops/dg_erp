@@ -4,62 +4,70 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-use App\Models\Account;
-use App\Models\FinancialYear;
-
 class Income extends Model
 {
+    public const STATUS_CANCELLED = 0;
 
-protected $fillable=[
+    public const STATUS_ACTIVE = 1;
 
-'company_id',
+    protected $fillable = [
+        'company_id',
+        'financial_year_id',
+        'income_category_id',
+        'income_no',
+        'title',
+        'account_id',
+        'amount',
+        'income_date',
+        'attachment',
+        'note',
+        'created_by',
+        'updated_by',
+        'cancelled_by',
+        'cancelled_date',
+        'cancel_reason',
+        'status',
+    ];
 
-'financial_year_id',
+    protected $casts = [
+        'income_date'    => 'date',
+        'cancelled_date' => 'date',
+        'amount'         => 'decimal:2',
+        'status'         => 'integer',
+    ];
 
-'income_no',
+    public function account()
+    {
+        return $this->belongsTo(Account::class);
+    }
 
-'title',
+    public function category()
+    {
+        return $this->belongsTo(IncomeCategory::class, 'income_category_id');
+    }
 
-'account_id',
+    public function financialYear()
+    {
+        return $this->belongsTo(FinancialYear::class, 'financial_year_id');
+    }
 
-'amount',
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
-'income_date',
+    public function updatedByUser()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 
-'category',
+    public function cancelledByUser()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
 
-'attachment',
-
-'note',
-
-'created_by',
-
-'status'
-
-];
-
-public function account()
-{
-
-return $this->belongsTo(
-
-Account::class
-
-);
-
-}
-
-public function financialYear()
-{
-
-return $this->belongsTo(
-
-FinancialYear::class,
-
-'financial_year_id'
-
-);
-
-}
-
+    public function isActive(): bool
+    {
+        return (int) $this->status === self::STATUS_ACTIVE;
+    }
 }

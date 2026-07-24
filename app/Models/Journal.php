@@ -3,54 +3,64 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\FinancialYear;
+
 class Journal extends Model
 {
+    public const STATUS_CANCELLED = 0;
 
-protected $fillable = [
+    public const STATUS_ACTIVE = 1;
 
-'company_id',
+    protected $fillable = [
+        'company_id',
+        'financial_year_id',
+        'journal_no',
+        'journal_date',
+        'reference_no',
+        'total_amount',
+        'attachment',
+        'note',
+        'created_by',
+        'updated_by',
+        'cancelled_by',
+        'cancelled_date',
+        'cancel_reason',
+        'status',
+    ];
 
-'financial_year_id',
+    protected $casts = [
+        'journal_date'   => 'date',
+        'cancelled_date' => 'date',
+        'total_amount'   => 'decimal:2',
+        'status'         => 'integer',
+    ];
 
-'journal_no',
+    public function items()
+    {
+        return $this->hasMany(JournalItem::class);
+    }
 
-'journal_date',
+    public function financialYear()
+    {
+        return $this->belongsTo(FinancialYear::class, 'financial_year_id');
+    }
 
-'total_amount',
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
-'attachment',
+    public function updatedByUser()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 
-'note',
+    public function cancelledByUser()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
 
-'created_by',
-
-'status'
-
-];
-
-
-public function items()
-{
-
-return $this->hasMany(
-
-JournalItem::class
-
-);
-
-}
-public function financialYear()
-{
-
-return $this->belongsTo(
-
-FinancialYear::class,
-
-'financial_year_id'
-
-);
-
-}
-
+    public function isActive(): bool
+    {
+        return (int) $this->status === self::STATUS_ACTIVE;
+    }
 }

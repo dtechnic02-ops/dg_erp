@@ -2,114 +2,83 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
+use App\Services\StaffUserService;
+use App\Services\SubscriptionService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
-    // 🔐 HELPER (company admin bypass + staff permission)
-    private function checkAccess($permission)
-    {
-        $user = auth()->user();
-
-        // ❌ Super admin cannot access company panel
-        if ($user->role_id == 1) {
-            abort(403);
-        }
-
-        // ✅ Company admin → full access
-        if ($user->role_id == 2) {
-            return true;
-        }
-
-        // 🔒 Staff → permission required
-        abort_unless($user->hasPermission($permission), 403);
+    public function __construct(
+        private SubscriptionService $subscriptionService,
+        private StaffUserService $staffUserService
+    ) {
     }
 
-    // 👥 USERS LIST
-    public function index()
+    public function index(Request $request)
     {
-        $this->checkAccess('manage_users');
+        $company = auth()->user()->company;
 
-        $user = auth()->user();
+        abort_unless($company, 403, 'Company not found.');
 
-        $users = User::where('company_id', $user->company_id)
-                    ->where('role_id', 3)
-                    ->latest()
-                    ->get();
+        $users = $this->staffUserService->paginateStaff($request, (int) $company->id);
+        $staffCount = $this->staffUserService->staffQuery((int) $company->id)->count();
+        $staffLimit = $this->subscriptionService->getEffectiveStaffLimit($company);
 
-        return view('company.users.index', compact('users'));
+        return view('company.users.index', compact('users', 'staffCount', 'staffLimit', 'company'));
     }
 
-    // ➕ CREATE STAFF
     public function store(Request $request)
     {
-        $this->checkAccess('manage_users');
-
         $request->validate([
-            'name' => 'required',
+            'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6',
-            'job_role' => 'required|in:cashier,receiver,accountant,manager'
+            'password' => 'required|string|min:6',
+            'job_role' => 'required|in:cashier,receiver,accountant,manager',
         ]);
 
-        $user = auth()->user();
-        $company = $user->company;
+        $authUser = auth()->user();
+        $company = $authUser->company;
 
-        if (!$company) {
+        if (! $company) {
             return back()->with('error', 'Company not found');
         }
 
-        // 🔥 LIMIT CHECK
-        $currentStaff = User::where('company_id', $user->company_id)
-            ->where('role_id', 3)
-            ->count();
-
-        $limit = $company->selected_user_limit ?? 0;
-
-        if ($limit > 0 && $currentStaff >= $limit) {
-            return back()->with('error', 'Staff limit reached! Upgrade your plan.');
+        if (! $this->subscriptionService->canCreateStaff($company)) {
+            return back()->with('error', 'Staff limit reached. Upgrade your plan.');
         }
 
-        // ✅ CREATE
         User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'company_id' => $user->company_id,
-            'role_id' => 3,
+            'password' => $request->password,
+            'company_id' => $company->id,
+            'role_id' => Role::idForName(Role::STAFF),
             'job_role' => $request->job_role,
             'account_status' => 'active',
         ]);
 
-        return back()->with('success', 'Staff created successfully');
+        return back()->with('success', 'Staff member created successfully.');
     }
 
-    // ✏️ EDIT USER
-    public function edit($id)
+    public function edit(int $id)
     {
-        $this->checkAccess('manage_users');
-
-        $user = User::where('id', $id)
-            ->where('company_id', auth()->user()->company_id)
-            ->firstOrFail();
+        $user = $this->staffUserService->findStaffForCompany($id, (int) auth()->user()->company_id);
 
         return view('company.users.edit', compact('user'));
     }
 
-    // 🔄 UPDATE USER
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id)
     {
-        $this->checkAccess('manage_users');
-
-        $user = User::where('id', $id)
-            ->where('company_id', auth()->user()->company_id)
-            ->firstOrFail();
+        $user = $this->staffUserService->findStaffForCompany($id, (int) auth()->user()->company_id);
 
         $request->validate([
-            'name' => 'required',
-            'job_role' => 'required|in:cashier,receiver,accountant,manager'
+            'name' => 'required|string|max:255',
+            'job_role' => 'required|in:cashier,receiver,accountant,manager',
         ]);
 
         $user->update([
@@ -117,109 +86,104 @@ class UserController extends Controller
             'job_role' => $request->job_role,
         ]);
 
-        return redirect()->route('company.users.index')->with('success', 'User updated');
+        return redirect()
+            ->route('company.users.index')
+            ->with('success', 'Staff member updated successfully.');
     }
 
-    // 🗑 DELETE USER
-    public function destroy($id)
+    public function destroy(int $id)
     {
-        $this->checkAccess('delete_user');
-
         $auth = auth()->user();
+        $user = $this->staffUserService->findStaffForCompany($id, (int) $auth->company_id);
 
-        $user = User::where('id', $id)
-            ->where('company_id', $auth->company_id)
-            ->firstOrFail();
-
-        if ($user->id == $auth->id) {
-            return back()->with('error', 'Cannot delete yourself');
+        if ($user->id === $auth->id) {
+            return back()->with('error', 'You cannot delete your own account.');
         }
 
         $user->delete();
 
-        return back()->with('success', 'User deleted');
+        return back()->with('success', 'Staff member deleted successfully.');
     }
 
-    // 🚫 BLOCK USER
-    public function block($id)
+    public function block(int $id)
     {
-        $this->checkAccess('block_user');
+        $auth = auth()->user();
+        $user = $this->staffUserService->findStaffForCompany($id, (int) $auth->company_id);
 
-        $user = User::where('id', $id)
-            ->where('company_id', auth()->user()->company_id)
-            ->firstOrFail();
-
-        $user->account_status = 'blocked';
-        $user->save();
-
-        return back()->with('success', 'User blocked');
-    }
-
-    // ✅ UNBLOCK USER
-    public function unblock($id)
-    {
-        $this->checkAccess('block_user');
-
-        $user = User::where('id', $id)
-            ->where('company_id', auth()->user()->company_id)
-            ->firstOrFail();
-
-        $user->account_status = 'active';
-        $user->save();
-
-        return back()->with('success', 'User activated');
-    }
-
-    // 🔑 RESET PASSWORD
-    public function resetPassword($id)
-    {
-        $this->checkAccess('reset_password');
-
-        $user = User::where('id', $id)
-            ->where('company_id', auth()->user()->company_id)
-            ->firstOrFail();
-
-        $newPassword = '123456';
-
-        $user->password = Hash::make($newPassword);
-        $user->save();
-
-        return back()->with('success', 'Password reset to: ' . $newPassword);
-    }
-
-    // 🔐 PERMISSION PAGE
-    public function permissionPage()
-    {
-        $this->checkAccess('manage_users');
-
-        $permissions = \App\Models\Permission::all();
-
-        $rolePermissions = \DB::table('permission_role')
-            ->where('role_id', 3)
-            ->pluck('permission_id')
-            ->toArray();
-
-        return view('company.permissions.index', compact('permissions', 'rolePermissions'));
-    }
-
-    // 🔐 UPDATE PERMISSION
-    public function updateRolePermission(Request $request)
-    {
-        $this->checkAccess('manage_users');
-
-        $roleId = 3;
-
-        \DB::table('permission_role')->where('role_id', $roleId)->delete();
-
-        if ($request->permissions) {
-            foreach ($request->permissions as $permId) {
-                \DB::table('permission_role')->insert([
-                    'role_id' => $roleId,
-                    'permission_id' => (int)$permId
-                ]);
-            }
+        if ($user->id === $auth->id) {
+            return back()->with('error', 'You cannot block your own account.');
         }
 
-        return back()->with('success', 'Permissions updated');
+        $user->update(['account_status' => 'blocked']);
+
+        return back()->with('success', 'Staff member blocked successfully.');
+    }
+
+    public function unblock(int $id)
+    {
+        $user = $this->staffUserService->findStaffForCompany($id, (int) auth()->user()->company_id);
+        $user->update(['account_status' => 'active']);
+
+        return back()->with('success', 'Staff member activated successfully.');
+    }
+
+    public function resetPassword(Request $request, int $id)
+    {
+        $user = $this->staffUserService->findStaffForCompany($id, (int) auth()->user()->company_id);
+
+        $request->validate([
+            'new_password' => 'nullable|string|min:8|confirmed',
+        ]);
+
+        $password = $request->filled('new_password')
+            ? $request->new_password
+            : $this->staffUserService->generateTemporaryPassword();
+
+        $user->update(['password' => $password]);
+
+        return back()->with(
+            'success',
+            $request->filled('new_password')
+                ? 'Staff password updated successfully.'
+                : 'Staff password reset successfully. Share the new credentials through a secure channel.'
+        );
+    }
+
+    public function permissionPage()
+    {
+        $company = auth()->user()->company;
+
+        abort_unless($company, 403, 'Company not found.');
+
+        $permissions = Permission::company()->orderBy('name')->get();
+        $assignedPermissionIds = $company->staffPermissions()->pluck('permissions.id')->all();
+
+        return view('company.permissions.index', [
+            'permissions' => $permissions,
+            'assignedPermissionIds' => $assignedPermissionIds,
+        ]);
+    }
+
+    public function updateRolePermission(Request $request)
+    {
+        $company = auth()->user()->company;
+
+        abort_unless($company, 403, 'Company not found.');
+
+        $validated = $request->validate([
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'integer|exists:permissions,id',
+        ]);
+
+        $permissionIds = Permission::company()
+            ->whereIn('id', $validated['permissions'] ?? [])
+            ->pluck('id')
+            ->all();
+
+        DB::transaction(function () use ($company, $permissionIds) {
+            $company->staffPermissions()->sync($permissionIds);
+        });
+
+        return back()->with('success', 'Company staff permissions updated successfully.');
     }
 }

@@ -22,9 +22,11 @@ use App\Services\ValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
 class PurchaseReturnRefundController extends Controller
 {
+    use HandlesTransactionDocumentationEdit;
     public function index(Request $request)
     {
         $companyId = auth()->user()->company_id;
@@ -108,7 +110,7 @@ class PurchaseReturnRefundController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        $suppliers = Supplier::where('company_id', $companyId)->get();
+        $suppliers = Supplier::where('company_id', $companyId)->active()->get();
 
         return view(
             'company.purchase-return-refunds.index',
@@ -464,6 +466,108 @@ class PurchaseReturnRefundController extends Controller
             'company.purchase-return-refunds.show',
             compact('refund', 'remainingRefund', 'supplierTransactions', 'accountTransaction')
         );
+    }
+
+    public function edit($id)
+    {
+        $companyId = auth()->user()->company_id;
+
+        $refund = PurchaseReturnRefund::with([
+            'purchaseReturn',
+            'supplier',
+            'account',
+            'financialYear',
+        ])
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
+        if (!$refund->isActive()) {
+            return redirect()
+                ->route('company.purchase-return-refunds.show', $refund->id)
+                ->with('error', 'Cancelled refund cannot be edited.');
+        }
+
+        return view(
+            'company.purchase-return-refunds.edit',
+            compact('refund')
+        );
+    }
+
+    public function update(Request $request, $id)
+    {
+        $companyId = auth()->user()->company_id;
+
+        $request->validate(
+            $this->documentationEditRules('refund_date')
+        );
+
+        $safeMessages = [
+            'Cancelled refund cannot be edited.',
+            'Please activate financial year first.',
+            'Purchase Return Refund belongs to another Financial Year.',
+            'Selected date must fall within the active financial year.',
+            'Deleted transaction cannot be edited.',
+        ];
+
+        try {
+            DB::transaction(function () use ($request, $id, $companyId) {
+                $refund = PurchaseReturnRefund::where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($id);
+
+                $this->guardActiveRefund(
+                    $refund,
+                    'Cancelled refund cannot be edited.'
+                );
+                $this->guardEditableTransaction(
+                    $refund,
+                    'Cancelled refund cannot be edited.',
+                    PurchaseReturnRefund::STATUS_CANCELLED
+                );
+
+                $activeFy = $this->assertActiveFinancialYear($companyId);
+
+                $this->assertTransactionFinancialYear(
+                    $refund,
+                    $activeFy,
+                    'Purchase Return Refund belongs to another Financial Year.'
+                );
+
+                $this->assertDateWithinFinancialYear(
+                    $request->refund_date,
+                    $activeFy
+                );
+
+                $refund->update(
+                    $this->appendUpdatedBy([
+                        'refund_date' => \Carbon\Carbon::parse($request->refund_date)
+                            ->toDateString(),
+                        'note' => $request->note,
+                    ], $refund)
+                );
+
+                $this->logDocumentationEdit(
+                    'Purchase return refund documentation updated.',
+                    $refund
+                );
+            });
+        } catch (\Throwable $e) {
+            $this->logRefundException('Purchase return refund update failed.', $e, [
+                'refund_id' => $id,
+            ]);
+
+            return back()
+                ->withInput()
+                ->with('error', $this->resolveSafeExceptionMessage(
+                    $e,
+                    $safeMessages,
+                    'Unable to update purchase return refund.'
+                ));
+        }
+
+        return redirect()
+            ->route('company.purchase-return-refunds.show', $id)
+            ->with('success', 'Purchase return refund updated successfully.');
     }
 
     public function print($id)

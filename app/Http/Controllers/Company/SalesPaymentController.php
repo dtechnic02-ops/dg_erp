@@ -19,9 +19,11 @@ use App\Models\FinancialYear;
 use App\Services\ValidationService;
 use App\Services\FileUploadService;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
 class SalesPaymentController extends Controller
 {
+    use HandlesTransactionDocumentationEdit;
     public function index(Request $request)
     {
         $companyId = auth()->user()->company_id;
@@ -704,5 +706,103 @@ class SalesPaymentController extends Controller
             'company.sales-payment.print',
             compact('payment')
         );
+    }
+
+    public function edit($id)
+    {
+        $companyId = auth()->user()->company_id;
+
+        $payment = SalesPayment::with([
+                'salesInvoice',
+                'customer',
+                'account',
+                'financialYear',
+            ])
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
+        if ((int) $payment->status === SalesPayment::STATUS_CANCELLED) {
+            return redirect()
+                ->route('company.sales-payment.show', $payment->id)
+                ->with('error', 'Cancelled payment cannot be edited.');
+        }
+
+        return view(
+            'company.sales-payment.edit',
+            compact('payment')
+        );
+    }
+
+    public function update(Request $request, $id)
+    {
+        $companyId = auth()->user()->company_id;
+
+        $request->validate(
+            $this->documentationEditRules('payment_date')
+        );
+
+        $safeMessages = [
+            'Cancelled payment cannot be edited.',
+            'Please activate financial year first.',
+            'Sales Payment belongs to another Financial Year.',
+            'Selected date must fall within the active financial year.',
+            'Deleted transaction cannot be edited.',
+        ];
+
+        try {
+            DB::transaction(function () use ($request, $id, $companyId) {
+                $payment = SalesPayment::where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($id);
+
+                $this->guardEditableTransaction(
+                    $payment,
+                    'Cancelled payment cannot be edited.',
+                    SalesPayment::STATUS_CANCELLED
+                );
+
+                $activeFy = $this->assertActiveFinancialYear($companyId);
+
+                $this->assertTransactionFinancialYear(
+                    $payment,
+                    $activeFy,
+                    'Sales Payment belongs to another Financial Year.'
+                );
+
+                $this->assertDateWithinFinancialYear(
+                    $request->payment_date,
+                    $activeFy
+                );
+
+                $payment->update(
+                    $this->appendUpdatedBy([
+                        'payment_date' => \Carbon\Carbon::parse($request->payment_date)
+                            ->toDateString(),
+                        'note' => $request->note,
+                    ], $payment)
+                );
+
+                $this->logDocumentationEdit(
+                    'Sales payment documentation updated.',
+                    $payment
+                );
+            });
+        } catch (\Throwable $e) {
+            $this->logPaymentException('Sales payment update failed.', $e, [
+                'payment_id' => $id,
+            ]);
+
+            return back()
+                ->withInput()
+                ->with('error', $this->resolveSafeExceptionMessage(
+                    $e,
+                    $safeMessages,
+                    'Unable to update sales payment.'
+                ));
+        }
+
+        return redirect()
+            ->route('company.sales-payment.show', $id)
+            ->with('success', 'Sales payment updated successfully.');
     }
 }

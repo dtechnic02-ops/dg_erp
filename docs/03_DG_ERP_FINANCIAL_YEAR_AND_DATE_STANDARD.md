@@ -137,51 +137,72 @@ See also Section 19 — Business Date Supremacy Rule.
 
 ---
 
-# 4. SYSTEM DATE RULE
 
-The following fields are NOT Business Dates.
+
+# 4. SYSTEM TIMESTAMP RULE
+
+The following fields are system timestamps.
 
 created_at
 
 updated_at
 
-created_by
+These fields exist ONLY for
 
-updated_by
+✓ Record Creation Time
 
-deleted_by
-
-These fields exist ONLY for:
-
-✓ Audit Trail
-
-✓ User Tracking
+✓ Record Update Time
 
 ✓ Record History
 
-✓ Investigation
+✓ Debugging
 
-✓ Change Tracking
+✓ Developer Investigation
 
-These fields MUST NEVER be used for:
+✓ Audit Reference
 
-✗ Financial Reports
+These fields are NOT Business Dates.
 
-✗ Ledger Posting
+They must NEVER be used for
 
-✗ Stock Posting
+✗ Financial Year Validation
 
-✗ Financial Year
+✗ Posting
+
+✗ Ledger
+
+✗ Stock
+
+✗ Reports
+
+✗ Dashboard
+
+✗ Balance
 
 ✗ VAT
 
-✗ Balance Calculation
+✗ Financial Calculations
+deleted_at
 
-✗ Due Calculation
+deleted_by
+Financial documents normally do not use deleted_at or deleted_by.
+
+Financial documents are cancelled, not deleted.
+
+These fields may exist only for modules where deletion is constitutionally permitted.
 
 ---
 
 # 5. FINANCIAL YEAR RULE
+Financial Year Name is only a label.
+
+Validation always depends on
+
+Start Date
+
+End Date
+
+Never validate using the Financial Year name.
 
 Every company owns its own Financial Year.
 
@@ -303,6 +324,9 @@ This is a Business Approved Rule.
 This behaviour is permanently frozen.
 
 # 7. TRANSACTION DATE RULE
+Business Date must never be empty.
+
+Business Date must always be a valid date.
 
 Every transaction MUST belong to the selected Financial Year.
 
@@ -474,6 +498,9 @@ Transaction MUST NOT be saved.
 ✓ Business Date belongs to Active Financial Year
 
 ✓ Company Ownership
+✓ Business Date is not null
+
+✓ Business Date is a valid date
 
 ---
 # 10A. DEFAULT FILTER RULE
@@ -573,6 +600,19 @@ Cancelled transactions may be displayed,
 but they must never participate in financial calculations.
 
 This rule is permanently frozen.
+Cancelled transactions remain available for
+
+Search
+
+Viewing
+
+Printing
+
+Audit
+
+History
+
+only.
 
 # 11. CALENDAR INDEPENDENCE RULE
 
@@ -596,7 +636,21 @@ The ERP always follows the configured Financial Year.
 
 # 12. AUDIT TRAIL RULE
 
-Audit fields are for reference only.
+Audit fields are Record Metadata.
+
+They record
+
+Creation
+
+Modification
+
+History
+
+Investigation
+
+Developer Debugging
+
+These fields never participate in financial behaviour.
 
 created_by
 
@@ -837,6 +891,20 @@ Section 19 represents the approved business standard.
 Business Date is the Financial Truth.
 
 Business Date is the ONLY valid date used by DG ERP for all accounting and business operations.
+Business Date represents
+the actual date on which the business event occurred.
+
+It is independent of
+
+Record Creation Time
+
+Record Update Time
+
+Server Time
+
+System Time
+
+User Login Time.
 
 ---
 
@@ -957,6 +1025,13 @@ They must NEVER be used for:
 • Stock
 
 • Business Calculations
+System timestamps record
+
+when the ERP stored the record.
+
+Business Date records
+
+when the business actually occurred.
 
 ---
 
@@ -1013,6 +1088,10 @@ Examples include:
 Amounts, balances, stock quantities, and payment calculations must NOT change when only the Business Date is edited.
 
 Only the business-date fields of linked records may be updated.
+Business Date synchronization
+must execute inside a single database transaction.
+
+Partial synchronization is prohibited.
 
 ---
 
@@ -1023,6 +1102,11 @@ Every future DG ERP module MUST follow this Business Date Supremacy Rule without
 No module may introduce an alternate date source for financial behaviour.
 
 No module may use created_at or updated_at for business calculations, reporting, or filtering.
+Every future module must expose
+its own Business Date field.
+
+Financial behaviour must never rely
+on created_at or updated_at.
 
 ---
 

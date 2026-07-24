@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Services\AccountBalanceService;
 use App\Services\StockService;
 use App\Services\PurchaseService;
-use App\Services\SupplierBalanceService;
 use App\Services\CustomerStatementService;
+use App\Services\SupplierStatementService;
 class MaintenanceController extends Controller
 {
     /*
@@ -78,15 +78,29 @@ public function recalculatePurchaseInvoices()
 */
 public function recalculateSupplierBalance()
 {
-    SupplierBalanceService::recalculateAllSuppliers(
-        auth()->user()->company_id
+    $summary = SupplierStatementService::recalculateAll(
+        auth()->user()->company_id,
+        auth()->id()
     );
 
-    return back()->with(
-        'success',
-        'Supplier Balance Recalculated Successfully.'
+    $message = sprintf(
+        'Supplier Statement Recalculated. Suppliers Processed: %d. Statements Recalculated: %d. Errors: %d.',
+        $summary['total_suppliers_processed'],
+        $summary['total_statements_recalculated'],
+        $summary['total_errors']
     );
+
+    if ($summary['total_errors'] > 0) {
+        return back()->with('warning', $message);
+    }
+
+    return back()->with('success', $message);
 }
+
+    public function recalculateSupplierStatement()
+    {
+        return $this->recalculateSupplierBalance();
+    }
 
     /*
     |--------------------------------------------------------------------------

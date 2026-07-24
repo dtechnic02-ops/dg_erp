@@ -3,114 +3,124 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class LoanPayment extends Model
 {
+    use SoftDeletes;
 
-protected $fillable = [
+    public const STATUS_CANCELLED = 0;
 
-'company_id',
+    public const STATUS_ACTIVE = 1;
 
-'loan_account_id',
+    protected $fillable = [
+        'company_id',
+        'financial_year_id',
+        'loan_account_id',
+        'account_id',
+        'payment_date',
+        'next_payment_date',
+        'principal_amount',
+        'interest_amount',
+        'fine_amount',
+        'saving_amount',
+        'total_amount',
+        'remaining_principal',
+        'reference_no',
+        'attachment',
+        'note',
+        'created_by',
+        'updated_by',
+        'cancelled_by',
+        'cancelled_date',
+        'cancel_reason',
+        'status',
+    ];
 
-'account_id',
+    protected $casts = [
+        'payment_date' => 'date',
+        'next_payment_date' => 'date',
+        'cancelled_date' => 'date',
+        'principal_amount' => 'decimal:2',
+        'interest_amount' => 'decimal:2',
+        'fine_amount' => 'decimal:2',
+        'saving_amount' => 'decimal:2',
+        'total_amount' => 'decimal:2',
+        'remaining_principal' => 'decimal:2',
+        'status' => 'integer',
+    ];
 
-'payment_date',
+    public function scopeActive($query)
+    {
+        return $query->where('status', self::STATUS_ACTIVE);
+    }
 
-'principal_amount',
+    public function isActive(): bool
+    {
+        return (int) $this->status === self::STATUS_ACTIVE;
+    }
 
-'interest_amount',
+    public function loanAccount()
+    {
+        return $this->belongsTo(LoanAccount::class);
+    }
 
-'fine_amount',
+    public function financialYear()
+    {
+        return $this->belongsTo(FinancialYear::class, 'financial_year_id');
+    }
 
-'saving_amount',
+    public function account()
+    {
+        return $this->belongsTo(Account::class);
+    }
 
-'total_amount',
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
-'remaining_principal',
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
-'reference_no',
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
-'attachment',
+    public function updatedBy()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 
-'note',
+    public function cancelledBy()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
 
-'created_by',
+    public function savingLedgers()
+    {
+        return $this->hasMany(LoanSavingLedger::class);
+    }
 
-'status'
+    public function savingLedger()
+    {
+        return $this->hasOne(LoanSavingLedger::class);
+    }
 
-];
+    public function isPaidFromSaving(): bool
+    {
+        if ($this->relationLoaded('savingLedgers')) {
+            return $this->savingLedgers
+                ->where('status', 1)
+                ->contains('type', 'withdraw');
+        }
 
-/**
-* Loan Account
-*/
-
-public function loanAccount()
-{
-
-return $this->belongsTo(
-
-LoanAccount::class
-
-);
-
-}
-
-/**
-* Account
-*/
-
-public function account()
-{
-
-return $this->belongsTo(
-
-Account::class
-
-);
-
-}
-
-/**
-* Company
-*/
-
-public function company()
-{
-
-return $this->belongsTo(
-
-Company::class
-
-);
-
-}
-
-/**
-* Creator
-*/
-
-public function creator()
-{
-
-return $this->belongsTo(
-
-User::class,
-
-'created_by'
-
-);
-
-}
-public function savingLedger()
-{
-
-return $this->hasOne(
-
-LoanSavingLedger::class
-
-);
-
-}
-
+        return $this->savingLedgers()
+            ->where('status', 1)
+            ->where('type', 'withdraw')
+            ->exists();
+    }
 }

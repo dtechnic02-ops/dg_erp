@@ -33,12 +33,39 @@ Business entities may change.
 Business direction may change.
 
 Architecture SHALL remain consistent.
+Architecture may evolve only through Business Owner approval.
+
+No module may introduce a second business architecture when an equivalent architecture already exists.
+MASTER ARCHITECTURE
+
+Customer = MASTER
+
+Supplier = MIRROR
+
+Sales = MASTER
+
+Purchase = MIRROR
+
+Income = MASTER
+
+Expense = MIRROR
+
+Business Date = Financial Truth
+
+Financial Year = Financial Boundary
+
+Cancel = Never Delete
+
+These architectural relationships are permanently frozen unless changed by the Business Owner.
 
 ---
 
 # 3. MASTER PRINCIPLES
 
 The following principles are frozen.
+Business Date philosophy remains identical.
+
+Every financial module shall follow the Financial Year and Business Date Constitution.
 
 ## Principle 1
 
@@ -151,6 +178,7 @@ The Purchase Module SHALL mirror:
 • Stored Amount Philosophy
 
 • Summary Calculation Philosophy
+Purchase shall never introduce business behaviour different from Sales unless approved by the Business Owner.
 
 ---
 
@@ -179,6 +207,14 @@ Customer Transaction
 
 Sales
 → Purchase
+Income
+→ Expense
+
+Employee
+→ Payroll
+
+Customer Balance
+→ Supplier Balance
 
 ---
 
@@ -357,6 +393,11 @@ Invent different Company Isolation philosophy.
 Invent different coding standards.
 
 Invent different document structure.
+Delete philosophy remains identical.
+
+Financial documents are cancelled.
+
+They are never physically deleted.
 
 ---
 
@@ -418,7 +459,36 @@ Any future module.
 
 ---
 
-# 14. FINAL RULE
+# 14. ROLE, PERMISSION & ACCESS (FROZEN)
+
+User access, platform control, company isolation, staff limits,
+and company permission architecture are governed by the
+Role & Permission Standard.
+
+Reference:
+
+docs/12_DG_ERP_ROLE_PERMISSION_STANDARD.md (Version 4.0)
+
+Key frozen rules:
+
+• System Role IDs 1–4 are reserved and system-assigned only
+• Platform (Super Admin / Super Staff) vs Company (Admin / Staff) are separated
+• Authorization uses Permission framework only — never role_id
+• Company Profile is editable by Company Admin only
+• Staff creation is limited by Subscription Plan
+• Platform permissions: Platform Module + Platform Action (individual per Super Staff)
+• Super Admin: implicit full platform access (non-removable)
+• Super Staff: NO default permissions — all assigned individually
+• Company permissions: Module + Action (individual per Company Staff)
+• Job Role is designation only — it NEVER determines permissions
+• Module Permission controls visibility; Action Permission controls operations
+• Both levels must pass before access is granted in each domain
+• Super Staff must NEVER receive Company permissions
+• Company users must NEVER receive Platform permissions
+
+---
+
+# 15. FINAL RULE
 
 Sales Module is the Master Business Standard of DG ERP.
 
@@ -433,6 +503,7 @@ This rule is FINAL.
 This rule is FROZEN.
 
 Business Owner approval is required before any modification.
+Mirror Modules shall inherit improvements made to the Master Module unless explicitly exempted by the Business Owner.
 
 ---
 

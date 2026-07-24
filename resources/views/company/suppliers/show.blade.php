@@ -211,6 +211,13 @@
 
                                     <div class="col-md-6">
                                         <div class="dg-row">
+                                            <span class="dg-label d-inline mb-0">Credit Days :</span>
+                                            {{ (int) ($supplier->credit_days ?? 0) }}
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <div class="dg-row">
                                             <span class="dg-label d-inline mb-0">Opening Balance :</span>
                                             {{ number_format($supplier->opening_balance, 2) }}
                                         </div>

@@ -36,6 +36,9 @@
                 <nav class="btn-group" aria-label="Sales payment toolbar">
                     <a href="{{ route('company.sales-payment.index') }}" class="btn btn-outline-secondary dg-btn">Back</a>
                     <a href="{{ route('company.sales-payment.print', $payment->id) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
+                    @if ((int) $payment->status === 1)
+                        <a href="{{ route('company.sales-payment.edit', $payment->id) }}" class="btn btn-outline-primary dg-btn">Edit</a>
+                    @endif
                     @if ($invoice)
                         <a href="{{ route('company.sales.show', $invoice->id) }}" class="btn btn-outline-primary dg-btn">View Invoice</a>
                     @endif

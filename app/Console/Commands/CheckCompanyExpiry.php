@@ -2,29 +2,35 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Models\Company;
-use Carbon\Carbon;
+use App\Services\SubscriptionService;
+use Illuminate\Console\Command;
 
 class CheckCompanyExpiry extends Command
 {
     protected $signature = 'companies:check-expiry';
-    protected $description = 'Check and block expired companies';
+    protected $description = 'Expire companies whose subscriptions have ended';
 
-    public function handle()
+    public function __construct(private SubscriptionService $subscriptionService)
     {
-        $today = Carbon::today();
+        parent::__construct();
+    }
 
-       $companies = Company::whereNotNull('expiry_date')
-    ->whereDate('expiry_date', '<', now()) // 🔥 FIX
-    ->where('status', '!=', 'blocked')
-    ->get();
+    public function handle(): int
+    {
+        Company::query()
+            ->where('status', '!=', 'blocked')
+            ->whereHas('subscriptions', function ($q) {
+                $q->where('status', 'active')
+                    ->whereNotNull('expiry_date')
+                    ->whereDate('expiry_date', '<', now()->toDateString());
+            })
+            ->each(function (Company $company) {
+                $this->subscriptionService->expireSubscription($company);
+            });
 
-        foreach ($companies as $company) {
-            $company->status = 'blocked';
-            $company->save();
-        }
+        $this->info('Expired subscriptions processed successfully.');
 
-        $this->info('Expired companies blocked successfully');
+        return self::SUCCESS;
     }
 }

@@ -3,692 +3,646 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
-
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
+use App\Http\Controllers\Concerns\AuthorizesSubscriptionModule;
+use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use App\Models\Account;
+use App\Models\FinancialYear;
+use App\Models\LoanAccount;
+use App\Models\LoanSavingLedger;
+use App\Models\PartyAccount;
+use App\Models\AccountTransaction;
+use App\Services\AccountBalanceService;
+use App\Services\ValidationService;
 use Illuminate\Http\Request;
-
 use Illuminate\Support\Facades\DB;
 
-use App\Models\LoanAccount;
-use App\Models\PartyAccount;
-use App\Models\Account;
-
-class LoanAccountController extends Controller
+class LoanAccountController extends Controller implements HasMiddleware
 {
-
-/**
-* INDEX
-*/
-
-public function index(Request $request)
-{
-
-$loans = LoanAccount::with([
-
-'partyAccount',
-
-'account'
-
-])
-
-->where(
-
-'company_id',
-
-auth()->user()->company_id
-
-)
-
-->latest()
-
-->paginate(20)
-
-->withQueryString();
-
-return view(
-
-'company.loan-account.index',
-
-compact(
-
-'loans'
-
-)
-
-);
-
-}
-
-/**
-* CREATE
-*/
-
-public function create()
-{
-
-$companyId =
-auth()->user()->company_id;
-
-$partyAccounts =
-PartyAccount::where(
-
-'company_id',
-
-$companyId
-
-)
-
-->where(
-
-'status',
-
-1
-
-)
-
-->get();
-
-$accounts =
-Account::where(
-
-'company_id',
-
-$companyId
-
-)
-
-->where(
-
-'status',
-
-1
-
-)
-
-->get();
-$year =
-now()->year;
-
-$last =
-LoanAccount::where(
-
-'company_id',
-
-$companyId
-
-)
-
-->latest('id')
-
-->first();
-
-$next = 1;
-
-if($last){
-
-$parts =
-explode(
-'-',
-$last->loan_no
-);
-
-$next =
-((int) end($parts))
-+1;
-
-}
-
-$loanNo =
-
-'LOAN-'
-
-.$companyId
-
-.'-'
-
-.$year
-
-.'-'
-
-.str_pad(
-
-$next,
-
-4,
-
-'0',
-
-STR_PAD_LEFT
-
-);
-
-return view(
-
-'company.loan-account.create',
-
-compact(
-
-'loanNo',
-
-'partyAccounts',
-
-'accounts'
-
-)
-
-);
-
-}
-
-/**
-* STORE
-*/
-
-public function store(Request $request)
-{
-
-$request->validate([
-
-'loan_name'=>
-
-'required',
-
-'loan_type'=>
-
-'required',
-
-'party_account_id'=>
-
-'required',
-
-'account_id'=>
-
-'required',
-
-'principal_amount'=>
-
-'required|numeric|min:0.01',
-
-'interest_rate'=>
-
-'nullable|numeric',
-
-'start_date'=>
-
-'required',
-
-'attachment'=>
-
-'nullable|
-
-mimes:jpg,jpeg,png,pdf|
-
-max:5120'
-
-]);
-
-DB::transaction(
-
-function()
-
-use($request){
-
-$companyId =
-auth()->user()->company_id;
-
-$account =
-Account::where(
-
-'company_id',
-
-$companyId
-
-)
-
-->findOrFail(
-
-$request->account_id
-
-);
-
-$party =
-PartyAccount::where(
-
-'company_id',
-
-$companyId
-
-)
-
-->findOrFail(
-
-$request->party_account_id
-
-);
-
-$file = null;
-
-if(
-
-$request->hasFile(
-
-'attachment'
-
-)
-
-){
-
-$folder =
-
-'companies/'
-
-.$companyId
-
-.'/loans';
-
-if(
-
-!file_exists(
-
-public_path(
-
-$folder
-
-)
-
-)
-
-){
-
-mkdir(
-
-public_path(
-
-$folder
-
-),
-
-0777,
-
-true
-
-);
-
-}
-
-$name =
-
-time()
-
-.'_'
-
-.$request
-
-->file(
-
-'attachment'
-
-)
-
-->getClientOriginalName();
-
-$request
-
-->file(
-
-'attachment'
-
-)
-
-->move(
-
-public_path(
-
-$folder
-
-),
-
-$name
-
-);
-
-$file =
-
-$folder
-
-.'/'
-
-.$name;
-
-}
-
-$year =
-now()->year;
-
-$last =
-LoanAccount::where(
-
-'company_id',
-
-$companyId
-
-)
-
-->latest('id')
-
-->first();
-
-$next=1;
-
-if($last){
-
-$parts=
-explode(
-'-',
-$last->loan_no
-);
-
-$next=
-((int) end($parts))
-+1;
-
-}
-
-$loanNo =
-
-'LOAN-'
-
-.$companyId
-
-.'-'
-
-.now()->year
-
-.'-'
-
-.str_pad(
-
-$next,
-
-4,
-
-'0',
-
-STR_PAD_LEFT
-
-);
-
-$loan = LoanAccount::create([
-
-'company_id'=>
-
-$companyId,
-
-'loan_no'=>
-
-$loanNo,
-
-'loan_name'=>
-
-$request->loan_name,
-
-'loan_type'=>
-
-$request->loan_type,
-
-'party_account_id'=>
-
-$request->party_account_id,
-
-'account_id'=>
-
-$request->account_id,
-
-'principal_amount'=>
-
-$request->principal_amount,
-
-'interest_rate'=>
-
-$request->interest_rate,
-
-'remaining_principal'=>
-
-$request->principal_amount,
-
-'start_date'=>
-
-$request->start_date,
-
-'end_date'=>
-
-$request->end_date,
-
-'next_payment_date'=>
-
-$request->next_payment_date,
-
-'attachment'=>
-
-$file,
-
-'note'=>
-
-$request->note,
-
-'created_by'=>
-
-auth()->id(),
-
-'status'=>1
-
-]);
-/*
-LOAN TAKEN
-*/
-
-if(
-
-$request->loan_type
-
-==
-
-'taken'
-
-){
-
-$account->increment(
-
-'current_balance',
-
-(float)
-
-$request->principal_amount
-
-);
-
-$party->increment(
-
-'current_balance',
-
-(float)
-
-$request->principal_amount
-
-);
-
-}
-
-/*
-LOAN GIVEN
-*/
-
-else{
-
-if(
-
-(float)
-
-$account->current_balance
-
-<
-
-(float)
-
-$request->principal_amount
-
-){
-
-throw new \Exception(
-
-'Insufficient balance.'
-
-);
-
-}
-
-$account->decrement(
-
-'current_balance',
-
-(float)
-
-$request->principal_amount
-
-);
-
-$party->increment(
-
-'current_balance',
-
-(float)
-
-$request->principal_amount
-
-);
-
-}
-
-}
-
-);
-
-return redirect()
-
-->route(
-
-'company.loan-account.index'
-
-)
-
-->with(
-
-'success',
-
-'Loan created.'
-
-);
-
-}
-
-/**
-* SHOW
-*/
-
-public function show($id)
-{
-
-$loan =
-
-LoanAccount::with([
-
-'partyAccount',
-
-'account',
-
-'payments',
-
-'savingLedgers'
-
-])
-
-->where(
-
-'company_id',
-
-auth()->user()->company_id
-
-)
-
-->findOrFail($id);
-
-
-/*
-|--------------------------------------------------------------------------
-| SAVING SUMMARY
-|--------------------------------------------------------------------------
-*/
-
-$totalSavingDeposit =
-
-$loan->savingLedgers()
-
-->where(
-
-'type',
-
-'deposit'
-
-)
-
-->sum(
-
-'amount'
-
-);
-
-$totalSavingWithdraw =
-
-$loan->savingLedgers()
-
-->where(
-
-'type',
-
-'withdraw'
-
-)
-
-->sum(
-
-'amount'
-
-);
-
-$currentSavingBalance =
-
-$totalSavingDeposit
-
--
-
-$totalSavingWithdraw;
-
-return view(
-
-'company.loan-account.show',
-
-compact(
-
-'loan',
-
-'totalSavingDeposit',
-
-'totalSavingWithdraw',
-
-'currentSavingBalance'
-
-)
-
-);
-
-}
+    use AuthorizesCompanyPermission;
+    use AuthorizesSubscriptionModule;
+    use HandlesTransactionDocumentationEdit;
+
+    public static function middleware(): array
+    {
+        return self::subscriptionModuleMiddleware();
+    }
+
+    protected static function subscriptionModuleCode(): string
+    {
+        return 'loan';
+    }
+
+    private function validateLoanAccountRequest(Request $request, int $companyId, bool $isUpdate = false): void
+    {
+        $rules = [
+            'financial_year_id' => [
+                'required',
+                'integer',
+                ValidationService::existsForCompany('financial_years', $companyId),
+            ],
+            'status'            => ValidationService::enum(['0', '1', 0, 1]),
+            'attachment'        => ValidationService::document(5120),
+            'note'              => ValidationService::text(),
+        ];
+
+        if (!$isUpdate) {
+            $rules = array_merge($rules, [
+                'loan_name'        => ValidationService::requiredString(255),
+                'loan_type'        => ValidationService::requiredEnum(['taken', 'given']),
+                'party_account_id' => [
+                    'required',
+                    'integer',
+                    ValidationService::existsForCompany('party_accounts', $companyId),
+                ],
+                'account_id'       => [
+                    'required',
+                    'integer',
+                    ValidationService::existsForCompany('accounts', $companyId),
+                ],
+                'principal_amount' => 'required|numeric|min:0.01',
+                'interest_rate'    => ValidationService::amount(),
+                'start_date'       => ValidationService::requiredDate(),
+                'end_date'         => ValidationService::date(),
+            ]);
+        } else {
+            $rules = array_merge($rules, [
+                'loan_name' => ValidationService::requiredString(255),
+            ]);
+        }
+
+        $request->validate($rules);
+    }
+
+    private function generateLoanNo(int $companyId): string
+    {
+        $year = now()->year;
+
+        $last = LoanAccount::where('company_id', $companyId)
+            ->latest('id')
+            ->first();
+
+        $next = 1;
+
+        if ($last) {
+            $parts = explode('-', $last->loan_no);
+            $next = ((int) end($parts)) + 1;
+        }
+
+        return 'LOAN-'
+            . $companyId
+            . '-'
+            . $year
+            . '-'
+            . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function filteredLoanQuery(Request $request)
+    {
+        $companyId = auth()->user()->company_id;
+
+        $query = LoanAccount::with([
+            'partyAccount:id,company_id,name,phone',
+            'account:id,company_id,account_name',
+            'createdBy:id,name',
+        ])->where('company_id', $companyId);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('loan_no', 'like', '%' . $search . '%')
+                    ->orWhere('loan_name', 'like', '%' . $search . '%')
+                    ->orWhereHas('partyAccount', function ($partyQuery) use ($search) {
+                        $partyQuery->where('name', 'like', '%' . $search . '%')
+                            ->orWhere('phone', 'like', '%' . $search . '%');
+                    });
+            });
+        }
+
+        if ($request->filled('loan_no')) {
+            $query->where('loan_no', 'like', '%' . $request->loan_no . '%');
+        }
+
+        if ($request->filled('party_account_id')) {
+            $query->where('party_account_id', $request->party_account_id);
+        }
+
+        if ($request->filled('loan_type')) {
+            $query->where('loan_type', $request->loan_type);
+        }
+
+        if ($request->filled('account_id')) {
+            $query->where('account_id', $request->account_id);
+        }
+
+        if ($request->filled('status')) {
+            match ($request->status) {
+                'active' => $query->where('status', LoanAccount::STATUS_ACTIVE)
+                    ->where('remaining_principal', '>', 0),
+                'closed' => $query->where('status', LoanAccount::STATUS_ACTIVE)
+                    ->where('remaining_principal', '<=', 0),
+                'cancelled' => $query->where('status', LoanAccount::STATUS_CANCELLED),
+                default => null,
+            };
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('start_date', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('start_date', '<=', $request->date_to);
+        }
+
+        return $query->latest('start_date')->latest('id');
+    }
+
+    public function index(Request $request)
+    {
+        $this->authorizeCompanyPermission('view_loan_account');
+
+        $companyId = auth()->user()->company_id;
+
+        $filteredQuery = $this->filteredLoanQuery($request);
+
+        $summaryQuery = clone $filteredQuery;
+
+        $financialSummary = (clone $summaryQuery)->where('status', LoanAccount::STATUS_ACTIVE);
+
+        $totalLoans = (clone $summaryQuery)->count();
+        $totalPrincipalAmount = (clone $financialSummary)->sum('principal_amount');
+        $totalRemainingPrincipal = (clone $financialSummary)->sum('remaining_principal');
+        $activeLoans = (clone $summaryQuery)
+            ->where('status', LoanAccount::STATUS_ACTIVE)
+            ->where('remaining_principal', '>', 0)
+            ->count();
+        $closedLoans = (clone $summaryQuery)
+            ->where('status', LoanAccount::STATUS_ACTIVE)
+            ->where('remaining_principal', '<=', 0)
+            ->count();
+        $cancelledLoans = (clone $summaryQuery)
+            ->where('status', LoanAccount::STATUS_CANCELLED)
+            ->count();
+
+        $allowedPerPage = [10, 20, 50, 100, 200];
+        $perPage = (int) $request->get('per_page', 10);
+
+        if (!in_array($perPage, $allowedPerPage, true)) {
+            $perPage = 10;
+        }
+
+        $loans = $filteredQuery
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $partyAccounts = PartyAccount::where('company_id', $companyId)
+            ->where('status', PartyAccount::STATUS_ACTIVE)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $accounts = Account::where('company_id', $companyId)
+            ->where('status', 1)
+            ->orderBy('account_name')
+            ->get(['id', 'account_name']);
+
+        return view(
+            'company.loan-account.index',
+            compact(
+                'loans',
+                'perPage',
+                'partyAccounts',
+                'accounts',
+                'totalLoans',
+                'totalPrincipalAmount',
+                'totalRemainingPrincipal',
+                'activeLoans',
+                'closedLoans',
+                'cancelledLoans'
+            )
+        );
+    }
+
+    public function create()
+    {
+        $this->authorizeCompanyPermission('create_loan_account');
+
+        $companyId = auth()->user()->company_id;
+
+        $activeFy = FinancialYear::where('company_id', $companyId)
+            ->where('is_active', 1)
+            ->first();
+
+        $partyAccounts = PartyAccount::where('company_id', $companyId)
+            ->where('status', PartyAccount::STATUS_ACTIVE)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $accounts = Account::where('company_id', $companyId)
+            ->where('status', 1)
+            ->orderBy('account_name')
+            ->get(['id', 'account_name', 'current_balance']);
+
+        $loanNo = $this->generateLoanNo($companyId);
+
+        return view(
+            'company.loan-account.create',
+            compact('loanNo', 'partyAccounts', 'accounts', 'activeFy')
+        );
+    }
+
+    public function store(Request $request)
+    {
+        $this->authorizeCompanyPermission('create_loan_account');
+
+        $companyId = auth()->user()->company_id;
+
+        $this->validateLoanAccountRequest($request, $companyId);
+
+        try {
+            DB::transaction(function () use ($request, $companyId) {
+                $activeFy = $this->assertActiveFinancialYear($companyId);
+
+                if ((int) $request->financial_year_id !== (int) $activeFy->id) {
+                    throw new \Exception('Financial year must be the active financial year.');
+                }
+
+                $this->assertDateWithinFinancialYear(
+                    $request->start_date,
+                    $activeFy,
+                    'Loan date must be inside the active financial year.'
+                );
+
+                $account = Account::where('company_id', $companyId)
+                    ->findOrFail($request->account_id);
+
+                $party = PartyAccount::where('company_id', $companyId)
+                    ->findOrFail($request->party_account_id);
+
+                $file = null;
+
+                if ($request->hasFile('attachment')) {
+                    $folder = 'companies/' . $companyId . '/loans';
+
+                    if (!file_exists(public_path($folder))) {
+                        mkdir(public_path($folder), 0777, true);
+                    }
+
+                    $name = time()
+                        . '_'
+                        . $request->file('attachment')->getClientOriginalName();
+
+                    $request->file('attachment')->move(public_path($folder), $name);
+
+                    $file = $folder . '/' . $name;
+                }
+
+                $loanNo = $this->generateLoanNo($companyId);
+
+                if (LoanAccount::where('company_id', $companyId)
+                    ->where('loan_no', $loanNo)
+                    ->exists()) {
+                    throw new \Exception('Loan number already exists. Please try again.');
+                }
+
+                $loan = LoanAccount::create([
+                    'company_id'          => $companyId,
+                    'financial_year_id'   => $activeFy->id,
+                    'loan_no'             => $loanNo,
+                    'loan_name'           => $request->loan_name,
+                    'loan_type'           => $request->loan_type,
+                    'party_account_id'    => $request->party_account_id,
+                    'account_id'          => $request->account_id,
+                    'principal_amount'    => $request->principal_amount,
+                    'interest_rate'       => $request->interest_rate ?? 0,
+                    'remaining_principal' => $request->principal_amount,
+                    'start_date'          => $request->start_date,
+                    'end_date'            => $request->end_date,
+                    'next_payment_date'   => $request->next_payment_date,
+                    'attachment'          => $file,
+                    'note'                => $request->note,
+                    'created_by'          => auth()->id(),
+                    'status'              => (int) ($request->status ?? LoanAccount::STATUS_ACTIVE),
+                ]);
+
+                $principal = (float) $request->principal_amount;
+
+                if ($request->loan_type == 'taken') {
+                    $account->increment(
+                        'current_balance',
+                        $principal
+                    );
+
+                    $party->increment(
+                        'current_balance',
+                        $principal
+                    );
+
+                    AccountBalanceService::createTransaction([
+                        'company_id'        => $companyId,
+                        'financial_year_id' => $activeFy->id,
+                        'account_id'        => $account->id,
+                        'transaction_date'  => $request->start_date,
+                        'voucher_no'        => $loanNo,
+                        'reference_type'    => 'LoanAccount',
+                        'reference_id'      => $loan->id,
+                        'description'       => 'Loan Taken',
+                        'debit'             => $principal,
+                        'credit'            => 0,
+                        'created_by'        => auth()->id(),
+                    ], false);
+                } else {
+                    if ((float) $account->current_balance < $principal) {
+                        throw new \Exception('Insufficient balance.');
+                    }
+
+                    $account->decrement(
+                        'current_balance',
+                        $principal
+                    );
+
+                    $party->increment(
+                        'current_balance',
+                        $principal
+                    );
+
+                    AccountBalanceService::createTransaction([
+                        'company_id'        => $companyId,
+                        'financial_year_id' => $activeFy->id,
+                        'account_id'        => $account->id,
+                        'transaction_date'  => $request->start_date,
+                        'voucher_no'        => $loanNo,
+                        'reference_type'    => 'LoanAccount',
+                        'reference_id'      => $loan->id,
+                        'description'       => 'Loan Given',
+                        'debit'             => 0,
+                        'credit'            => $principal,
+                        'created_by'        => auth()->id(),
+                    ], false);
+                }
+            });
+        } catch (\Exception $e) {
+            return back()
+                ->withInput()
+                ->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('company.loan-account.index')
+            ->with('success', 'Loan created.');
+    }
+
+    public function show($id)
+    {
+        $this->authorizeCompanyPermission('view_loan_account');
+
+        $loan = LoanAccount::with([
+            'partyAccount',
+            'account',
+            'payments',
+            'savingLedgers' => fn ($query) => $query->active()->orderBy('date')->orderBy('id'),
+            'createdBy',
+            'cancelledBy',
+            'financialYear',
+        ])
+            ->where('company_id', auth()->user()->company_id)
+            ->findOrFail($id);
+
+        $totalSavingDeposit = $loan->savingLedgers()
+            ->active()
+            ->where('type', 'deposit')
+            ->sum('amount');
+
+        $totalSavingWithdraw = $loan->savingLedgers()
+            ->active()
+            ->where('type', 'withdraw')
+            ->sum('amount');
+
+        $currentSavingBalance = $loan->savingLedgers()
+            ->active()
+            ->latest('id')
+            ->value('balance_after') ?? 0;
+
+        $canCancel = $this->loanCanBeCancelled($loan);
+
+        return view(
+            'company.loan-account.show',
+            compact(
+                'loan',
+                'totalSavingDeposit',
+                'totalSavingWithdraw',
+                'currentSavingBalance',
+                'canCancel'
+            )
+        );
+    }
+
+    public function edit($id)
+    {
+        $this->authorizeCompanyPermission('edit_loan_account');
+
+        $loan = LoanAccount::where('company_id', auth()->user()->company_id)
+            ->findOrFail($id);
+
+        if ($loan->isCancelled()) {
+            return redirect()
+                ->route('company.loan-account.show', $loan->id)
+                ->with('error', 'Cancelled loan cannot be edited.');
+        }
+
+        return view(
+            'company.loan-account.edit',
+            compact('loan')
+        );
+    }
+
+    public function update(Request $request, $id)
+    {
+        $this->authorizeCompanyPermission('edit_loan_account');
+
+        $companyId = auth()->user()->company_id;
+
+        $this->validateLoanAccountRequest($request, $companyId, true);
+
+        $loan = LoanAccount::where('company_id', $companyId)
+            ->findOrFail($id);
+
+        if ($loan->isCancelled()) {
+            return back()->with('error', 'Cancelled loan cannot be edited.');
+        }
+
+        $data = [
+            'loan_name'         => $request->loan_name,
+            'note'              => $request->note,
+            'end_date'          => $request->end_date,
+            'next_payment_date' => $request->next_payment_date,
+            'status'            => (int) ($loan->status),
+            'updated_by'        => auth()->id(),
+        ];
+
+        if ($request->hasFile('attachment')) {
+            if ($loan->attachment && file_exists(public_path($loan->attachment))) {
+                unlink(public_path($loan->attachment));
+            }
+
+            $folder = 'companies/' . $companyId . '/loans';
+
+            if (!file_exists(public_path($folder))) {
+                mkdir(public_path($folder), 0777, true);
+            }
+
+            $name = time()
+                . '_'
+                . $request->file('attachment')->getClientOriginalName();
+
+            $request->file('attachment')->move(public_path($folder), $name);
+
+            $data['attachment'] = $folder . '/' . $name;
+        }
+
+        $loan->update($data);
+
+        return redirect()
+            ->route('company.loan-account.show', $loan->id)
+            ->with('success', 'Loan updated.');
+    }
+
+    private function loanCanBeCancelled(LoanAccount $loan): bool
+    {
+        if ((int) $loan->status !== LoanAccount::STATUS_ACTIVE) {
+            return false;
+        }
+
+        if ($loan->payments()->active()->exists()) {
+            return false;
+        }
+
+        if ($loan->savingLedgers()->active()->exists()) {
+            return false;
+        }
+
+        if ((float) $loan->remaining_principal !== (float) $loan->principal_amount) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function assertNoActiveLoanPayments(LoanAccount $loan): void
+    {
+        if ($loan->payments()->active()->exists()) {
+            throw new \Exception(
+                'Loan cannot be cancelled because active loan payments exist. Cancel all loan payments before cancelling the loan.'
+            );
+        }
+    }
+
+    private function assertLoanCanBeCancelled(LoanAccount $loan): void
+    {
+        $this->assertNoActiveLoanPayments($loan);
+
+        if ((int) $loan->status !== LoanAccount::STATUS_ACTIVE) {
+            throw new \Exception('Only active loans can be cancelled.');
+        }
+
+        if ($loan->savingLedgers()->active()->exists()) {
+            throw new \Exception(
+                'Loan cannot be cancelled because active saving ledger entries exist.'
+            );
+        }
+
+        if ((float) $loan->remaining_principal !== (float) $loan->principal_amount) {
+            throw new \Exception(
+                'Loan cannot be cancelled because the remaining principal differs from the original principal amount.'
+            );
+        }
+    }
+
+    private function reverseLoanBalances(LoanAccount $loan, int $companyId): void
+    {
+        $principal = (float) $loan->principal_amount;
+
+        $account = Account::where('company_id', $companyId)
+            ->lockForUpdate()
+            ->findOrFail($loan->account_id);
+
+        $party = PartyAccount::where('company_id', $companyId)
+            ->lockForUpdate()
+            ->findOrFail($loan->party_account_id);
+
+        if ($loan->loan_type === 'given') {
+            $account->increment('current_balance', $principal);
+
+            if ((float) $party->current_balance < $principal) {
+                throw new \Exception('Insufficient party balance to cancel this loan.');
+            }
+
+            $party->decrement('current_balance', $principal);
+        } else {
+            if ((float) $account->current_balance < $principal) {
+                throw new \Exception('Insufficient account balance to cancel this loan.');
+            }
+
+            $account->decrement('current_balance', $principal);
+            $party->decrement('current_balance', $principal);
+        }
+    }
+
+    public function cancel($id)
+    {
+        $this->authorizeCompanyPermission('cancel_loan_account');
+
+        $companyId = auth()->user()->company_id;
+
+        $loan = LoanAccount::where('company_id', $companyId)
+            ->findOrFail($id);
+
+        try {
+            $this->assertLoanCanBeCancelled($loan);
+        } catch (\Exception $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        try {
+            DB::transaction(function () use ($loan, $companyId) {
+                $lockedLoan = LoanAccount::where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($loan->id);
+
+                $this->assertLoanCanBeCancelled($lockedLoan);
+
+                $this->reverseLoanBalances($lockedLoan, $companyId);
+
+                $accountTransaction = AccountTransaction::where('company_id', $companyId)
+                    ->where('reference_type', 'LoanAccount')
+                    ->where('reference_id', $lockedLoan->id)
+                    ->where('status', 1)
+                    ->first();
+
+                if ($accountTransaction) {
+                    AccountBalanceService::reverseTransaction(
+                        $accountTransaction,
+                        'loan_account_cancel',
+                        'Loan Account Cancel',
+                        now()->toDateString(),
+                        (int) $lockedLoan->financial_year_id
+                    );
+                }
+
+                $lockedLoan->update([
+                    'status'       => LoanAccount::STATUS_CANCELLED,
+                    'cancelled_by' => auth()->id(),
+                    'cancelled_at' => now(),
+                    'updated_by'   => auth()->id(),
+                ]);
+            });
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('company.loan-account.show', $loan->id)
+            ->with('success', 'Loan cancelled.');
+    }
 }

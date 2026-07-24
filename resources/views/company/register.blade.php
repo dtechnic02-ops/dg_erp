@@ -95,42 +95,32 @@
     <div class="right">
 
         <div class="form-box">
-<h2>Register</h2>
+            <h2>Register</h2>
 
-{{-- 🔥 ERROR MESSAGE --}}
-@if ($errors->any())
-    <div style="color:red; margin-bottom:10px;">
-        @foreach ($errors->all() as $error)
-            <div>{{ $error }}</div>
-        @endforeach
-    </div>
-@endif
-
-<form method="POST" action="{{ route('company.register.post') }}">
             @if ($errors->any())
-    <div style="color:red; margin-bottom:10px;">
-        @foreach ($errors->all() as $error)
-            <div>{{ $error }}</div>
-        @endforeach
-    </div>
-@endif
+                <div style="color:red; margin-bottom:10px;">
+                    @foreach ($errors->all() as $error)
+                        <div>{{ $error }}</div>
+                    @endforeach
+                </div>
+            @endif
 
-           <form method="POST" action="/company/register">
+            <form method="POST" action="{{ route('company.register.post') }}">
                 @csrf
 
-                <input type="text" name="company_name" placeholder="Company Name" required>
+                <input type="text" name="company_name" placeholder="Company Name" value="{{ old('company_name') }}" required>
 
-                <input type="text" name="full_name" placeholder="Owner Name" required>
+                <input type="text" name="full_name" placeholder="Owner Name" value="{{ old('full_name') }}" required>
 
-                <input type="email" name="email" placeholder="Email" required>
+                <input type="email" name="email" placeholder="Email" value="{{ old('email') }}" required>
 
-                <input type="text" name="username" placeholder="Username" required>
+                <input type="text" name="username" placeholder="Username" value="{{ old('username') }}" required>
 
                 <input type="password" name="password" placeholder="Password" required>
 
-               <input type="text" name="mobile_no" placeholder="Mobile Number" required>
+                <input type="text" name="mobile_no" placeholder="Mobile Number" value="{{ old('mobile_no') }}" required>
 
-                <input type="text" name="country" placeholder="Country" required>
+                <input type="text" name="country" placeholder="Country" value="{{ old('country') }}" required>
 
                 <button type="submit">Register</button>
             </form>

@@ -6,50 +6,68 @@ use Illuminate\Database\Eloquent\Model;
 
 class Expense extends Model
 {
+    public const STATUS_CANCELLED = 0;
 
-protected $fillable = [
+    public const STATUS_ACTIVE = 1;
 
-'company_id',
-'financial_year_id',
-'expense_no',
+    protected $fillable = [
+        'company_id',
+        'financial_year_id',
+        'expense_no',
+        'expense_category_id',
+        'account_id',
+        'expense_date',
+        'amount',
+        'reference_no',
+        'note',
+        'attachment',
+        'created_by',
+        'updated_by',
+        'cancelled_by',
+        'cancelled_date',
+        'cancel_reason',
+        'status',
+    ];
 
-'expense_category_id',
+    protected $casts = [
+        'expense_date'   => 'date',
+        'cancelled_date' => 'date',
+        'amount'         => 'decimal:2',
+        'status'         => 'integer',
+    ];
 
-'account_id',
+    public function category()
+    {
+        return $this->belongsTo(ExpenseCategory::class, 'expense_category_id');
+    }
 
-'expense_date',
+    public function account()
+    {
+        return $this->belongsTo(Account::class);
+    }
 
-'amount',
+    public function financialYear()
+    {
+        return $this->belongsTo(FinancialYear::class, 'financial_year_id');
+    }
 
-'reference_no',
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
-'note',
+    public function updatedByUser()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 
-'attachment',
+    public function cancelledByUser()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
 
-'created_by',
-
-'status'
-
-];
-
-public function category()
-{
-
-return $this->belongsTo(
-ExpenseCategory::class,
-'expense_category_id'
-);
-
-}
-
-public function account()
-{
-
-return $this->belongsTo(
-Account::class
-);
-
-}
-
+    public function isActive(): bool
+    {
+        return (int) $this->status === self::STATUS_ACTIVE;
+    }
 }

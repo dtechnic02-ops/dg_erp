@@ -1,0 +1,29 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('crm_notes', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('entity_type', 50);
+            $table->unsignedBigInteger('entity_id');
+            $table->text('note');
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
+            $table->timestamps();
+
+            $table->index(['company_id', 'entity_type', 'entity_id'], 'crm_notes_entity_index');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('crm_notes');
+    }
+};

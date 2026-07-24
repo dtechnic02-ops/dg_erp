@@ -3,89 +3,70 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PartyAccount extends Model
 {
+    use SoftDeletes;
 
-protected $fillable = [
+    public const STATUS_INACTIVE = 0;
 
-'company_id',
+    public const STATUS_ACTIVE = 1;
 
-'account_no',
+    protected $fillable = [
+        'company_id',
+        'account_no',
+        'name',
+        'phone',
+        'address',
+        'opening_balance',
+        'current_balance',
+        'type',
+        'photo',
+        'id_card',
+        'document',
+        'note',
+        'due_date',
+        'created_by',
+        'updated_by',
+        'deleted_by',
+        'status',
+    ];
 
-'name',
+    protected $casts = [
+        'opening_balance' => 'decimal:2',
+        'current_balance' => 'decimal:2',
+        'due_date'          => 'date',
+        'status'            => 'integer',
+    ];
 
-'phone',
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
-'address',
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
-'opening_balance',
+    public function updatedBy()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 
-'current_balance',
+    public function deletedBy()
+    {
+        return $this->belongsTo(User::class, 'deleted_by');
+    }
 
-'type',
+    public function loanAccounts()
+    {
+        return $this->hasMany(LoanAccount::class, 'party_account_id');
+    }
 
-'photo',
-
-'id_card',
-
-'document',
-
-'note',
-
-'created_by',
-
-'status'
-
-];
-
-/**
-* Company
-*/
-
-public function company()
-{
-
-return $this->belongsTo(
-
-Company::class
-
-);
-
-}
-
-/**
-* Creator
-*/
-
-public function creator()
-{
-
-return $this->belongsTo(
-
-User::class,
-
-'created_by'
-
-);
-
-}
-
-/**
-* Loan Accounts
-*/
-
-public function loanAccounts()
-{
-
-return $this->hasMany(
-
-LoanAccount::class,
-
-'party_account_id'
-
-);
-
-}
-
+    public function isActive(): bool
+    {
+        return (int) $this->status === self::STATUS_ACTIVE;
+    }
 }

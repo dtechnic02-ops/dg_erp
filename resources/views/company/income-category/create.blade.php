@@ -1,77 +1,80 @@
 @extends('company.layout')
 
+@section('title', 'Create Income Category')
+
 @section('content')
 
-<div class="container">
+<div class="dg-page">
 
-<div class="card">
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="row align-items-center g-2">
+                <div class="col">
+                    <h1 class="h4 mb-0">Create Income Category</h1>
+                </div>
+                <div class="col-auto">
+                    <nav class="btn-group" aria-label="Income category toolbar">
+                        <a href="{{ route('company.income-category.index') }}" class="btn btn-outline-secondary dg-btn">Category List</a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </header>
 
-<div class="card-header">
+    <main class="dg-container">
+        <div class="container-fluid">
 
-Create Income Category
+            @if ($errors->any())
+                <div class="alert alert-danger dg-alert" role="alert">
+                    <ul class="mb-0">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
-</div>
+            <form method="POST" action="{{ route('company.income-category.store') }}" class="dg-form">
+                @csrf
 
-<form
-method="POST"
-action="{{ route(
-'company.income-category.store'
-) }}">
+                <section class="dg-section">
+                    <article class="card dg-card">
+                        <header class="card-header dg-card-header">
+                            <h2 class="h6 mb-0">Category Information</h2>
+                        </header>
+                        <div class="card-body dg-card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="name">Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" id="name" class="form-control dg-input" value="{{ old('name') }}" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="code">Code</label>
+                                    <input type="text" name="code" id="code" class="form-control dg-input" value="{{ old('code') }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="status">Status</label>
+                                    <select name="status" id="status" class="form-select dg-select">
+                                        <option value="1" @selected(old('status', '1') == '1')>Active</option>
+                                        <option value="0" @selected(old('status') === '0')>Inactive</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="note">Note</label>
+                                    <textarea name="note" id="note" rows="3" class="form-control dg-input">{{ old('note') }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <footer class="card-footer dg-card-footer">
+                            <button type="submit" class="btn btn-primary dg-btn">Save Category</button>
+                            <a href="{{ route('company.income-category.index') }}" class="btn btn-outline-secondary dg-btn">Cancel</a>
+                        </footer>
+                    </article>
+                </section>
+            </form>
 
-@csrf
-
-<div class="card-body">
-
-<label>
-
-Name
-
-</label>
-
-<input
-required
-name="name"
-class="form-control">
-
-
-<label class="mt-3">
-
-Code
-
-</label>
-
-<input
-name="code"
-class="form-control">
-
-
-<label class="mt-3">
-
-Note
-
-</label>
-
-<textarea
-name="note"
-class="form-control"></textarea>
-
-</div>
-
-
-<div class="card-footer">
-
-<button class="btn btn-primary">
-
-Save
-
-</button>
-
-</div>
-
-</form>
-
-</div>
-
+        </div>
+    </main>
 </div>
 
 @endsection

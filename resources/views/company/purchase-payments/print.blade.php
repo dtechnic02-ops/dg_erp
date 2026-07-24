@@ -254,6 +254,18 @@
                                                 <span class="dg-summary-bar-value">{{ $payment->note }}</span>
                                             </div>
                                         @endif
+                                        <div class="dg-summary-bar-item">
+                                            <span class="dg-summary-bar-label text-muted">Receipt Attached</span>
+                                            <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
+                                            <span class="dg-summary-bar-value">{{ $payment->receipt_file ? 'Yes' : 'No' }}</span>
+                                        </div>
+                                        @if ($payment->receipt_file)
+                                            <div class="dg-summary-bar-item">
+                                                <span class="dg-summary-bar-label text-muted">Receipt File</span>
+                                                <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
+                                                <span class="dg-summary-bar-value">{{ basename($payment->receipt_file) }}</span>
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             </div>

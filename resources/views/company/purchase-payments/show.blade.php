@@ -36,6 +36,9 @@
                 <nav class="btn-group" aria-label="Purchase payment toolbar">
                     <a href="{{ route('company.purchase-payments.index') }}" class="btn btn-outline-secondary dg-btn">Back</a>
                     <a href="{{ route('company.purchase-payments.print', $payment->id) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
+                    @if ((int) $payment->status === 1)
+                        <a href="{{ route('company.purchase-payments.edit', $payment->id) }}" class="btn btn-outline-primary dg-btn">Edit</a>
+                    @endif
                     @if ($invoice)
                         <a href="{{ route('company.purchases.show', $invoice->id) }}" class="btn btn-outline-primary dg-btn">View Invoice</a>
                     @endif
@@ -321,6 +324,15 @@
                                                 <span class="dg-summary-bar-label text-muted">Note</span>
                                                 <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
                                                 <span class="dg-summary-bar-value">{{ $payment->note }}</span>
+                                            </div>
+                                        @endif
+                                        @if ($payment->receipt_file)
+                                            <div class="dg-summary-bar-item">
+                                                <span class="dg-summary-bar-label text-muted">Receipt</span>
+                                                <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
+                                                <span class="dg-summary-bar-value">
+                                                    <a href="{{ asset($payment->receipt_file) }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary dg-btn">View Receipt</a>
+                                                </span>
                                             </div>
                                         @endif
                                     </div>

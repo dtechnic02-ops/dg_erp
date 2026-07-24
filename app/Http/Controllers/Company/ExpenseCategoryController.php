@@ -3,138 +3,118 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
-
-use Illuminate\Http\Request;
-
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
+use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Services\ValidationService;
+use Illuminate\Http\Request;
 
 class ExpenseCategoryController extends Controller
 {
+    use AuthorizesCompanyPermission;
 
-/**
- * INDEX
- */
+    public function index(Request $request)
+    {
+        $this->authorizeCompanyPermission('view_expense_categories');
 
-public function index(Request $request)
-{
+        $companyId = auth()->user()->company_id;
 
-$companyId =
-auth()->user()->company_id;
+        $query = ExpenseCategory::where('company_id', $companyId);
 
-$query =
-ExpenseCategory::where(
-'company_id',
-$companyId
-);
+        if ($request->filled('search')) {
+            $query->where('name', 'like', '%' . $request->search . '%');
+        }
 
-if($request->search){
+        if ($request->filled('status') && in_array((int) $request->status, [0, 1], true)) {
+            $query->where('status', (int) $request->status);
+        }
 
-$query->where(
+        $categories = $query->latest()->paginate(20)->withQueryString();
 
-'name',
+        return view('company.expense-category.index', compact('categories'));
+    }
 
-'like',
+    public function create()
+    {
+        $this->authorizeCompanyPermission('manage_expense_categories');
 
-'%'.$request->search.'%'
+        return view('company.expense-category.create');
+    }
 
-);
+    public function store(Request $request)
+    {
+        $this->authorizeCompanyPermission('manage_expense_categories');
 
-}
+        $request->validate([
+            'name'        => ValidationService::requiredString(100),
+            'description' => ValidationService::text(),
+            'status'      => 'nullable|in:0,1',
+        ]);
 
-$categories =
+        ExpenseCategory::create([
+            'company_id'  => auth()->user()->company_id,
+            'name'        => $request->name,
+            'description' => $request->description,
+            'status'      => $request->input('status', ExpenseCategory::STATUS_ACTIVE),
+            'created_by'  => auth()->id(),
+        ]);
 
-$query
+        return redirect()
+            ->route('company.expense-category.index')
+            ->with('success', 'Expense category created successfully.');
+    }
 
-->latest()
+    public function edit($id)
+    {
+        $this->authorizeCompanyPermission('manage_expense_categories');
 
-->paginate(20)
+        $category = ExpenseCategory::where('company_id', auth()->user()->company_id)
+            ->findOrFail($id);
 
-->withQueryString();
+        return view('company.expense-category.edit', compact('category'));
+    }
 
-return view(
+    public function update(Request $request, $id)
+    {
+        $this->authorizeCompanyPermission('manage_expense_categories');
 
-'company.expense-category.index',
+        $request->validate([
+            'name'        => ValidationService::requiredString(100),
+            'description' => ValidationService::text(),
+            'status'      => 'required|in:0,1',
+        ]);
 
-compact(
+        $category = ExpenseCategory::where('company_id', auth()->user()->company_id)
+            ->findOrFail($id);
 
-'categories'
+        $category->update([
+            'name'        => $request->name,
+            'description' => $request->description,
+            'status'      => (int) $request->status,
+        ]);
 
-)
+        return redirect()
+            ->route('company.expense-category.index')
+            ->with('success', 'Expense category updated successfully.');
+    }
 
-);
+    public function destroy($id)
+    {
+        $this->authorizeCompanyPermission('manage_expense_categories');
 
-}
+        $category = ExpenseCategory::where('company_id', auth()->user()->company_id)
+            ->findOrFail($id);
 
+        $inUse = Expense::where('company_id', auth()->user()->company_id)
+            ->where('expense_category_id', $category->id)
+            ->exists();
 
-/**
- * CREATE
- */
+        if ($inUse) {
+            return back()->with('error', 'Cannot delete category because it is used by one or more expense entries.');
+        }
 
-public function create()
-{
+        $category->delete();
 
-return view(
-
-'company.expense-category.create'
-
-);
-
-}
-
-
-/**
- * STORE
- */
-
-public function store(Request $request)
-{
-
-$request->validate([
-
-'name'=>
-
-'required|max:100',
-
-'description'=>
-
-'nullable'
-
-]);
-
-ExpenseCategory::create([
-
-'company_id'=>
-
-auth()->user()->company_id,
-
-'name'=>
-
-$request->name,
-
-'description'=>
-
-$request->description,
-
-'status'=>1
-
-]);
-
-return redirect()
-
-->route(
-
-'company.expense-category.index'
-
-)
-
-->with(
-
-'success',
-
-'Expense category created successfully.'
-
-);
-
-}
-
+        return back()->with('success', 'Expense category deleted successfully.');
+    }
 }

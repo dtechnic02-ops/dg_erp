@@ -246,14 +246,21 @@
                                                         @php
                                                             $hasActivePayments = (int) ($invoice->active_payments_count ?? 0) > 0;
                                                             $hasActiveReturns = in_array((int) $invoice->id, $activeReturnInvoiceIds ?? [], true);
-                                                            $canCancelInvoice = !$hasActivePayments && !$hasActiveReturns;
+                                                            $hasActiveRefunds = in_array((int) $invoice->id, $activeRefundInvoiceIds ?? [], true);
+                                                            $canCancelInvoice = !$hasActivePayments && !$hasActiveReturns && !$hasActiveRefunds;
 
-                                                            if ($hasActivePayments && $hasActiveReturns) {
-                                                                $cancelBlockMessage = 'Cannot cancel: active payment(s) and purchase return(s) exist.';
-                                                            } elseif ($hasActivePayments) {
-                                                                $cancelBlockMessage = 'Cannot cancel: one or more active payments exist.';
-                                                            } elseif ($hasActiveReturns) {
-                                                                $cancelBlockMessage = 'Cannot cancel: one or more active purchase returns exist.';
+                                                            if (!$canCancelInvoice) {
+                                                                $cancelBlockParts = [];
+                                                                if ($hasActivePayments) {
+                                                                    $cancelBlockParts[] = 'active payment(s)';
+                                                                }
+                                                                if ($hasActiveReturns) {
+                                                                    $cancelBlockParts[] = 'purchase return(s)';
+                                                                }
+                                                                if ($hasActiveRefunds) {
+                                                                    $cancelBlockParts[] = 'purchase return refund(s)';
+                                                                }
+                                                                $cancelBlockMessage = 'Cannot cancel: ' . implode(' and ', $cancelBlockParts) . ' exist.';
                                                             } else {
                                                                 $cancelBlockMessage = '';
                                                             }
@@ -296,7 +303,8 @@
                 @php
                     $hasActivePayments = (int) ($invoice->active_payments_count ?? 0) > 0;
                     $hasActiveReturns = in_array((int) $invoice->id, $activeReturnInvoiceIds ?? [], true);
-                    $canCancelInvoice = !$hasActivePayments && !$hasActiveReturns;
+                    $hasActiveRefunds = in_array((int) $invoice->id, $activeRefundInvoiceIds ?? [], true);
+                    $canCancelInvoice = !$hasActivePayments && !$hasActiveReturns && !$hasActiveRefunds;
                 @endphp
                 @if ((int) $invoice->status === 1 && $canCancelInvoice)
                     @include('company.partials.dg-sales-cancel-modal', [

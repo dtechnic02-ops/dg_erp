@@ -1,58 +1,75 @@
 @extends('company.layout')
 
+@section('title', 'Edit Staff')
+
 @section('content')
 
-<!-- ALERT -->
-@if(session('success'))
-    <p style="color:#22c55e;">{{ session('success') }}</p>
-@endif
+<div class="dg-page">
 
-@if($errors->any())
-    <div style="color:#ef4444; margin-bottom:10px;">
-        {{ $errors->first() }}
-    </div>
-@endif
+    <header class="dg-toolbar">
+        <div class="container-fluid">
+            <div class="d-flex flex-nowrap align-items-center gap-2">
+                <div class="flex-shrink-0">
+                    <h1 class="h4 mb-0">Edit Staff</h1>
+                </div>
+                <div class="flex-fill d-flex justify-content-end">
+                    <a href="{{ route('company.users.index') }}" class="btn btn-outline-secondary dg-btn">Back to Staff</a>
+                </div>
+            </div>
+        </div>
+    </header>
 
-<h2 style="color:#e2e8f0;">✏️ Edit Staff</h2>
+    <main class="dg-container">
+        <div class="container-fluid">
 
-<div style="background:#0f172a; padding:20px; border-radius:10px; max-width:500px;">
+            @if(session('success'))
+                <div class="alert alert-success dg-alert" role="alert">{{ session('success') }}</div>
+            @endif
 
-<form method="POST" action="{{ route('company.users.update', $user->id) }}">
-    @csrf
+            @if($errors->any())
+                <div class="alert alert-danger dg-alert" role="alert">{{ $errors->first() }}</div>
+            @endif
 
-    <!-- NAME -->
-    <div style="margin-bottom:10px;">
-        <label>Name</label><br>
-        <input type="text" name="name" value="{{ $user->name }}" required
-            style="width:100%; padding:8px; border-radius:6px; border:none;">
-    </div>
+            <section class="dg-section">
+                <article class="card dg-card">
+                    <header class="card-header dg-card-header">
+                        <h2 class="h6 mb-0">Staff Details</h2>
+                    </header>
+                    <div class="card-body dg-card-body">
+                        <form method="POST" action="{{ route('company.users.update', $user->id) }}" class="row g-3">
+                            @csrf
 
-    <!-- ROLE -->
-    <div style="margin-bottom:10px;">
-        <label>Role</label><br>
-        <select name="job_role" required
-            style="width:100%; padding:8px; border-radius:6px; border:none;">
+                            <div class="col-md-6">
+                                <label for="name" class="form-label">Name</label>
+                                <input type="text" name="name" id="name" class="form-control dg-input" value="{{ old('name', $user->name) }}" required>
+                            </div>
 
-            <option value="cashier" {{ $user->job_role=='cashier'?'selected':'' }}>Cashier</option>
-            <option value="receiver" {{ $user->job_role=='receiver'?'selected':'' }}>Receiver</option>
-            <option value="accountant" {{ $user->job_role=='accountant'?'selected':'' }}>Accountant</option>
-            <option value="manager" {{ $user->job_role=='manager'?'selected':'' }}>Manager</option>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" id="email" class="form-control dg-input" value="{{ $user->email }}" disabled readonly>
+                            </div>
 
-        </select>
-    </div>
+                            <div class="col-md-6">
+                                <label for="job_role" class="form-label">Job Role</label>
+                                <select name="job_role" id="job_role" class="form-select dg-select" required>
+                                    <option value="cashier" @selected(old('job_role', $user->job_role) === 'cashier')>Cashier</option>
+                                    <option value="receiver" @selected(old('job_role', $user->job_role) === 'receiver')>Receiver</option>
+                                    <option value="accountant" @selected(old('job_role', $user->job_role) === 'accountant')>Accountant</option>
+                                    <option value="manager" @selected(old('job_role', $user->job_role) === 'manager')>Manager</option>
+                                </select>
+                            </div>
 
-    <!-- BUTTON -->
-    <button style="background:#3b82f6; color:white; padding:8px 20px; border:none; border-radius:6px;">
-        💾 Update
-    </button>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary dg-btn">Update Staff</button>
+                                <a href="{{ route('company.users.index') }}" class="btn btn-outline-secondary dg-btn">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
+                </article>
+            </section>
 
- <a href="{{ route('company.users.index') }}" style="margin-left:10px; color:#94a3b8;">
-    Cancel
-</a>
-    </a>
-
-</form>
-
+        </div>
+    </main>
 </div>
 
 @endsection

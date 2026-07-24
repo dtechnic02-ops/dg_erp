@@ -49,6 +49,46 @@ class VoucherRouteService
 
                 ) . $return,
 
+            'purchase_invoice' =>
+
+                route(
+
+                    'company.purchases.show',
+
+                    $referenceId
+
+                ) . $return,
+
+            'purchase_payment' =>
+
+                route(
+
+                    'company.purchase-payments.show',
+
+                    $referenceId
+
+                ) . $return,
+
+            'purchase_return' =>
+
+                route(
+
+                    'company.purchase-return.show',
+
+                    $referenceId
+
+                ) . $return,
+
+            'purchase_return_refund' =>
+
+                route(
+
+                    'company.purchase-return-refunds.show',
+
+                    $referenceId
+
+                ) . $return,
+
             default => '#',
         };
     }

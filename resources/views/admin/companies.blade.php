@@ -52,6 +52,7 @@
 
     <!-- USER LIMIT -->
     <td>
+        @if(auth()->user()->hasPermission('edit_company'))
         <form method="POST" action="{{ route('admin.company.limit', $c->id) }}">
             @csrf
             <input type="number" name="limit" value="{{ $c->selected_user_limit }}" style="width:50px;">
@@ -59,10 +60,14 @@
                 ✔
             </button>
         </form>
+        @else
+            {{ $c->selected_user_limit }}
+        @endif
     </td>
 
     <!-- CUSTOMER LIMIT -->
     <td>
+        @if(auth()->user()->hasPermission('edit_company'))
         <form method="POST" action="{{ route('admin.company.customer.limit', $c->id) }}">
             @csrf
             <input type="number" name="customer_limit" value="{{ $c->selected_customer_limit }}" style="width:50px;">
@@ -70,6 +75,9 @@
                 ✔
             </button>
         </form>
+        @else
+            {{ $c->selected_customer_limit }}
+        @endif
     </td>
 
     <!-- STATUS -->
@@ -97,30 +105,36 @@
     <!-- ACTIONS -->
     <td>
 
-        @if(auth()->user()->role_id == 1)
+        @if(auth()->user()->hasPermission('reset_company_password'))
+            <form method="POST" action="{{ route('admin.company.reset', $c->id) }}" style="display:inline;">
+                @csrf
+                <button type="submit" onclick="return confirm('Reset company admin password to 123456?')" style="background:none;border:none;cursor:pointer;padding:0;">🔐</button>
+            </form>
+        @endif
 
-            <!-- RESET PASSWORD -->
-            <a href="{{ route('admin.company.reset', $c->id) }}">🔐</a>
+        @if(auth()->user()->hasPermission('block_company') && $c->status == 'active')
+            <form method="POST" action="{{ route('admin.company.block', $c->id) }}" style="display:inline;">
+                @csrf
+                <button type="submit" onclick="return confirm('Block this company?')" style="background:none;border:none;cursor:pointer;padding:0;">🚫</button>
+            </form>
+        @endif
 
-            <!-- BLOCK / UNBLOCK -->
-            @if($c->status == 'active')
-                <a href="{{ route('admin.company.block', $c->id) }}" 
-                   onclick="return confirm('Block this company?')">🚫</a>
-            @else
-                <a href="{{ route('admin.company.unblock', $c->id) }}" 
-                   onclick="return confirm('Unblock this company?')">✅</a>
-            @endif
+        @if(auth()->user()->hasPermission('unblock_company') && $c->status != 'active')
+            <form method="POST" action="{{ route('admin.company.unblock', $c->id) }}" style="display:inline;">
+                @csrf
+                <button type="submit" onclick="return confirm('Unblock this company?')" style="background:none;border:none;cursor:pointer;padding:0;">✅</button>
+            </form>
+        @endif
 
-            <!-- DELETE -->
+        @if(auth()->user()->hasPermission('delete_company'))
             <form method="POST" action="{{ route('admin.company.delete', $c->id) }}" style="display:inline;">
                 @csrf
                 <input type="password" name="admin_password" placeholder="Password" required style="width:80px;">
-                <button onclick="return confirm('Delete company?')" 
+                <button onclick="return confirm('Delete company?')"
                     style="background:red;color:white;border:none;padding:4px 8px;">
                     ❌
                 </button>
             </form>
-
         @endif
 
     </td>

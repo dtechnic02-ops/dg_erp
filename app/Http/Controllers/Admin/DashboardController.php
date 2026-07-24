@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Company;
-use App\Models\Payment;
-use App\Models\Plan;
+use App\Models\SubscriptionPayment;
+use App\Models\SubscriptionPlan;
 use App\Models\CompanyRegistration;
 use Carbon\Carbon;
 
@@ -57,17 +57,17 @@ class DashboardController extends Controller
         $pending = CompanyRegistration::where('status', 'pending')->count();
 
         // 💳 PAYMENTS
-        $totalPayments = Payment::count();
+        $totalPayments = SubscriptionPayment::count();
 
-        $approvedPayments = Payment::where('status', 'approved')->count();
-        $rejectedPayments = Payment::where('status', 'rejected')->count();
-        $pendingPayments = Payment::where('status', 'pending')->count();
+        $approvedPayments = SubscriptionPayment::where('status', 'approved')->count();
+        $rejectedPayments = SubscriptionPayment::where('status', 'rejected')->count();
+        $pendingPayments = SubscriptionPayment::where('status', 'pending')->count();
 
         // 🎁 TRIAL
         $trial = Company::whereNull('expiry_date')->count();
 
         // 📦 SYSTEM
-        $plans = Plan::count();
+        $plans = SubscriptionPlan::count();
 
         return view('admin.dashboard', compact(
             'totalUsers',

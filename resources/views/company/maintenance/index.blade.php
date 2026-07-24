@@ -146,6 +146,39 @@
 
     </div>
 
+    <div class="col-md-4 mb-3">
+
+        <div class="card">
+
+            <div class="card-body">
+
+                <h5>
+
+                    Supplier Statement
+
+                </h5>
+
+                <form method="POST"
+                      action="{{ route('company.maintenance.recalculate.supplier.statement') }}">
+
+                    @csrf
+
+                    <button
+                        class="erp-btn btn-blue"
+                        onclick="return confirm('Recalculate Supplier Statement?')">
+
+                        Recalculate Supplier Statement
+
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
 </div>
 
 @endsection

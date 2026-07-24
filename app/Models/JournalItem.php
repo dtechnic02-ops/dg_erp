@@ -6,60 +6,91 @@ use Illuminate\Database\Eloquent\Model;
 
 class JournalItem extends Model
 {
+    public const TYPE_DEBIT = 'debit';
 
-protected $fillable=[
+    public const TYPE_CREDIT = 'credit';
 
-'company_id',
+    protected $fillable = [
+        'company_id',
+        'journal_id',
+        'account_id',
+        'sub_ledger_type',
+        'sub_ledger_id',
+        'type',
+        'amount',
+        'note',
+        'status',
+    ];
 
-'journal_id',
+    protected $casts = [
+        'amount' => 'decimal:2',
+        'status' => 'integer',
+    ];
 
-'account_id',
+    public function journal()
+    {
+        return $this->belongsTo(Journal::class);
+    }
 
-'type',
+    public function account()
+    {
+        return $this->belongsTo(Account::class);
+    }
 
-'amount',
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
-'note',
+    public function getDebitAmountAttribute(): float
+    {
+        return $this->type === self::TYPE_DEBIT ? (float) $this->amount : 0.0;
+    }
 
-'status'
+    public function getCreditAmountAttribute(): float
+    {
+        return $this->type === self::TYPE_CREDIT ? (float) $this->amount : 0.0;
+    }
 
-];
+    public function getSubLedgerLabelAttribute(): ?string
+    {
+        if (!$this->sub_ledger_type || !$this->sub_ledger_id) {
+            return null;
+        }
 
-public function journal()
-{
+        $name = $this->resolveSubLedgerName();
 
-return $this->belongsTo(
+        if (!$name) {
+            return null;
+        }
 
-Journal::class
+        $typeLabel = Account::subLedgerTypeLabels()[$this->sub_ledger_type] ?? ucfirst($this->sub_ledger_type);
 
-);
+        return $typeLabel . ': ' . $name;
+    }
 
-}
+    public function resolveSubLedgerName(): ?string
+    {
+        if (!$this->sub_ledger_type || !$this->sub_ledger_id) {
+            return null;
+        }
 
-public function account()
-{
+        $companyId = $this->company_id;
 
-return $this->belongsTo(
-
-Account::class
-
-);
-
-}
-
-/*
-Company Relation
-*/
-
-public function company()
-{
-
-return $this->belongsTo(
-
-Company::class
-
-);
-
-}
-
+        return match ($this->sub_ledger_type) {
+            Account::SUB_LEDGER_CUSTOMER => Customer::where('company_id', $companyId)
+                ->whereKey($this->sub_ledger_id)
+                ->value('name'),
+            Account::SUB_LEDGER_SUPPLIER => Supplier::where('company_id', $companyId)
+                ->whereKey($this->sub_ledger_id)
+                ->value('name'),
+            Account::SUB_LEDGER_EMPLOYEE => optional(
+                EmployeeAccount::where('company_id', $companyId)->find($this->sub_ledger_id)
+            )->full_name,
+            Account::SUB_LEDGER_PARTY => PartyAccount::where('company_id', $companyId)
+                ->whereKey($this->sub_ledger_id)
+                ->value('name'),
+            default => null,
+        };
+    }
 }

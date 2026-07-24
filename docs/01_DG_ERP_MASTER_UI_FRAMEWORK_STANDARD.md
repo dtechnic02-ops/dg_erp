@@ -380,6 +380,25 @@ dg-status
 dg-icon
 
 dg-print
+=========================================================
+COMPONENT CREATION RULE
+=========================================================
+
+Before creating a new DG component
+
+Search existing components.
+
+If an existing component satisfies the requirement,
+
+reuse it.
+
+Never create duplicate reusable components.
+
+If a new reusable component is required,
+
+add it to the Approved Components list first.
+
+Only after approval may it be used in the ERP.
 
 =========================================================
 COMPONENT HIERARCHY
@@ -539,8 +558,17 @@ calculator.js
 Every reusable function
 belongs inside dg.js.
 
-Business specific logic
-stays inside module JS.
+Business-specific UI interaction
+may stay inside module JavaScript.
+
+Reusable JavaScript
+must always remain inside dg.js.
+
+Financial logic,
+Business rules,
+Database logic,
+Validation,
+must never exist inside JavaScript.
 
 =========================================================
 AJAX / DATA FLOW RULE

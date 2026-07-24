@@ -28,6 +28,9 @@
                 <nav class="btn-group" aria-label="Purchase return refund toolbar">
                     <a href="{{ route('company.purchase-return-refunds.index') }}" class="btn btn-outline-secondary dg-btn">Back</a>
                     <a href="{{ route('company.purchase-return-refunds.print', $refund->id) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
+                    @if ($refund->isActive())
+                        <a href="{{ route('company.purchase-return-refunds.edit', $refund->id) }}" class="btn btn-outline-primary dg-btn">Edit</a>
+                    @endif
                     @if ($purchaseReturn)
                         <a href="{{ route('company.purchase-return.show', $purchaseReturn->id) }}" class="btn btn-outline-primary dg-btn">View Return</a>
                     @endif

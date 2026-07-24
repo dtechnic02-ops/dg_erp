@@ -7,9 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 class LoanSavingLedger extends Model
 {
 
+public const STATUS_INACTIVE = 0;
+
+public const STATUS_ACTIVE = 1;
+
 protected $fillable = [
 
 'company_id',
+
+'financial_year_id',
 
 'loan_account_id',
 
@@ -31,8 +37,17 @@ protected $fillable = [
 
 'created_by',
 
+'updated_by',
+
 'status'
 
+];
+
+protected $casts = [
+    'date' => 'date',
+    'amount' => 'decimal:2',
+    'balance_after' => 'decimal:2',
+    'status' => 'integer',
 ];
 
 /**
@@ -48,6 +63,11 @@ LoanAccount::class
 
 );
 
+}
+
+public function financialYear()
+{
+    return $this->belongsTo(FinancialYear::class, 'financial_year_id');
 }
 
 /**
@@ -99,17 +119,23 @@ Company::class
 * CREATOR
 */
 
-public function creator()
-{
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
-return $this->belongsTo(
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
-User::class,
+    public function updatedBy()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 
-'created_by'
-
-);
-
-}
-
+    public function scopeActive($query)
+    {
+        return $query->where('status', self::STATUS_ACTIVE);
+    }
 }

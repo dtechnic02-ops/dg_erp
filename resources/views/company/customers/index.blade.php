@@ -21,16 +21,35 @@
                     </div>
                 </div>
 
-                <div class="flex-fill d-flex justify-content-end align-items-center gap-2">
+                <div class="flex-fill d-flex justify-content-end align-items-center gap-2 flex-wrap flex-md-nowrap">
                     <form method="GET" class="d-flex gap-2">
                         <label for="search" class="visually-hidden">Search Customer</label>
-                        <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Search Customer" class="form-control dg-input">
-                        <button type="submit" class="btn btn-primary dg-btn">Search</button>
+                        <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Search Customer" class="form-control form-control-sm dg-input">
+                        <button type="submit" class="btn btn-sm btn-primary dg-btn">Search</button>
                     </form>
 
-                    <a href="{{ route('company.customers.print', request()->query()) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
+                    <nav class="btn-group flex-wrap" aria-label="Customer list toolbar">
+                        <button type="button" class="btn btn-sm btn-success dg-btn" data-bs-toggle="modal" data-bs-target="#customerModal">Add Customer</button>
 
-                    <button type="button" class="btn btn-success dg-btn" data-bs-toggle="modal" data-bs-target="#customerModal">Add Customer</button>
+                        <a href="{{ route('company.customer-statement.index') }}" class="btn btn-sm btn-outline-secondary dg-btn">
+                            <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+                            Statement
+                        </a>
+
+                        @if (Route::has('company.customer-ledger.index'))
+                            <a href="{{ route('company.customer-ledger.index') }}" class="btn btn-sm btn-outline-secondary dg-btn">
+                                <i class="fa-solid fa-book" aria-hidden="true"></i>
+                                Ledger
+                            </a>
+                        @else
+                            <a href="{{ route('company.customer-statement.index') }}" class="btn btn-sm btn-outline-secondary dg-btn">
+                                <i class="fa-solid fa-book" aria-hidden="true"></i>
+                                Ledger
+                            </a>
+                        @endif
+
+                        <a href="{{ route('company.customers.print', request()->query()) }}" target="_blank" class="btn btn-sm btn-outline-secondary dg-btn">Print</a>
+                    </nav>
                 </div>
 
             </div>
@@ -43,24 +62,26 @@
             <section class="dg-section">
                 <article class="card dg-card">
                     <header class="card-header dg-card-header">
-                        <h2 class="h6 mb-0">Customer List</h2>
+                        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <h2 class="h6 mb-0">Customer List</h2>
+
+                            <form method="GET" class="d-flex align-items-center gap-2 mb-0">
+                                <input type="hidden" name="search" value="{{ request('search') }}">
+
+                                <label for="per_page" class="mb-0 fw-bold">Per Page:</label>
+                                <select name="per_page" id="per_page" class="form-select form-select-sm dg-select w-auto" onchange="this.form.submit()">
+                                    <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
+                                    <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
+                                    <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
+                                    <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
+                                    <option value="200" {{ $perPage == 200 ? 'selected' : '' }}>200</option>
+                                    <option value="500" {{ $perPage == 500 ? 'selected' : '' }}>500</option>
+                                </select>
+                            </form>
+                        </div>
                     </header>
 
                     <div class="card-body dg-card-body">
-                        <form method="GET" class="d-flex justify-content-end align-items-center gap-2 mb-2">
-                            <input type="hidden" name="search" value="{{ request('search') }}">
-
-                            <label for="per_page" class="mb-0 fw-bold">Show</label>
-                            <select name="per_page" id="per_page" class="form-select form-select-sm dg-select w-auto" onchange="this.form.submit()">
-                                <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
-                                <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
-                                <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
-                                <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
-                                <option value="200" {{ $perPage == 200 ? 'selected' : '' }}>200</option>
-                                <option value="500" {{ $perPage == 500 ? 'selected' : '' }}>500</option>
-                            </select>
-                        </form>
-
                         <div class="table-responsive">
                             <table class="table dg-table">
                                 <thead class="dg-head">

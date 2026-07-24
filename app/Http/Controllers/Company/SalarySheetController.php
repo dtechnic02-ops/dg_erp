@@ -3,605 +3,517 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-
-use App\Models\SalarySheet;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
+use App\Http\Controllers\Concerns\AuthorizesSubscriptionModule;
+use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
+use Illuminate\Routing\Controllers\HasMiddleware;
 use App\Models\EmployeeAccount;
 use App\Models\FinancialYear;
-use Illuminate\Validation\Rule;
+use App\Models\SalarySheet;
 use App\Services\ValidationService;
+use App\Services\SalarySheetPaymentService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-class SalarySheetController extends Controller
+use Illuminate\Validation\Rule;
+
+class SalarySheetController extends Controller implements HasMiddleware
 {
-   public function index(Request $request)
-{
-    $query = SalarySheet::with('employee')
+    use AuthorizesCompanyPermission;
+    use AuthorizesSubscriptionModule;
+    use HandlesTransactionDocumentationEdit;
 
-        ->where(
-            'company_id',
-            auth()->user()->company_id
-        );
-
-    if($request->search){
-
-        $query->whereHas(
-            'employee',
-            function($q) use ($request){
-
-                $q->where(
-    'first_name',
-    'like',
-    '%'.$request->search.'%'
-)
-->orWhere(
-    'employee_code',
-    'like',
-    '%'.$request->search.'%'
-)
-->orWhere(
-    'phone',
-    'like',
-    '%'.$request->search.'%'
-);
-
-            }
-        );
+    public static function middleware(): array
+    {
+        return self::subscriptionModuleMiddleware();
     }
-    if($request->salary_month){
 
-    $query->where(
-        'salary_month',
-        $request->salary_month
-    );
-}
+    protected static function subscriptionModuleCode(): string
+    {
+        return 'hr';
+    }
 
-if($request->status){
+    public function index(Request $request)
+    {
+        $this->authorizeCompanyPermission('salary.view');
 
-    $query->where(
-        'status',
-        $request->status
-    );
-}
+        $companyId = auth()->user()->company_id;
 
-    $salarySheets = $query
-        ->latest()
-        ->paginate(20)
-        ->withQueryString();
+        $employees = EmployeeAccount::where('company_id', $companyId)
+            ->orderBy('first_name')
+            ->get();
 
-    return view(
-        'company.salary-sheets.index',
-        compact('salarySheets')
-    );
-}
-public function create()
-{
-    $employees = EmployeeAccount::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->where(
-        'status',
-        1
-    )
-    ->orderBy('first_name')
-    ->get();
+        $financialYears = FinancialYear::where('company_id', $companyId)
+            ->latest('id')
+            ->get();
 
-    $financialYears = FinancialYear::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->orderByDesc('id')
-    ->get();
+        $activeFy = FinancialYear::where('company_id', $companyId)
+            ->where('is_active', 1)
+            ->first();
 
-    return view(
-        'company.salary-sheets.create',
-        compact(
+        $query = $this->filteredSalarySheetQuery($request, $companyId, $activeFy);
+
+        $totalsQuery = (clone $query)
+            ->where('status', '!=', SalarySheet::STATUS_CANCELLED);
+
+        $totalAmount = (float) (clone $totalsQuery)->sum('net_salary');
+        $totalPaid = (float) (clone $totalsQuery)->sum('paid_amount');
+        $totalDue = (float) (clone $totalsQuery)->sum('due_amount');
+
+        $allowedPerPage = [10, 20, 100, 200];
+        $perPage = (int) $request->get('per_page', 10);
+
+        if (!in_array($perPage, $allowedPerPage, true)) {
+            $perPage = 10;
+        }
+
+        $salarySheets = $query
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return view('company.salary-sheets.index', compact(
+            'salarySheets',
             'employees',
-            'financialYears'
-        )
-    );
-}
+            'financialYears',
+            'activeFy',
+            'totalAmount',
+            'totalPaid',
+            'totalDue',
+            'perPage'
+        ));
+    }
 
+    public function print(Request $request)
+    {
+        $this->authorizeCompanyPermission('salary.view');
 
-public function store(Request $request)
-{
-    $companyId =
-    auth()->user()->company_id;
+        $companyId = auth()->user()->company_id;
 
-    $financialYearId =
-    $request->financial_year_id;
+        $activeFy = FinancialYear::where('company_id', $companyId)
+            ->where('is_active', 1)
+            ->first();
 
-    $request->validate([
+        $salarySheets = $this->filteredSalarySheetQuery($request, $companyId, $activeFy)
+            ->orderByDesc('salary_month')
+            ->orderBy('employee_id')
+            ->get();
 
-        'financial_year_id' =>
-        'required',
+        $totalsQuery = $salarySheets->where('status', '!=', SalarySheet::STATUS_CANCELLED);
 
-        'employee_id' =>
-        'required',
+        $totalAmount = (float) $totalsQuery->sum('net_salary');
+        $totalPaid = (float) $totalsQuery->sum('paid_amount');
+        $totalDue = (float) $totalsQuery->sum('due_amount');
 
-        'salary_month' => [
+        $financialYears = FinancialYear::where('company_id', $companyId)
+            ->orderByDesc('id')
+            ->get();
 
-            'required',
+        return view('company.salary-sheets.print', compact(
+            'salarySheets',
+            'totalAmount',
+            'totalPaid',
+            'totalDue',
+            'financialYears',
+            'activeFy'
+        ));
+    }
 
-            Rule::unique('salary_sheets')
-                ->where(function ($query) use ($request) {
+    private function filteredSalarySheetQuery(Request $request, int $companyId, ?FinancialYear $activeFy)
+    {
+        $query = SalarySheet::with(['employee', 'financialYear'])
+            ->where('company_id', $companyId);
 
+        if (!$request->has('financial_year_id')) {
+            if ($activeFy) {
+                $query->where('financial_year_id', $activeFy->id);
+            }
+        } elseif ($request->filled('financial_year_id')) {
+            $query->where('financial_year_id', $request->financial_year_id);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->whereHas('employee', function ($q) use ($search) {
+                $q->where('first_name', 'like', '%' . $search . '%')
+                    ->orWhere('middle_name', 'like', '%' . $search . '%')
+                    ->orWhere('last_name', 'like', '%' . $search . '%')
+                    ->orWhere('employee_code', 'like', '%' . $search . '%')
+                    ->orWhere('phone', 'like', '%' . $search . '%');
+            });
+        }
+
+        if ($request->filled('employee_id')) {
+            $query->where('employee_id', $request->employee_id);
+        }
+
+        if ($request->filled('salary_month')) {
+            $query->where('salary_month', $request->salary_month);
+        }
+
+        if (!$request->has('status')) {
+            $query->where('status', '!=', SalarySheet::STATUS_CANCELLED);
+        } elseif ($request->filled('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        return $query;
+    }
+
+    public function create()
+    {
+        $this->authorizeCompanyPermission('salary.create');
+
+        $companyId = auth()->user()->company_id;
+
+        $employees = EmployeeAccount::where('company_id', $companyId)
+            ->active()
+            ->orderBy('first_name')
+            ->get();
+
+        $financialYears = FinancialYear::where('company_id', $companyId)
+            ->orderByDesc('id')
+            ->get();
+
+        return view('company.salary-sheets.create', compact('employees', 'financialYears'));
+    }
+
+    public function store(Request $request)
+    {
+        $this->authorizeCompanyPermission('salary.create');
+
+        $companyId = auth()->user()->company_id;
+
+        $request->validate([
+            'financial_year_id' => [
+                'required',
+                ValidationService::existsForCompany('financial_years', $companyId),
+            ],
+            'employee_id' => [
+                'required',
+                ValidationService::existsForCompany('employee_accounts', $companyId),
+            ],
+            'salary_month' => [
+                'required',
+                Rule::unique('salary_sheets', 'salary_month')->where(function ($query) use ($request, $companyId) {
                     return $query
-                        ->where(
-                            'company_id',
-                            auth()->user()->company_id
-                        )
-                        ->where(
-                            'financial_year_id',
-                            $request->financial_year_id
-                        )
-                        ->where(
-                            'employee_id',
-                            $request->employee_id
-                        );
-
-                })
-
-        ],
-
-        'working_days' =>
-        'required|integer|min:1',
-
-        'present_days' =>
-        'required|integer|min:0',
-
-        'absent_days' =>
-        'nullable|integer|min:0',
-
-        'allowance' =>
-        'nullable|numeric',
-
-        'bonus' =>
-        'nullable|numeric',
-
-        'overtime_amount' =>
-        'nullable|numeric',
-
-        'deduction' =>
-        'nullable|numeric',
-
-    ]);
-
-    $employee =
-    EmployeeAccount::where(
-        'company_id',
-        $companyId
-    )
-    ->findOrFail(
-        $request->employee_id
-    );
-
-    if(
-        $request->present_days
-        +
-        ($request->absent_days ?? 0)
-        >
-        $request->working_days
-    ){
-
-        return back()
-            ->withInput()
-            ->withErrors([
-                'present_days' =>
-                'Present + Absent days cannot exceed Working Days.'
-            ]);
-
-    }
-
-    if($employee->basic_salary <= 0){
-
-        return back()
-            ->withInput()
-            ->withErrors([
-                'employee_id' =>
-                'Employee basic salary is not set.'
-            ]);
-
-    }
-
-    DB::transaction(function() use (
-
-        $request,
-        $companyId,
-        $financialYearId,
-        $employee
-
-    ){
-
-        $perDaySalary =
-
-            $request->working_days > 0
-
-            ?
-
-            (
-                $employee->basic_salary
-                /
-                $request->working_days
-            )
-
-            :
-
-            0;
-
-        $earnedSalary =
-
-            $perDaySalary
-            *
-            $request->present_days;
-
-        $netSalary = round(
-
-            $earnedSalary
-            +
-            ($request->allowance ?? 0)
-            +
-            ($request->bonus ?? 0)
-            +
-            ($request->overtime_amount ?? 0)
-            -
-            ($request->deduction ?? 0),
-
-            2
-
-        );
-
-        SalarySheet::create([
-
-            'company_id' =>
-            $companyId,
-
-            'financial_year_id' =>
-            $financialYearId,
-
-            'employee_id' =>
-            $employee->id,
-
-            'salary_month' =>
-            $request->salary_month,
-
-            'basic_salary' =>
-            $employee->basic_salary,
-
-            'working_days' =>
-            $request->working_days,
-
-            'present_days' =>
-            $request->present_days,
-
-            'absent_days' =>
-            $request->absent_days ?? 0,
-
-            'allowance' =>
-            $request->allowance ?? 0,
-
-            'bonus' =>
-            $request->bonus ?? 0,
-
-            'overtime_amount' =>
-            $request->overtime_amount ?? 0,
-
-            'deduction' =>
-            $request->deduction ?? 0,
-
-            'net_salary' =>
-            $netSalary,
-
-            'status' =>
-            'unpaid',
-
-            'note' =>
-            $request->note,
-
-            'created_by' =>
-            auth()->id()
-
+                        ->where('company_id', $companyId)
+                        ->where('financial_year_id', $request->financial_year_id)
+                        ->where('employee_id', $request->employee_id)
+                        ->where('status', '!=', SalarySheet::STATUS_CANCELLED);
+                }),
+            ],
+            'working_days' => 'required|integer|min:1',
+            'present_days' => 'required|integer|min:0',
+            'absent_days' => 'nullable|integer|min:0',
+            'allowance' => ValidationService::amount(),
+            'bonus' => ValidationService::amount(),
+            'overtime_amount' => ValidationService::amount(),
+            'deduction' => ValidationService::amount(),
         ]);
 
-    });
+        $employee = EmployeeAccount::where('company_id', $companyId)
+            ->active()
+            ->findOrFail($request->employee_id);
 
-    return redirect()
-        ->route(
-            'company.salary-sheets.index'
-        )
-        ->with(
-            'success',
-            'Salary Sheet Created Successfully'
-        );
-}
+        if ($request->present_days + ($request->absent_days ?? 0) > $request->working_days) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'present_days' => 'Present + Absent days cannot exceed Working Days.',
+                ]);
+        }
 
+        if ($employee->basic_salary <= 0) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'employee_id' => 'Employee basic salary is not set.',
+                ]);
+        }
 
+        $financialYear = FinancialYear::where('company_id', $companyId)
+            ->findOrFail($request->financial_year_id);
 
-
-
-
-public function edit($id)
-{
-    $salarySheet = SalarySheet::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->findOrFail($id);
-
-    $employees = EmployeeAccount::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->where(
-        'status',
-        1
-    )
-    ->orderBy('first_name')
-    ->get();
-
-    return view(
-        'company.salary-sheets.edit',
-        compact(
-            'salarySheet',
-            'employees'
-        )
-    );
-}
-public function update(
-    Request $request,
-    $id
-)
-{
-    $salarySheet = SalarySheet::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->findOrFail($id);
-
-    $request->validate([
-
-        'employee_id' => 'required',
-
-        'salary_month' => [
-            'required',
-
-           Rule::unique('salary_sheets')
-    ->ignore($salarySheet->id)
-    ->where(function ($query) use ($request) {
-
-        return $query
-            ->where(
-                'company_id',
-                auth()->user()->company_id
-            )
-            ->where(
-                'financial_year_id',
-                $request->financial_year_id
-            )
-            ->where(
-                'employee_id',
-                $request->employee_id
+        try {
+            $activeFy = $this->assertActiveFinancialYear($companyId);
+            $this->assertFinancialYearIsActive($financialYear);
+            $this->assertTransactionFinancialYear(
+                new SalarySheet(['financial_year_id' => $financialYear->id]),
+                $activeFy,
+                'Salary sheet must belong to the active financial year.'
             );
+        } catch (\Exception $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
 
-    })
-(function ($query) use ($request) {
+        DB::transaction(function () use ($request, $companyId, $employee) {
+            $netSalary = $this->calculateNetSalary($employee, $request);
 
-    return $query
-        ->where(
-            'company_id',
-            auth()->user()->company_id
-        )
-        ->where(
-            'financial_year_id',
-            $request->financial_year_id
-        )
-        ->where(
-            'employee_id',
-            $request->employee_id
-        );
-
-})
-        ],
-
-        'working_days' =>
-        'required|integer|min:1',
-
-        'present_days' =>
-        'required|integer|min:0',
-
-        'absent_days' =>
-        'nullable|integer|min:0',
-
-        'allowance' =>
-        ValidationService::amount(),
-
-        'bonus' =>
-        ValidationService::amount(),
-
-        'overtime_amount' =>
-        ValidationService::amount(),
-
-        'deduction' =>
-        ValidationService::amount(),
-
-    ]);
-
-    $employee = EmployeeAccount::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->findOrFail(
-        $request->employee_id
-    );
-
-    if(
-        $request->present_days +
-        ($request->absent_days ?? 0)
-        >
-        $request->working_days
-    ){
-        return back()
-            ->withInput()
-            ->withErrors([
-                'present_days' =>
-                'Present + Absent days cannot exceed Working Days.'
+            SalarySheet::create([
+                'company_id' => $companyId,
+                'financial_year_id' => $request->financial_year_id,
+                'employee_id' => $employee->id,
+                'salary_month' => $request->salary_month,
+                'basic_salary' => $employee->basic_salary,
+                'working_days' => $request->working_days,
+                'present_days' => $request->present_days,
+                'absent_days' => $request->absent_days ?? 0,
+                'allowance' => $request->allowance ?? 0,
+                'bonus' => $request->bonus ?? 0,
+                'overtime_amount' => $request->overtime_amount ?? 0,
+                'deduction' => $request->deduction ?? 0,
+                'net_salary' => $netSalary,
+                'paid_amount' => 0,
+                'due_amount' => $netSalary,
+                'status' => SalarySheet::STATUS_UNPAID,
+                'note' => $request->note,
+                'created_by' => auth()->id(),
             ]);
+        });
+
+        return redirect()
+            ->route('company.salary-sheets.index')
+            ->with('success', 'Salary Sheet Created Successfully');
     }
 
-    $perDaySalary =
-        $employee->basic_salary /
-        $request->working_days;
+    public function show($id)
+    {
+        $this->authorizeCompanyPermission('salary.view');
 
-    $earnedSalary =
-        $perDaySalary *
-        $request->present_days;
+        $salarySheet = SalarySheet::with([
+            'employee',
+            'financialYear',
+            'creator',
+            'updater',
+            'canceller',
+            'employeePayments.account',
+        ])
+            ->where('company_id', auth()->user()->company_id)
+            ->findOrFail($id);
 
-    $netSalary = round(
+        return view('company.salary-sheets.show', compact('salarySheet'));
+    }
 
-        $earnedSalary
-        +
-        ($request->allowance ?? 0)
-        +
-        ($request->bonus ?? 0)
-        +
-        ($request->overtime_amount ?? 0)
-        -
-        ($request->deduction ?? 0),
+    public function edit($id)
+    {
+        $this->authorizeCompanyPermission('salary.edit');
 
-        2
+        $companyId = auth()->user()->company_id;
 
-    );
+        $salarySheet = SalarySheet::with('financialYear')
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
-    $salarySheet->update([
+        try {
+            $this->assertEditable($salarySheet);
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('company.salary-sheets.show', $salarySheet->id)
+                ->with('error', $e->getMessage());
+        }
 
-        'employee_id' =>
-        $employee->id,
+        $employees = EmployeeAccount::where('company_id', $companyId)
+            ->where(function ($query) use ($salarySheet) {
+                $query->active()
+                    ->orWhere('id', $salarySheet->employee_id);
+            })
+            ->orderBy('first_name')
+            ->get();
 
-        'salary_month' =>
-        $request->salary_month,
+        return view('company.salary-sheets.edit', compact('salarySheet', 'employees'));
+    }
 
-        'basic_salary' =>
-        $employee->basic_salary,
+    public function update(Request $request, $id)
+    {
+        $this->authorizeCompanyPermission('salary.edit');
 
-        'working_days' =>
-        $request->working_days,
+        $companyId = auth()->user()->company_id;
 
-        'present_days' =>
-        $request->present_days,
+        $salarySheet = SalarySheet::where('company_id', $companyId)
+            ->findOrFail($id);
 
-        'absent_days' =>
-        $request->absent_days ?? 0,
+        try {
+            $this->assertEditable($salarySheet);
+            $this->assertFinancialYearIsActive(
+                $salarySheet->financialYear
+                    ?? FinancialYear::where('company_id', $companyId)
+                        ->findOrFail($salarySheet->financial_year_id),
+                'Inactive financial year cannot be edited.'
+            );
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
-        'allowance' =>
-        $request->allowance ?? 0,
+        $request->validate([
+            'financial_year_id' => [
+                'required',
+                Rule::in([$salarySheet->financial_year_id]),
+                ValidationService::existsForCompany('financial_years', $companyId),
+            ],
+            'employee_id' => [
+                'required',
+                ValidationService::existsForCompany('employee_accounts', $companyId),
+            ],
+            'salary_month' => [
+                'required',
+                Rule::unique('salary_sheets', 'salary_month')
+                    ->ignore($salarySheet->id)
+                    ->where(function ($query) use ($request, $companyId, $salarySheet) {
+                        return $query
+                            ->where('company_id', $companyId)
+                            ->where('financial_year_id', $salarySheet->financial_year_id)
+                            ->where('employee_id', $request->employee_id)
+                            ->where('status', '!=', SalarySheet::STATUS_CANCELLED);
+                    }),
+            ],
+            'working_days' => 'required|integer|min:1',
+            'present_days' => 'required|integer|min:0',
+            'absent_days' => 'nullable|integer|min:0',
+            'allowance' => ValidationService::amount(),
+            'bonus' => ValidationService::amount(),
+            'overtime_amount' => ValidationService::amount(),
+            'deduction' => ValidationService::amount(),
+        ]);
 
-        'bonus' =>
-        $request->bonus ?? 0,
+        $employee = EmployeeAccount::where('company_id', $companyId)
+            ->findOrFail($request->employee_id);
 
-        'overtime_amount' =>
-        $request->overtime_amount ?? 0,
+        if ($request->present_days + ($request->absent_days ?? 0) > $request->working_days) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'present_days' => 'Present + Absent days cannot exceed Working Days.',
+                ]);
+        }
 
-        'deduction' =>
-        $request->deduction ?? 0,
+        $netSalary = $this->calculateNetSalary($employee, $request);
 
-        'net_salary' =>
-        $netSalary,
+        DB::transaction(function () use ($request, $companyId, $employee, $salarySheet, $netSalary) {
+            $lockedSheet = SalarySheet::where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($salarySheet->id);
 
-        'note' =>
-        $request->note,
+            $this->assertEditable($lockedSheet);
 
-    ]);
+            $lockedSheet->update([
+                'employee_id' => $employee->id,
+                'salary_month' => $request->salary_month,
+                'basic_salary' => $employee->basic_salary,
+                'working_days' => $request->working_days,
+                'present_days' => $request->present_days,
+                'absent_days' => $request->absent_days ?? 0,
+                'allowance' => $request->allowance ?? 0,
+                'bonus' => $request->bonus ?? 0,
+                'overtime_amount' => $request->overtime_amount ?? 0,
+                'deduction' => $request->deduction ?? 0,
+                'net_salary' => $netSalary,
+                'note' => $request->note,
+                'updated_by' => auth()->id(),
+            ]);
 
-    return redirect()
-        ->route(
-            'company.salary-sheets.index'
-        )
-        ->with(
-            'success',
-            'Salary Sheet Updated Successfully'
-        );
-}
+            app(SalarySheetPaymentService::class)->sync($lockedSheet->fresh());
+        });
 
-public function destroy($id)
-{
-   
-    $salarySheet = SalarySheet::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->findOrFail($id);
+        return redirect()
+            ->route('company.salary-sheets.index')
+            ->with('success', 'Salary Sheet Updated Successfully');
+    }
 
-    $salarySheet->delete();
+    public function cancel(Request $request, $id)
+    {
+        $this->authorizeCompanyPermission('salary.cancel');
 
-    return back()->with(
-        'success',
-        'Salary Sheet Deleted Successfully'
-    );
-}
+        $request->validate([
+            'cancel_reason' => ValidationService::requiredString(500),
+        ]);
 
+        try {
+            DB::transaction(function () use ($request, $id) {
+                $companyId = auth()->user()->company_id;
 
+                $salarySheet = SalarySheet::with('financialYear')
+                    ->where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($id);
 
+                $this->assertCancellable($salarySheet);
+                $this->assertFinancialYearIsActive(
+                    $salarySheet->financialYear
+                        ?? FinancialYear::where('company_id', $companyId)
+                            ->findOrFail($salarySheet->financial_year_id),
+                    'Inactive financial year cannot be cancelled.'
+                );
 
-public function show($id)
-{
-    $salarySheet = SalarySheet::with('employee')
+                $cancelReason = trim($request->cancel_reason);
 
-        ->where(
-            'company_id',
-            auth()->user()->company_id
-        )
+                $salarySheet->update([
+                    'status' => SalarySheet::STATUS_CANCELLED,
+                    'cancelled_by' => auth()->id(),
+                    'cancelled_at' => now(),
+                    'cancel_reason' => $cancelReason,
+                    'updated_by' => auth()->id(),
+                    'note' => trim(($salarySheet->note ?? '') . ' [Cancelled: ' . $cancelReason . ']'),
+                ]);
+            });
 
-        ->findOrFail($id);
+            return back()->with('success', 'Salary sheet cancelled successfully.');
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
 
-    return view(
-        'company.salary-sheets.show',
-        compact('salarySheet')
-    );
-}
-public function print(Request $request)
-{
-    $query = SalarySheet::with('employee')
+    private function calculateNetSalary(EmployeeAccount $employee, Request $request): float
+    {
+        $perDaySalary = $request->working_days > 0
+            ? ($employee->basic_salary / $request->working_days)
+            : 0;
 
-        ->where(
-            'company_id',
-            auth()->user()->company_id
-        );
+        $earnedSalary = $perDaySalary * $request->present_days;
 
-    if($request->employee_id){
-
-        $query->where(
-            'employee_id',
-            $request->employee_id
+        return round(
+            $earnedSalary
+            + ($request->allowance ?? 0)
+            + ($request->bonus ?? 0)
+            + ($request->overtime_amount ?? 0)
+            - ($request->deduction ?? 0),
+            2
         );
     }
 
-    if($request->salary_month){
+    private function assertEditable(SalarySheet $salarySheet): void
+    {
+        if ($salarySheet->isCancelled()) {
+            throw new \Exception('Cancelled salary sheet cannot be edited.');
+        }
 
-        $query->where(
-            'salary_month',
-            $request->salary_month
-        );
+        if ($salarySheet->isPaid()) {
+            throw new \Exception('Paid salary sheet cannot be edited.');
+        }
+
+        if ($salarySheet->isPartial()) {
+            throw new \Exception('Partial salary sheet cannot be edited.');
+        }
     }
 
-    if($request->status){
+    private function assertCancellable(SalarySheet $salarySheet): void
+    {
+        if ($salarySheet->isCancelled()) {
+            throw new \Exception('Salary sheet already cancelled.');
+        }
 
-        $query->where(
-            'status',
-            $request->status
-        );
+        if ($salarySheet->isPaid()) {
+            throw new \Exception('Paid salary sheet cannot be cancelled.');
+        }
+
+        if ($salarySheet->isPartial()) {
+            throw new \Exception('Partial salary sheet cannot be cancelled.');
+        }
+
+        if ($salarySheet->hasActiveEmployeePayments()) {
+            throw new \Exception(
+                'Salary Sheet cannot be cancelled because active salary payments exist. Cancel all salary payments before cancelling the salary sheet.'
+            );
+        }
     }
-
-    $salarySheets = $query
-        ->orderBy(
-            'salary_month',
-            'desc'
-        )
-        ->get();
-
-    return view(
-        'company.salary-sheets.print',
-        compact('salarySheets')
-    );
-}
-
 }

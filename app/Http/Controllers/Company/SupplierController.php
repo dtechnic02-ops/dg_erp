@@ -28,15 +28,7 @@ auth()->user()->company_id
 
 )
 
-->where(
-
-'status',
-
-'!=',
-
-'inactive'
-
-);
+->active();
 
         // 🔍 SEARCH
         if ($request->search) {
@@ -58,14 +50,22 @@ auth()->user()->company_id
         $totalCurrentBalance = $this->filteredSupplierQuery($request)
             ->sum('current_balance');
 
+        $allowedPerPage = [10, 25, 50, 100, 200, 500];
+
+        $perPage = (int) $request->get('per_page', 10);
+
+        if (!in_array($perPage, $allowedPerPage)) {
+            $perPage = 10;
+        }
+
         $suppliers = $this->filteredSupplierQuery($request)
             ->latest()
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view(
             'company.suppliers.index',
-            compact('suppliers', 'totalCurrentBalance')
+            compact('suppliers', 'totalCurrentBalance', 'perPage')
         );
     }
 
@@ -75,15 +75,10 @@ auth()->user()->company_id
 public function store(Request $request)
 {
     $request->validate([
-
+        'credit_days' => ValidationService::quantity(),
         'name' => 'required|max:255',
-
-        'image_path' =>
-            ValidationService::image(),
-
-        'opening_balance' =>
-            ValidationService::amount(),
-
+        'image_path' => ValidationService::image(),
+        'opening_balance' => ValidationService::amount(),
     ]);
 
     $imagePath = null;
@@ -102,138 +97,144 @@ public function store(Request $request)
                 800
             );
     }
-DB::beginTransaction();
 
-try {
-    $supplier = Supplier::create([
+    DB::beginTransaction();
 
-        'company_id' =>
-            auth()->user()->company_id,
-
-        'name' =>
-            $request->name,
-
-        'authority_name' =>
-            $request->authority_name,
-
-        'mobile' =>
-            $request->mobile,
-
-        'telephone' =>
-            $request->telephone,
-
-        'fax_no' =>
-            $request->fax_no,
-
-        'email' =>
-            $request->email,
-
-        'website' =>
-            $request->website,
-
-        'address' =>
-            $request->address,
-
-        'tax_no' =>
-            $request->tax_no,
-
-        'opening_balance' =>
-            $request->opening_balance ?? 0,
-
-
-        'bank_name' =>
-            $request->bank_name,
-
-        'bank_account_no' =>
-            $request->bank_account_no,
-
-        'note' =>
-            $request->note,
-
-        'image_path' =>
-            $imagePath,
-
-        'status' =>
-            $request->status ?? 'active',
-
-    ]);
-    if ($supplier->opening_balance > 0)
-{
-    $activeFy = FinancialYear::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->where(
-        'is_active',
-        1
-    )
-    ->first();
-
-    if ($activeFy)
-    {
-        SupplierTransactionService::createTransaction([
+    try {
+        $supplier = Supplier::create([
 
             'company_id' =>
                 auth()->user()->company_id,
 
-            'financial_year_id' =>
-                $activeFy->id,
-
-            'supplier_id' =>
-                $supplier->id,
-
-            'transaction_date' =>
-                $activeFy->start_date,
-
-            'voucher_no' =>
-                'OB-' . $supplier->id,
-
-            'reference_type' =>
-                'opening_balance',
-
-            'reference_id' =>
-                $supplier->id,
-
-            'reference_no' =>
-                null,
-
-            'description' =>
-                'Opening Balance',
-
-            'debit' =>
-                $supplier->opening_balance,
-
-            'credit' =>
-                0,
-
             'created_by' =>
                 auth()->id(),
 
+            'name' =>
+                $request->name,
+
+            'authority_name' =>
+                $request->authority_name,
+
+            'mobile' =>
+                $request->mobile,
+
+            'telephone' =>
+                $request->telephone,
+
+            'fax_no' =>
+                $request->fax_no,
+
+            'email' =>
+                $request->email,
+
+            'website' =>
+                $request->website,
+
+            'address' =>
+                $request->address,
+
+            'tax_no' =>
+                $request->tax_no,
+
+            'opening_balance' =>
+                $request->opening_balance ?? 0,
+
+            'credit_days' =>
+                max(0, (int) ($request->credit_days ?? 0)),
+
+            'current_balance' =>
+                $request->opening_balance ?? 0,
+
+            'bank_name' =>
+                $request->bank_name,
+
+            'bank_account_no' =>
+                $request->bank_account_no,
+
+            'note' =>
+                $request->note,
+
+            'image_path' =>
+                $imagePath,
+
             'status' =>
-                1,
+                $request->status ?? 'active',
 
         ]);
+
+        if ($supplier->opening_balance > 0)
+        {
+            $activeFy = FinancialYear::where(
+                'company_id',
+                auth()->user()->company_id
+            )
+            ->where(
+                'is_active',
+                1
+            )
+            ->firstOrFail();
+
+            SupplierTransactionService::createTransaction([
+
+                'company_id' =>
+                    auth()->user()->company_id,
+
+                'financial_year_id' =>
+                    $activeFy->id,
+
+                'supplier_id' =>
+                    $supplier->id,
+
+                'transaction_date' =>
+                    $activeFy->start_date,
+
+                'voucher_no' =>
+                    'OPEN-' . $supplier->id,
+
+                'reference_type' =>
+                    'opening_balance',
+
+                'reference_id' =>
+                    $supplier->id,
+
+                'reference_no' =>
+                    'OPEN-' . $supplier->id,
+
+                'description' =>
+                    'Supplier Opening Balance',
+
+                'debit' =>
+                    0,
+
+                'credit' =>
+                    $supplier->opening_balance,
+
+                'created_by' =>
+                    auth()->id(),
+
+                'status' =>
+                    1,
+
+            ]);
+        }
+
+        DB::commit();
+
+        return back()->with(
+            'success',
+            'Supplier Added Successfully'
+        );
     }
-}
+    catch (\Exception $e)
+    {
+        DB::rollBack();
 
-    DB::commit();
+        FileUploadService::deleteFile(
+            $imagePath
+        );
 
-return back()->with(
-    'success',
-    'Supplier Added Successfully'
-);
-}
-catch (\Exception $e)
-{
-    DB::rollBack();
-
-    FileUploadService::deleteFile(
-        $imagePath
-    );
-
-    throw $e;
-}
-
+        throw $e;
+    }
 }
     
 
@@ -257,31 +258,11 @@ public function update(
     )
     ->firstOrFail();
 
-    // Opening Balance Change Protection
-    if (
-        $supplier->current_balance !=
-        $supplier->opening_balance
-        &&
-        $request->opening_balance !=
-        $supplier->opening_balance
-    )
-    {
-        return back()->with(
-            'error',
-            'Opening balance cannot be changed after transactions.'
-        );
-    }
-
     $request->validate([
-
+        'credit_days' => ValidationService::quantity(),
         'name' => 'required|max:255',
-
-        'opening_balance' =>
-            ValidationService::amount(),
-
-        'image_path' =>
-            ValidationService::image(),
-
+        'opening_balance' => ValidationService::amount(),
+        'image_path' => ValidationService::image(),
     ]);
 
     $data = [
@@ -313,8 +294,14 @@ public function update(
         'tax_no' =>
             $request->tax_no,
 
+        'credit_days' =>
+            max(0, (int) ($request->credit_days ?? 0)),
+
         'opening_balance' =>
-            $request->opening_balance ?? 0,
+            $supplier->opening_balance,
+
+        'current_balance' =>
+            $supplier->current_balance,
 
         'bank_name' =>
             $request->bank_name,

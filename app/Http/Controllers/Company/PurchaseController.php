@@ -24,9 +24,11 @@ use App\Models\SupplierTransaction;
 use App\Models\StockMovement;
 
 use App\Services\ValidationService;
-class PurchaseController extends Controller
+use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
+class PurchaseController extends Controller
 {
+    use HandlesTransactionDocumentationEdit;
 
 public function index(Request $request)
 {
@@ -36,7 +38,9 @@ public function index(Request $request)
     $suppliers = Supplier::where(
         'company_id',
         $companyId
-    )->get();
+    )
+    ->active()
+    ->get();
 
    
     $financialYears = FinancialYear::where(
@@ -239,6 +243,18 @@ public function index(Request $request)
         ->unique()
         ->all();
 
+    $activeRefundInvoiceIds = PurchaseReturn::where('company_id', $companyId)
+        ->whereIn('purchase_invoice_id', $invoices->pluck('id'))
+        ->whereIn('id', function ($query) use ($companyId) {
+            $query->select('purchase_return_id')
+                ->from('purchase_return_refunds')
+                ->where('company_id', $companyId)
+                ->whereIn('status', PurchaseReturnRefund::activeStatusValues());
+        })
+        ->pluck('purchase_invoice_id')
+        ->unique()
+        ->all();
+
     return view(
         'company.purchases.index',
         compact(
@@ -252,7 +268,8 @@ public function index(Request $request)
             'totalPaid',
             'totalDue',
             'perPage',
-            'activeReturnInvoiceIds'
+            'activeReturnInvoiceIds',
+            'activeRefundInvoiceIds'
         )
     );
 }
@@ -265,7 +282,9 @@ public function printList(Request $request)
     $suppliers = Supplier::where(
         'company_id',
         $companyId
-    )->get();
+    )
+    ->active()
+    ->get();
 
     $financialYears = FinancialYear::where(
         'company_id',
@@ -488,6 +507,7 @@ public function create()
             'company_id',
             $companyId
         )
+        ->active()
         ->get();
 
     $products = Product::with([
@@ -1295,6 +1315,23 @@ public function cancel(Request $request, $id)
                 );
             }
 
+            $returnIds = PurchaseReturn::where('company_id', $companyId)
+                ->where('purchase_invoice_id', $invoice->id)
+                ->pluck('id');
+
+            if ($returnIds->isNotEmpty()) {
+                $activeRefundsExist = PurchaseReturnRefund::where('company_id', $companyId)
+                    ->whereIn('purchase_return_id', $returnIds)
+                    ->active()
+                    ->exists();
+
+                if ($activeRefundsExist) {
+                    throw new \Exception(
+                        'This invoice cannot be cancelled because one or more active purchase return refunds exist.'
+                    );
+                }
+            }
+
             foreach ($invoice->items as $item)
             {
                 if (!$item->product_id)
@@ -1414,6 +1451,7 @@ public function cancel(Request $request, $id)
             'This Purchase Invoice belongs to another Financial Year. Please activate that Financial Year first.',
             'Invoice cannot be cancelled because one or more active payments exist.',
             'This invoice cannot be cancelled because one or more active purchase returns exist.',
+            'This invoice cannot be cancelled because one or more active purchase return refunds exist.',
             'Cancel date must belong to the active financial year.',
         ];
 
@@ -1537,8 +1575,8 @@ public function update(Request $request, $id)
     $companyId = auth()->user()->company_id;
 
     $request->validate([
-        'purchase_date' => 'required|date',
-        'note' => 'nullable|string',
+        'purchase_date' => ValidationService::requiredDate(),
+        'note'          => ValidationService::text(),
     ]);
 
     try {
@@ -1586,45 +1624,42 @@ public function update(Request $request, $id)
                     );
                 }
 
-                $invoice->update([
-                    'note' => $request->note,
-                ]);
+                $invoice->update(
+                    $this->appendUpdatedBy([
+                        'note' => $request->note,
+                    ], $invoice)
+                );
+
+                $this->logDocumentationEdit(
+                    'Purchase invoice documentation updated (note only).',
+                    $invoice
+                );
 
                 return;
             }
 
             $purchaseDate = \Carbon\Carbon::parse($request->purchase_date);
-            $startDate = \Carbon\Carbon::parse($activeFy->start_date);
-            $endDate = \Carbon\Carbon::parse($activeFy->end_date);
 
-            if ($purchaseDate->lt($startDate) || $purchaseDate->gt($endDate)) {
-                throw new \Exception('No active financial year found for selected purchase date.');
-            }
-
-            $supplier = Supplier::where('company_id', $companyId)
-                ->findOrFail($invoice->supplier_id);
+            $this->assertDateWithinFinancialYear(
+                $request->purchase_date,
+                $activeFy,
+                'No active financial year found for selected purchase date.'
+            );
 
             $newPurchaseDate = $purchaseDate->toDateString();
-            $currentPurchaseDate = $invoice->purchase_date
-                ? \Carbon\Carbon::parse($invoice->purchase_date)->format('Y-m-d')
-                : null;
 
-            $invoice->update([
-                'purchase_date' => $newPurchaseDate,
-                'due_date' => $this->calculateInvoiceDueDate(
-                    $newPurchaseDate,
-                    $supplier
-                ),
-                'note' => $request->note,
-            ]);
+            $invoice->update(
+                $this->appendUpdatedBy([
+                    'purchase_date' => $newPurchaseDate,
+                    'note'          => $request->note,
+                ], $invoice)
+            );
 
-            if ($newPurchaseDate !== $currentPurchaseDate) {
-                $this->syncInvoicePurchaseBusinessDate(
-                    $invoice,
-                    $newPurchaseDate,
-                    $companyId
-                );
-            }
+            $this->logDocumentationEdit(
+                'Purchase invoice documentation updated.',
+                $invoice,
+                ['purchase_date' => $newPurchaseDate]
+            );
         });
     } catch (\Throwable $e) {
         return back()->with(

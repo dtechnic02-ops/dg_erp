@@ -3,12 +3,17 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesCompanyProfile;
 use Illuminate\Http\Request;
 
 class CompanyClientController extends Controller
 {
+    use AuthorizesCompanyProfile;
+
     public function profile()
     {
+        $this->authorizeViewCompanyProfile();
+
         $company = auth()->user()->company;
 
         return view('company.profile', compact('company'));
@@ -16,6 +21,8 @@ class CompanyClientController extends Controller
 
     public function edit()
     {
+        $this->authorizeViewCompanyProfile();
+
         $company = auth()->user()->company;
 
         return view('company.profile', compact('company'));
@@ -23,6 +30,8 @@ class CompanyClientController extends Controller
 
     public function update(Request $request)
 {
+    $this->authorizeEditCompanyProfile();
+
     $company = auth()->user()->company;
 
     /**

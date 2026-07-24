@@ -351,9 +351,11 @@
 </div>
 
 <!-- BUTTON -->
+@if(auth()->user()->hasPermission('edit_company_profile'))
 <button type="submit" class="btn">
     💾 Update Profile
 </button>
+@endif
 
 </form>
 

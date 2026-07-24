@@ -34,4 +34,19 @@ class Company extends Model
     );
 
 }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(CompanySubscription::class);
+    }
+
+    public function activeSubscription()
+    {
+        return $this->hasOne(CompanySubscription::class)->where('status', 'active')->latestOfMany();
+    }
+
+    public function staffPermissions()
+    {
+        return $this->belongsToMany(Permission::class, 'company_permission');
+    }
 }
