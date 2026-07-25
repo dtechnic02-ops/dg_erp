@@ -6,8 +6,8 @@
 
 @php
     $user = auth()->user();
-    $canCreate = $user && ($user->role_id == 2 || $user->hasPermission('create_journal'));
-    $canEdit = $user && ($user->role_id == 2 || $user->hasPermission('edit_journal'));
+    $canCreate = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('create_journal'));
+    $canEdit = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('edit_journal'));
 @endphp
 
 <div class="dg-page">

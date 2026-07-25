@@ -57,7 +57,7 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => $request->password,
             'company_id' => $company->id,
-            'role_id' => Role::idForName(Role::STAFF),
+            'role_id' => Role::COMPANY_STAFF_ID,
             'job_role' => $request->job_role,
             'account_status' => 'active',
         ]);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Role;
 use App\Services\SubscriptionService;
 use Closure;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class EnsureSubscriptionModule
     {
         $user = auth()->user();
 
-        if ($user && (int) $user->role_id === 2) {
+        if ($user && (int) $user->role_id === Role::COMPANY_ADMIN_ID) {
             $company = $user->company;
 
             if (! $company) {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
+use App\Models\Role;
 use Illuminate\Http\Request;
 
 class PlanController extends Controller
@@ -11,7 +12,7 @@ class PlanController extends Controller
     // 🔥 LIST
     public function index()
     {
-        abort_unless(auth()->check() && auth()->user()->role_id == 1, 403);
+        abort_unless(auth()->check() && (int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
 
         $plans = Plan::latest()->get();
         return view('admin.plans', compact('plans'));
@@ -20,7 +21,7 @@ class PlanController extends Controller
     // 🔥 STORE
     public function store(Request $request)
 {
-    abort_unless(auth()->user()->role_id == 1, 403);
+    abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
 
     $request->validate([
         'name' => 'required|string|max:100',
@@ -52,7 +53,7 @@ class PlanController extends Controller
     // 🔥 EDIT
     public function edit($id)
     {
-        abort_unless(auth()->user()->role_id == 1, 403);
+        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
 
         $plan = Plan::findOrFail($id);
         return view('admin.plan_edit', compact('plan'));
@@ -61,7 +62,7 @@ class PlanController extends Controller
     // 🔥 UPDATE
     public function update(Request $request, $id)
 {
-    abort_unless(auth()->user()->role_id == 1, 403);
+    abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
 
     $request->validate([
         'name' => 'required|string|max:100',
@@ -96,7 +97,7 @@ class PlanController extends Controller
     // 🔥 DELETE
     public function delete($id)
     {
-        abort_unless(auth()->user()->role_id == 1, 403);
+        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
 
         Plan::findOrFail($id)->delete();
 

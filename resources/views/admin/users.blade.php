@@ -92,8 +92,8 @@
     <td>{{ $u->company->company_name ?? 'N/A' }}</td>
 
     <td>
-        @if($u->role_id == 1) Admin
-        @elseif($u->role_id == 2) Company
+        @if((int) $u->role_id === \App\Models\Role::SUPER_ADMIN_ID) Admin
+        @elseif((int) $u->role_id === \App\Models\Role::COMPANY_ADMIN_ID) Company
         @else Staff
         @endif
     </td>
@@ -109,7 +109,7 @@
     <td>
 
         {{-- 🔒 ONLY SUPER ADMIN --}}
-        @if(auth()->user()->role_id == 1)
+        @if((int) auth()->user()->role_id === \App\Models\Role::SUPER_ADMIN_ID)
 
             {{-- 🔐 BLOCK / UNBLOCK --}}
             @if($u->account_status == 'blocked')

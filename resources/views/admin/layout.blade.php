@@ -77,8 +77,8 @@
 
                     @auth
                         @php
-                            $canManageSubscription = auth()->user()->role_id == 1 || auth()->user()->hasPermission('manage_subscription_module');
-                            $canViewSubscription = auth()->user()->role_id == 1 || auth()->user()->role_id == 4 || auth()->user()->hasPermission('view_subscription_module');
+                            $canManageSubscription = (int) auth()->user()->role_id === \App\Models\Role::SUPER_ADMIN_ID || auth()->user()->hasPermission('manage_subscription_module');
+                            $canViewSubscription = in_array((int) auth()->user()->role_id, [\App\Models\Role::SUPER_ADMIN_ID, \App\Models\Role::SUPER_STAFF_ID], true) || auth()->user()->hasPermission('view_subscription_module');
                             $subscriptionOpen = request()->routeIs(
                                 'admin.subscription-plans.*',
                                 'admin.subscription-payments.*',

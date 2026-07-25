@@ -9,6 +9,7 @@ use App\Models\SubscriptionHistory;
 use App\Models\SubscriptionPayment;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanBillingOption;
+use App\Models\Role;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -611,7 +612,7 @@ class SubscriptionService
         }
 
         $currentStaff = User::where('company_id', $company->id)
-            ->where('role_id', 3)
+            ->where('role_id', Role::COMPANY_STAFF_ID)
             ->count();
 
         return $currentStaff < $limit;

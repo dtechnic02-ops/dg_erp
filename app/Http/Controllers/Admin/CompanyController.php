@@ -12,6 +12,8 @@ use App\Http\Controllers\Controller;
 
 use App\Models\Company;
 
+use App\Models\Role;
+
 use App\Models\User;
 
 use App\Services\SubscriptionService;
@@ -282,7 +284,7 @@ class CompanyController extends Controller
 
         $user = User::where('company_id', $company->id)
 
-            ->where('role_id', 2)
+            ->where('role_id', Role::COMPANY_ADMIN_ID)
 
             ->first();
 

@@ -6,8 +6,8 @@
 
 @php
     $user = auth()->user();
-    $canEdit = $user && ($user->role_id == 2 || $user->hasPermission('edit_journal'));
-    $canPrint = $user && ($user->role_id == 2 || $user->hasPermission('print_journal'));
+    $canEdit = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('edit_journal'));
+    $canPrint = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('print_journal'));
     $company = auth()->user()->company;
 
     $totalDebit = 0.0;

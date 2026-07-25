@@ -6,8 +6,8 @@
 
 @php
     $user = auth()->user();
-    $canCreate = $user && ($user->role_id == 2 || $user->hasPermission('create_delivery'));
-    $canProcess = $user && ($user->role_id == 2 || $user->hasPermission('process_delivery'));
+    $canCreate = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('create_delivery'));
+    $canProcess = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('process_delivery'));
 
     $statusOptions = [
         '' => 'Active (Exclude Cancelled)',

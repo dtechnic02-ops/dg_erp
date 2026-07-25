@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Role;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -16,7 +17,7 @@ class CheckPermission
         }
 
         // super admin bypass
-        if ($user->role_id == 1) {
+        if ((int) $user->role_id === Role::SUPER_ADMIN_ID) {
             return $next($request);
         }
 

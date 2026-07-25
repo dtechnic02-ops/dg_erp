@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Role;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
@@ -12,7 +13,7 @@ class UserController extends Controller
     // 🔥 USER LIST
     public function index(Request $request)
     {
-        abort_unless(auth()->check() && auth()->user()->role_id == 1, 403);
+        abort_unless(auth()->check() && (int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
 
         $query = User::with('company');
 
@@ -42,7 +43,7 @@ class UserController extends Controller
     // 🔥 DELETE USER
     public function delete($id)
     {
-        abort_unless(auth()->user()->role_id == 1, 403);
+        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
 
         $user = User::findOrFail($id);
 
@@ -59,7 +60,7 @@ class UserController extends Controller
     // 🔥 BLOCK USER
     public function block($id)
     {
-        abort_unless(auth()->user()->role_id == 1, 403);
+        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
 
         $user = User::findOrFail($id);
 
@@ -77,7 +78,7 @@ class UserController extends Controller
     // 🔥 UNBLOCK USER
     public function unblock($id)
     {
-        abort_unless(auth()->user()->role_id == 1, 403);
+        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
 
         $user = User::findOrFail($id);
 
@@ -90,7 +91,7 @@ class UserController extends Controller
     // 🔐 RESET PASSWORD
     public function reset($id)
     {
-        abort_unless(auth()->user()->role_id == 1, 403);
+        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
 
         $user = User::findOrFail($id);
 

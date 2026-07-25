@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\SubscriptionPayment;
 use App\Models\SubscriptionPlan;
 use App\Models\CompanyRegistration;
+use App\Models\Role;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -28,8 +29,8 @@ class DashboardController extends Controller
         $blockedUsers = User::where('account_status', 'blocked')->count();
         $pendingUsers = User::where('account_status', 'pending')->count();
 
-        $admins = User::where('role_id', 1)->count();
-        $staff = User::where('role_id', 3)->count();
+        $admins = User::where('role_id', Role::SUPER_ADMIN_ID)->count();
+        $staff = User::where('role_id', Role::COMPANY_STAFF_ID)->count();
 
         // 🟢 ONLINE USERS (last 2 minutes)
         $onlineUsers = User::whereNotNull('last_seen')

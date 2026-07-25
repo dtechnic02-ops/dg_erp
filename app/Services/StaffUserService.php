@@ -12,9 +12,7 @@ class StaffUserService
 {
     public function staffRoleId(): int
     {
-        return (int) Role::query()
-            ->where('name', Role::STAFF)
-            ->value('id');
+        return Role::COMPANY_STAFF_ID;
     }
 
     public function staffQuery(int $companyId)

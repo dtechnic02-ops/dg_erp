@@ -871,6 +871,119 @@ These are Company-scope permissions.
 Only Company Admin receives them by default policy.
 
 ==========================================================
+PASSWORD RESET SECURITY WORKFLOW — FINAL
+==========================================================
+
+Password Reset is a protected administrative action.
+
+This workflow applies when a Company Admin resets the
+password of a Company Staff user within the same company.
+
+Password Reset is NOT allowed without successful OTP
+verification.
+
+The Company Admin must have the applicable Company-scope
+Module Permission and Action Permission before initiating
+this protected action. Permission validation and Company
+isolation remain mandatory.
+
+----------------------------------------------------------
+STEP 1 — RESET REQUEST
+----------------------------------------------------------
+
+Company Admin clicks Reset Password for a Company Staff user.
+
+The request is limited to the Company Admin's own company.
+
+----------------------------------------------------------
+STEP 2 — OTP GENERATION
+----------------------------------------------------------
+
+System generates a secure One-Time Password (OTP).
+
+OTP validity is exactly 1 minute.
+
+Each OTP is single-use.
+
+Each OTP must be linked to:
+
+• Company
+• Admin User
+• Target User
+• Reset Request
+
+----------------------------------------------------------
+STEP 3 — OTP DELIVERY
+----------------------------------------------------------
+
+The OTP is sent only to the email address of the Company
+Admin who initiated the reset request.
+
+No OTP is sent to the target Company Staff user at this stage.
+
+----------------------------------------------------------
+STEP 4 — OTP VALIDATION
+----------------------------------------------------------
+
+Company Admin enters the OTP.
+
+System must validate all of the following:
+
+• OTP matches
+• OTP belongs to this reset request
+• OTP has not expired
+• OTP has not been used
+
+If any validation fails, Password Reset is denied.
+
+----------------------------------------------------------
+STEP 5 — PASSWORD RESET UNLOCK
+----------------------------------------------------------
+
+Only successful OTP validation unlocks the Password Reset
+process.
+
+The password may be reset only after that unlock.
+
+----------------------------------------------------------
+STEP 6 — TARGET USER NOTIFICATION
+----------------------------------------------------------
+
+After a successful password reset, the affected Company Staff
+user receives an email notification that the account password
+has been reset.
+
+The notification must NOT include the password.
+
+----------------------------------------------------------
+OTP SECURITY RULES
+----------------------------------------------------------
+
+• OTP expires after exactly 1 minute.
+• OTP is single-use.
+• Expired OTP cannot be reused.
+• Used OTP cannot be reused.
+• Password Reset is denied unless OTP verification succeeds.
+
+----------------------------------------------------------
+PASSWORD RESET AUDIT RULE — MANDATORY
+----------------------------------------------------------
+
+Every password reset must be logged.
+
+The audit log must store:
+
+• Company
+• Admin User
+• Target User
+• Date and Time
+• IP Address, if available
+• Result: Success or Failed
+
+This audit requirement is mandatory for successful and failed
+password-reset outcomes.
+
+==========================================================
 LOGIN DASHBOARD RULE
 ==========================================================
 

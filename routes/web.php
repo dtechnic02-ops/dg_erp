@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 use App\Models\Company;
+use App\Models\Role;
 use App\Services\SubscriptionService;
 use App\Services\LoginRedirectService;
 use App\Http\Controllers\UserController;
@@ -130,7 +131,7 @@ Route::post('/logout', function (Request $request) {
 
 //SUPER ADMIN ROUTES
 
-Route::middleware(['auth','role:1,4'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_STAFF_ID])->prefix('admin')->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
 
@@ -1696,5 +1697,4 @@ Route::get(
 
 
 });
-
 

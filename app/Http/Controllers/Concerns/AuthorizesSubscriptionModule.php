@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Models\Role;
 use App\Services\SubscriptionService;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -25,7 +26,7 @@ trait AuthorizesSubscriptionModule
     {
         $user = auth()->user();
 
-        if (! $user || (int) $user->role_id !== 2) {
+        if (! $user || (int) $user->role_id !== Role::COMPANY_ADMIN_ID) {
             return;
         }
 

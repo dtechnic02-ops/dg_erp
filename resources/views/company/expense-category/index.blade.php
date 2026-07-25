@@ -6,7 +6,7 @@
 
 @php
     $user = auth()->user();
-    $canManage = $user && ($user->role_id == 2 || $user->hasPermission('manage_expense_categories'));
+    $canManage = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('manage_expense_categories'));
 @endphp
 
 <div class="dg-page">

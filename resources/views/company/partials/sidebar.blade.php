@@ -314,22 +314,22 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.cash.accounts.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.cash.accounts.*') }}">Cash Accounts</a>
                             </div>
-                            @if ($user && ($user->role_id == 2 || $user->hasPermission('view_account_transactions')))
+                            @if ($user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('view_account_transactions')))
                                 <div class="dg-sidebar-child">
                                     <a href="{{ route('company.account-transaction.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.account-transaction.*') }}">Account Transactions</a>
                                 </div>
                             @endif
-                            @if ($user && ($user->role_id == 2 || $user->hasPermission('view_income')))
+                            @if ($user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('view_income')))
                                 <div class="dg-sidebar-child">
                                     <a href="{{ route('company.income.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.income.*', 'company.income-category.*') }}">Income</a>
                                 </div>
                             @endif
-                            @if ($user && ($user->role_id == 2 || $user->hasPermission('view_expense')))
+                            @if ($user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('view_expense')))
                                 <div class="dg-sidebar-child">
                                     <a href="{{ route('company.expense.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.expense.*', 'company.expense-category.*') }}">Expenses</a>
                                 </div>
                             @endif
-                            @if ($user && ($user->role_id == 2 || $user->hasPermission('view_journal')))
+                            @if ($user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('view_journal')))
                                 <div class="dg-sidebar-child">
                                     <a href="{{ route('company.journal.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.journal.*') }}">Journal</a>
                                 </div>

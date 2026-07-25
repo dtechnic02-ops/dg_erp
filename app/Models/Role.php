@@ -6,10 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class Role extends Model
 {
-    public const SUPER_ADMIN = 'super_admin';
-    public const SUPER_STAFF = 'super_staff';
-    public const COMPANY_ADMIN = 'company_admin';
-    public const STAFF = 'staff';
+    public const SUPER_ADMIN_ID = 1;
+    public const COMPANY_ADMIN_ID = 2;
+    public const COMPANY_STAFF_ID = 3;
+    public const SUPER_STAFF_ID = 4;
 
     protected $fillable = ['name'];
 
@@ -20,16 +20,11 @@ class Role extends Model
 
     public function resolvesToAdminDashboard(): bool
     {
-        return in_array($this->name, [self::SUPER_ADMIN, self::SUPER_STAFF], true);
+        return in_array((int) $this->id, [self::SUPER_ADMIN_ID, self::SUPER_STAFF_ID], true);
     }
 
     public function resolvesToCompanyDashboard(): bool
     {
-        return in_array($this->name, [self::COMPANY_ADMIN, self::STAFF], true);
-    }
-
-    public static function idForName(string $name): ?int
-    {
-        return static::query()->where('name', $name)->value('id');
+        return in_array((int) $this->id, [self::COMPANY_ADMIN_ID, self::COMPANY_STAFF_ID], true);
     }
 }

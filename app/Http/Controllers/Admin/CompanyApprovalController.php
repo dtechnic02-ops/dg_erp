@@ -14,6 +14,8 @@ use App\Models\CompanyRegistration;
 
 use App\Models\Company;
 
+use App\Models\Role;
+
 use App\Models\User;
 
 use App\Services\SubscriptionService;
@@ -136,7 +138,7 @@ class CompanyApprovalController extends Controller
 
                     'name' => $reg->full_name,
 
-                    'role_id' => 2,
+                    'role_id' => Role::COMPANY_ADMIN_ID,
 
                     'password' => $passwordHash,
 

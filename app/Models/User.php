@@ -54,7 +54,7 @@ class User extends Authenticatable
         }
 
         // super admin
-        if ($this->role_id == 1) {
+        if ((int) $this->role_id === Role::SUPER_ADMIN_ID) {
             return true;
         }
 
@@ -62,7 +62,7 @@ class User extends Authenticatable
             return false;
         }
 
-        if ($this->role->name === Role::STAFF && $this->company_id) {
+        if ((int) $this->role_id === Role::COMPANY_STAFF_ID && $this->company_id) {
             $companyHasPermission = $this->company
                 ?->staffPermissions()
                 ->where('permissions.name', $permission)

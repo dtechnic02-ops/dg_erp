@@ -7,9 +7,9 @@
 @php
     $company = auth()->user()->company;
     $user = auth()->user();
-    $canEdit = $user && ($user->role_id == 2 || $user->hasPermission('edit_income'));
-    $canCancel = $user && ($user->role_id == 2 || $user->hasPermission('cancel_income'));
-    $canPrint = $user && ($user->role_id == 2 || $user->hasPermission('print_income'));
+    $canEdit = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('edit_income'));
+    $canCancel = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('cancel_income'));
+    $canPrint = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('print_income'));
 
     $paidAmount = (float) $income->amount;
     $amountRupees = (int) floor($paidAmount);

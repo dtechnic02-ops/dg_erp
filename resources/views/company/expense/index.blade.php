@@ -6,10 +6,10 @@
 
 @php
     $user = auth()->user();
-    $canCreate = $user && ($user->role_id == 2 || $user->hasPermission('create_expense'));
-    $canEdit = $user && ($user->role_id == 2 || $user->hasPermission('edit_expense'));
-    $canPrint = $user && ($user->role_id == 2 || $user->hasPermission('print_expense'));
-    $canManageCategories = $user && ($user->role_id == 2 || $user->hasPermission('manage_expense_categories'));
+    $canCreate = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('create_expense'));
+    $canEdit = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('edit_expense'));
+    $canPrint = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('print_expense'));
+    $canManageCategories = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('manage_expense_categories'));
 @endphp
 
 <div class="dg-page">
