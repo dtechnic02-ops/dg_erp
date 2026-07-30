@@ -19,6 +19,7 @@ use App\Models\SubscriptionPayment;
 use App\Models\SubscriptionPlan;
 
 use App\Services\SubscriptionService;
+use App\Services\PlatformAuthorizationService;
 
 use Illuminate\Http\Request;
 
@@ -34,7 +35,10 @@ class SubscriptionPaymentController extends Controller
 
 
 
-    public function __construct(private SubscriptionService $subscriptionService)
+    public function __construct(
+        private SubscriptionService $subscriptionService,
+        private PlatformAuthorizationService $platformAuthorization
+    )
 
     {
 
@@ -46,7 +50,7 @@ class SubscriptionPaymentController extends Controller
 
     {
 
-        $this->authorizeAdminSubscriptionView();
+        $this->authorizePlatform('platform_subscription_payments_view');
 
 
 
@@ -258,7 +262,7 @@ class SubscriptionPaymentController extends Controller
 
     {
 
-        $this->authorizeAdminSubscriptionView();
+        $this->authorizePlatform('platform_subscription_payments_invoice_view');
 
 
 
@@ -284,6 +288,11 @@ class SubscriptionPaymentController extends Controller
 
         ]);
 
+    }
+
+    private function authorizePlatform(string $permission): void
+    {
+        abort_unless($this->platformAuthorization->can(auth()->user(), $permission), 403);
     }
 
 }

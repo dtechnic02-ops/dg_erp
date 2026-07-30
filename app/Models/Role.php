@@ -20,7 +20,7 @@ class Role extends Model
 
     public function resolvesToAdminDashboard(): bool
     {
-        return in_array((int) $this->id, [self::SUPER_ADMIN_ID, self::SUPER_STAFF_ID], true);
+        return (int) $this->id === self::SUPER_ADMIN_ID;
     }
 
     public function resolvesToCompanyDashboard(): bool

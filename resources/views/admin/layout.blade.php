@@ -41,15 +41,29 @@
             </div>
 
             <div class="dg-sidebar-scroll">
+                @php
+                    $platformAuthorization = app(\App\Services\PlatformAuthorizationService::class);
+                    $adminUser = auth()->user();
+                    $isSuperAdmin = (int) $adminUser?->role_id === \App\Models\Role::SUPER_ADMIN_ID;
+                    $canPlatform = fn (string $permission): bool => $platformAuthorization->can($adminUser, $permission);
+                    $canViewCompanies = $canPlatform('platform_companies_view');
+                    $canViewRegistrations = $canPlatform('platform_registrations_view');
+                    $canViewSubscriptions = $canPlatform('platform_subscriptions_view');
+                    $canViewSubscriptionPayments = $canPlatform('platform_subscription_payments_view');
+                    $canViewSubscriptionReports = $canPlatform('platform_subscription_reports_view');
+                    $canViewSubscriptionGroup = $canViewSubscriptions || $canViewSubscriptionPayments || $canViewSubscriptionReports;
+                @endphp
                 <nav class="dg-sidebar-nav">
                     <div class="dg-sidebar-section">
+                        @if($isSuperAdmin)
                         <div class="dg-sidebar-item">
                             <a href="{{ route('admin.dashboard') }}" class="dg-sidebar-link @if(request()->routeIs('admin.dashboard')) dg-sidebar-active @endif">
                                 <span class="dg-sidebar-icon"><i class="bi bi-speedometer2"></i></span>
                                 <span class="dg-sidebar-label">Dashboard</span>
                             </a>
                         </div>
-                        @if(auth()->user()->hasPermission('view_company'))
+                        @endif
+                        @if($canViewCompanies)
                         <div class="dg-sidebar-item">
                             <a href="{{ route('admin.companies') }}" class="dg-sidebar-link @if(request()->routeIs('admin.companies')) dg-sidebar-active @endif">
                                 <span class="dg-sidebar-icon"><i class="bi bi-building"></i></span>
@@ -57,7 +71,7 @@
                             </a>
                         </div>
                         @endif
-                        @if(auth()->user()->hasPermission('view_company'))
+                        @if($canViewRegistrations)
                         <div class="dg-sidebar-item">
                             <a href="{{ route('admin.registrations') }}" class="dg-sidebar-link @if(request()->routeIs('admin.registrations')) dg-sidebar-active @endif">
                                 <span class="dg-sidebar-icon"><i class="bi bi-file-earmark-text"></i></span>
@@ -65,7 +79,7 @@
                             </a>
                         </div>
                         @endif
-                        @if(Route::has('admin.users'))
+                        @if($isSuperAdmin)
                             <div class="dg-sidebar-item">
                                 <a href="{{ route('admin.users') }}" class="dg-sidebar-link @if(request()->routeIs('admin.users')) dg-sidebar-active @endif">
                                     <span class="dg-sidebar-icon"><i class="bi bi-people"></i></span>
@@ -73,12 +87,26 @@
                                 </a>
                             </div>
                         @endif
+                        @if($isSuperAdmin)
+                            <div class="dg-sidebar-item">
+                                <a href="{{ route('admin.super-staff.index') }}" class="dg-sidebar-link @if(request()->routeIs('admin.super-staff.*')) dg-sidebar-active @endif">
+                                    <span class="dg-sidebar-icon"><i class="bi bi-person-badge"></i></span>
+                                    <span class="dg-sidebar-label">Super Staff</span>
+                                </a>
+                            </div>
+                        @endif
+                        @if($isSuperAdmin)
+                            <div class="dg-sidebar-item">
+                                <a href="{{ route('admin.platform-settings.index') }}" class="dg-sidebar-link @if(request()->routeIs('admin.platform-settings.*')) dg-sidebar-active @endif">
+                                    <span class="dg-sidebar-icon"><i class="bi bi-gear"></i></span>
+                                    <span class="dg-sidebar-label">Platform Settings</span>
+                                </a>
+                            </div>
+                        @endif
                     </div>
 
                     @auth
                         @php
-                            $canManageSubscription = (int) auth()->user()->role_id === \App\Models\Role::SUPER_ADMIN_ID || auth()->user()->hasPermission('manage_subscription_module');
-                            $canViewSubscription = in_array((int) auth()->user()->role_id, [\App\Models\Role::SUPER_ADMIN_ID, \App\Models\Role::SUPER_STAFF_ID], true) || auth()->user()->hasPermission('view_subscription_module');
                             $subscriptionOpen = request()->routeIs(
                                 'admin.subscription-plans.*',
                                 'admin.subscription-payments.*',
@@ -90,7 +118,7 @@
                             );
                         @endphp
 
-                        @if($canManageSubscription || $canViewSubscription)
+                        @if($isSuperAdmin || $canViewSubscriptionGroup)
                             <div class="dg-sidebar-divider" aria-hidden="true"></div>
                             <div class="dg-sidebar-section">
                                 <details class="dg-sidebar-group dg-admin-nav-group" @if($subscriptionOpen) open @endif>
@@ -100,7 +128,7 @@
                                         <span class="dg-sidebar-chevron" aria-hidden="true"></span>
                                     </summary>
                                     <div class="dg-sidebar-submenu">
-                                        @if($canManageSubscription)
+                                        @if($isSuperAdmin)
                                             @if(Route::has('admin.subscription-plans.index'))
                                                 <div class="dg-sidebar-child">
                                                     <a href="{{ route('admin.subscription-plans.index') }}" class="dg-sidebar-child-link @if(request()->routeIs('admin.subscription-plans.*', 'admin.plans')) dg-sidebar-active @endif">Plans</a>
@@ -117,12 +145,21 @@
                                                 </div>
                                             @endif
                                         @endif
-                                        @if($canViewSubscription)
+                                        @if($canViewSubscriptions)
                                             @if(Route::has('admin.subscriptions.index'))
                                                 <div class="dg-sidebar-child">
                                                     <a href="{{ route('admin.subscriptions.index') }}" class="dg-sidebar-child-link @if(request()->routeIs('admin.subscriptions.*')) dg-sidebar-active @endif">Subscriptions</a>
                                                 </div>
                                             @endif
+                                        @endif
+                                        @if(! $isSuperAdmin && $canViewSubscriptionPayments)
+                                            @if(Route::has('admin.subscription-payments.index'))
+                                                <div class="dg-sidebar-child">
+                                                    <a href="{{ route('admin.subscription-payments.index') }}" class="dg-sidebar-child-link @if(request()->routeIs('admin.subscription-payments.index', 'admin.payments')) dg-sidebar-active @endif">Payments</a>
+                                                </div>
+                                            @endif
+                                        @endif
+                                        @if($canViewSubscriptionReports)
                                             @if(Route::has('admin.subscription-reports.index'))
                                                 <div class="dg-sidebar-child">
                                                     <a href="{{ route('admin.subscription-reports.index') }}" class="dg-sidebar-child-link @if(request()->routeIs('admin.subscription-reports.*')) dg-sidebar-active @endif">Reports</a>
@@ -158,8 +195,13 @@
 
                     <div class="dg-admin-page-meta">
                         <nav class="dg-breadcrumb" aria-label="Breadcrumb">
-                            <a href="{{ route('admin.dashboard') }}" class="dg-breadcrumb-link">Home</a>
-                            <span class="dg-breadcrumb-sep" aria-hidden="true">/</span>
+                            @if((int) $user?->role_id === \App\Models\Role::SUPER_ADMIN_ID)
+                                <a href="{{ route('admin.dashboard') }}" class="dg-breadcrumb-link">Home</a>
+                                <span class="dg-breadcrumb-sep" aria-hidden="true">/</span>
+                            @else
+                                <span class="dg-breadcrumb-current">Platform</span>
+                                <span class="dg-breadcrumb-sep" aria-hidden="true">/</span>
+                            @endif
                             @hasSection('breadcrumb')
                                 @yield('breadcrumb')
                             @else
@@ -189,7 +231,9 @@
                                     <strong>{{ $user->name }}</strong>
                                     <span>{{ $user->email }}</span>
                                 </div>
-                                <a href="{{ route('admin.dashboard') }}" class="dg-header-user-link" role="menuitem">Dashboard</a>
+                                @if((int) $user?->role_id === \App\Models\Role::SUPER_ADMIN_ID)
+                                    <a href="{{ route('admin.dashboard') }}" class="dg-header-user-link" role="menuitem">Dashboard</a>
+                                @endif
                                 <form method="POST" action="{{ route('logout') }}" class="dg-header-user-form">
                                     @csrf
                                     <button type="submit" class="dg-header-user-link dg-header-user-logout" role="menuitem">Logout</button>

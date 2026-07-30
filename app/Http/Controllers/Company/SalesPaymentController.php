@@ -16,6 +16,7 @@ use App\Models\SalesInvoice;
 use App\Models\SalesPayment;
 use App\Models\SalesReturnRefundAdjustment;
 use App\Models\FinancialYear;
+use App\Services\Accounting\Integrations\SalesPaymentAccountingIntegrationService;
 use App\Services\ValidationService;
 use App\Services\FileUploadService;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,12 @@ use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 class SalesPaymentController extends Controller
 {
     use HandlesTransactionDocumentationEdit;
+
+    public function __construct(
+        private readonly SalesPaymentAccountingIntegrationService $salesPaymentAccountingIntegrationService
+    ) {
+    }
+
     public function index(Request $request)
     {
         $companyId = auth()->user()->company_id;
@@ -338,6 +345,10 @@ class SalesPaymentController extends Controller
                 ]);
 
                 $this->syncInvoicePaymentState($invoice);
+
+                $this->salesPaymentAccountingIntegrationService->postPayment(
+                    $payment->fresh()
+                );
             });
 
             return redirect()
@@ -459,6 +470,12 @@ class SalesPaymentController extends Controller
                 ]);
 
                 $this->syncInvoicePaymentState($invoice);
+
+                $this->salesPaymentAccountingIntegrationService->reversePayment(
+                    $payment,
+                    $cancelBusinessDate,
+                    auth()->id()
+                );
             });
 
             return back()->with('success', 'Payment cancelled successfully.');

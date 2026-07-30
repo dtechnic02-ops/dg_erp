@@ -8,17 +8,23 @@ use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use App\Models\Account;
 use App\Models\AccountTransaction;
 use App\Models\Customer;
+use App\Models\CustomerTransaction;
 use App\Models\EmployeeAccount;
 use App\Models\FinancialYear;
 use App\Models\Journal;
 use App\Models\JournalItem;
 use App\Models\PartyAccount;
 use App\Models\Supplier;
+use App\Models\SupplierTransaction;
 use App\Services\AccountBalanceService;
+use App\Services\CustomerTransactionService;
+use App\Services\SupplierTransactionService;
 use App\Services\FileUploadService;
 use App\Services\ValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class JournalController extends Controller
 {
@@ -158,19 +164,59 @@ class JournalController extends Controller
         }
     }
 
+    protected function resolveControlAccount(int $companyId, string $subLedgerType): Account
+    {
+        $accounts = Account::where('company_id', $companyId)
+            ->where('status', 1)
+            ->where('sub_ledger_type', $subLedgerType)
+            ->limit(2)
+            ->get();
+
+        $label = ucfirst($subLedgerType);
+
+        if ($accounts->isEmpty()) {
+            throw new \Exception("Configure exactly one active {$label} control account before posting this journal line.");
+        }
+
+        if ($accounts->count() > 1) {
+            throw new \Exception("Keep exactly one active {$label} control account before posting this journal line.");
+        }
+
+        return $accounts->first();
+    }
+
+    protected function createSubmissionToken(): string
+    {
+        $token = (string) Str::uuid();
+        session()->put('journal_submission_tokens.' . $token, true);
+
+        return $token;
+    }
+
+    protected function consumeSubmissionToken(string $token): void
+    {
+        if (!session()->pull('journal_submission_tokens.' . $token)) {
+            throw new \Exception('This journal submission has already been processed or has expired. Please create a new journal request.');
+        }
+    }
+
+    protected function restoreSubmissionToken(string $token): void
+    {
+        session()->put('journal_submission_tokens.' . $token, true);
+    }
+
     /**
      * @return array<int, array{account_id:int,type:string,amount:float,note:?string,sub_ledger_type:?string,sub_ledger_id:?int}>
      */
     protected function parseDetailRows(Request $request): array
     {
-        $accountIds = $request->input('account_id', []);
+        $ledgerSelections = $request->input('ledger_selection', []);
         $debits = $request->input('debit', []);
         $credits = $request->input('credit', []);
         $rowNotes = $request->input('row_note', []);
-        $subLedgerIds = $request->input('sub_ledger_id', []);
         $companyId = auth()->user()->company_id;
 
-        if (!is_array($accountIds) || count($accountIds) < 2) {
+        if (!is_array($ledgerSelections) || count($ledgerSelections) < 2) {
             throw new \Exception('At least two journal detail rows are required.');
         }
 
@@ -178,24 +224,32 @@ class JournalController extends Controller
         $debitTotal = 0.0;
         $creditTotal = 0.0;
 
-        foreach ($accountIds as $index => $accountId) {
-            if (empty($accountId)) {
-                throw new \Exception('Account is required on every journal detail row.');
+        foreach ($ledgerSelections as $index => $ledgerSelection) {
+            [$ledgerType, $ledgerId] = array_pad(explode(':', (string) $ledgerSelection, 2), 2, null);
+            $ledgerId = ctype_digit((string) $ledgerId) ? (int) $ledgerId : null;
+
+            if (!in_array($ledgerType, ['account', Account::SUB_LEDGER_CUSTOMER, Account::SUB_LEDGER_SUPPLIER, Account::SUB_LEDGER_EMPLOYEE, Account::SUB_LEDGER_PARTY], true)) {
+                throw new \Exception('Ledger Type is invalid on a journal detail row.');
             }
 
-            $account = $this->validateAccount($companyId, (int) $accountId);
-            $subLedgerId = !empty($subLedgerIds[$index]) ? (int) $subLedgerIds[$index] : null;
+            if (!$ledgerId) {
+                throw new \Exception('Ledger / Related Party is required on every journal detail row.');
+            }
 
-            if ($account->requiresSubLedger()) {
-                if (!$subLedgerId) {
-                    throw new \Exception(
-                        'Sub Ledger is required for account: ' . $account->account_name . '.'
-                    );
+            if ($ledgerType === 'account') {
+                $account = $this->validateAccount($companyId, $ledgerId);
+
+                if ($account->requiresSubLedger()) {
+                    throw new \Exception('Select the matching Ledger Type for control account: ' . $account->account_name . '.');
                 }
 
-                $this->validateSubLedgerEntity($companyId, $account->sub_ledger_type, $subLedgerId);
-            } else {
+                $subLedgerType = null;
                 $subLedgerId = null;
+            } else {
+                $this->validateSubLedgerEntity($companyId, $ledgerType, $ledgerId);
+                $account = $this->resolveControlAccount($companyId, $ledgerType);
+                $subLedgerType = $ledgerType;
+                $subLedgerId = $ledgerId;
             }
 
             $debit = round((float) ($debits[$index] ?? 0), 2);
@@ -220,11 +274,11 @@ class JournalController extends Controller
             }
 
             $rows[] = [
-                'account_id'       => (int) $accountId,
+                'account_id'       => $account->id,
                 'type'             => $type,
                 'amount'           => $amount,
                 'note'             => isset($rowNotes[$index]) ? trim((string) $rowNotes[$index]) : null,
-                'sub_ledger_type'  => $account->sub_ledger_type,
+                'sub_ledger_type'  => $subLedgerType,
                 'sub_ledger_id'    => $subLedgerId,
             ];
         }
@@ -250,7 +304,7 @@ class JournalController extends Controller
         foreach ($rows as $row) {
             $this->validateAccount($companyId, $row['account_id']);
 
-            JournalItem::create([
+            $journalItem = JournalItem::create([
                 'company_id'      => $companyId,
                 'journal_id'      => $journal->id,
                 'account_id'      => $row['account_id'],
@@ -276,10 +330,35 @@ class JournalController extends Controller
                 'voucher_no'        => $journal->journal_no,
                 'reference_type'    => 'Journal',
                 'reference_id'      => $journal->id,
+                'journal_item_id'   => $journalItem->id,
                 'description'       => $description,
                 'debit'             => $row['type'] === JournalItem::TYPE_DEBIT ? $row['amount'] : 0,
                 'credit'            => $row['type'] === JournalItem::TYPE_CREDIT ? $row['amount'] : 0,
             ]);
+
+            $statementData = [
+                'company_id' => $companyId,
+                'financial_year_id' => $financialYear->id,
+                'transaction_date' => $journal->journal_date->format('Y-m-d'),
+                'voucher_no' => $journal->journal_no,
+                'reference_type' => 'Journal',
+                'reference_id' => $journal->id,
+                'journal_item_id' => $journalItem->id,
+                'reference_no' => $journal->reference_no,
+                'description' => $description,
+                'debit' => $row['type'] === JournalItem::TYPE_DEBIT ? $row['amount'] : 0,
+                'credit' => $row['type'] === JournalItem::TYPE_CREDIT ? $row['amount'] : 0,
+                'created_by' => auth()->id(),
+                'status' => 1,
+            ];
+
+            if ($row['sub_ledger_type'] === Account::SUB_LEDGER_CUSTOMER) {
+                CustomerTransactionService::createTransaction($statementData + ['customer_id' => $row['sub_ledger_id']]);
+            }
+
+            if ($row['sub_ledger_type'] === Account::SUB_LEDGER_SUPPLIER) {
+                SupplierTransactionService::createTransaction($statementData + ['supplier_id' => $row['sub_ledger_id']]);
+            }
         }
     }
 
@@ -356,10 +435,11 @@ class JournalController extends Controller
 
         $chartAccounts = $this->chartAccountsForJournal($companyId);
         $subLedgerData = $this->subLedgerCollections($companyId);
+        $submissionToken = $this->createSubmissionToken();
 
         return view('company.journal.create', array_merge(
             $subLedgerData,
-            compact('chartAccounts', 'activeFy')
+            compact('chartAccounts', 'activeFy', 'submissionToken')
         ));
     }
 
@@ -372,18 +452,28 @@ class JournalController extends Controller
             'reference_no' => 'nullable|string|max:100',
             'note'         => ValidationService::requiredText(1000),
             'attachment'   => ValidationService::document(),
-            'account_id'   => 'required|array|min:2',
-            'account_id.*' => 'required|integer',
+            'submission_token' => 'required|uuid',
+            'ledger_selection'   => 'required|array|min:2',
+            'ledger_selection.*' => 'required|string|max:30',
             'debit'          => 'required|array',
             'credit'         => 'required|array',
             'row_note'       => 'nullable|array',
-            'sub_ledger_id'  => 'nullable|array',
-            'sub_ledger_id.*'=> 'nullable|integer',
         ]);
 
         $file = null;
+        $submissionToken = (string) $request->submission_token;
+        $submissionConsumed = false;
+        $submissionProcessed = false;
+        $submissionLock = Cache::lock('journal-submission:' . $submissionToken, 30);
+
+        if (!$submissionLock->get()) {
+            return back()->withInput()->with('error', 'This journal submission is already being processed.');
+        }
 
         try {
+            $this->consumeSubmissionToken($submissionToken);
+            $submissionConsumed = true;
+
             $journal = DB::transaction(function () use ($request, &$file) {
                 $companyId = auth()->user()->company_id;
                 $activeFy = $this->assertActiveFinancialYear($companyId);
@@ -430,6 +520,8 @@ class JournalController extends Controller
                     'attachment'        => $file,
                     'note'              => $request->note,
                     'created_by'        => auth()->id(),
+                    'posted_by'         => auth()->id(),
+                    'posted_at'         => now(),
                     'status'            => Journal::STATUS_ACTIVE,
                 ]);
 
@@ -444,15 +536,23 @@ class JournalController extends Controller
                 return $journal;
             });
 
+            $submissionProcessed = true;
+
             return redirect()
                 ->route('company.journal.show', $journal->id)
                 ->with('success', 'Journal entry saved successfully.');
         } catch (\Exception $e) {
             FileUploadService::deleteFile($file);
 
+            if ($submissionConsumed && !$submissionProcessed) {
+                $this->restoreSubmissionToken($submissionToken);
+            }
+
             return back()
                 ->withInput()
                 ->with('error', $e->getMessage());
+        } finally {
+            $submissionLock->release();
         }
     }
 
@@ -512,99 +612,199 @@ class JournalController extends Controller
 
         $request->validate([
             'journal_date' => ValidationService::requiredDate(),
-            'reference_no' => 'nullable|string|max:100',
-            'note'         => ValidationService::requiredText(1000),
-            'attachment'   => ValidationService::document(),
-            'account_id'   => 'required|array|min:2',
-            'account_id.*' => 'required|integer',
-            'debit'          => 'required|array',
-            'credit'         => 'required|array',
-            'row_note'       => 'nullable|array',
-            'sub_ledger_id'  => 'nullable|array',
-            'sub_ledger_id.*'=> 'nullable|integer',
+            'note' => ValidationService::requiredText(1000),
         ]);
 
         try {
             DB::transaction(function () use ($request, $id) {
                 $companyId = auth()->user()->company_id;
+                $journal = Journal::where('company_id', $companyId)->lockForUpdate()->findOrFail($id);
 
-                $journal = Journal::with('items')
+                abort_unless($journal->isPosted(), 422, 'Only posted journals may be updated.');
+
+                $financialYear = FinancialYear::where('company_id', $companyId)
+                    ->whereKey($journal->financial_year_id)
+                    ->where('is_active', 1)
+                    ->firstOrFail();
+
+                $this->assertDateWithinFinancialYear($request->journal_date, $financialYear);
+
+                $journal->update($this->appendUpdatedBy([
+                    'journal_date' => $request->journal_date,
+                    'note' => $request->note,
+                ], $journal));
+
+                $description = trim($request->note);
+                foreach ([AccountTransaction::class, \App\Models\CustomerTransaction::class, \App\Models\SupplierTransaction::class] as $transactionModel) {
+                    $transactionModel::where('company_id', $companyId)
+                        ->where('reference_type', 'Journal')
+                        ->where('reference_id', $journal->id)
+                        ->where('status', 1)
+                        ->update(['transaction_date' => $request->journal_date, 'description' => $description]);
+                }
+            });
+
+            return redirect()->route('company.journal.show', $id)->with('success', 'Posted journal date and narration updated successfully.');
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+    }
+
+    public function reverse(Request $request, $id)
+    {
+        $this->authorizeCompanyPermission('edit_journal');
+
+        $request->validate([
+            'cancel_reason' => ValidationService::requiredText(1000),
+        ]);
+
+        try {
+            $reversal = DB::transaction(function () use ($request, $id) {
+                $companyId = auth()->user()->company_id;
+                $original = Journal::with('items')
                     ->where('company_id', $companyId)
                     ->lockForUpdate()
                     ->findOrFail($id);
 
-                $this->guardEditableTransaction(
-                    $journal,
-                    'Cancelled journal cannot be edited.'
-                );
-
-                $currentFy = FinancialYear::where('company_id', $companyId)
-                    ->findOrFail($journal->financial_year_id);
-
-                if (!$currentFy->is_active) {
-                    throw new \Exception('Closed financial year cannot be edited.');
+                if (!$original->isPosted() || $original->reversal_of_journal_id) {
+                    throw new \Exception('Only an original posted journal can be reversed.');
                 }
 
-                $this->assertDateWithinFinancialYear(
-                    $request->journal_date,
-                    $currentFy,
-                    'Journal date must be inside the financial year.'
-                );
+                if (Journal::where('company_id', $companyId)
+                    ->where('reversal_of_journal_id', $original->id)
+                    ->lockForUpdate()
+                    ->exists()) {
+                    throw new \Exception('This journal has already been reversed.');
+                }
 
-                $parsed = $this->parseDetailRows($request);
-                $rows = $parsed['rows'];
-                $debitTotal = $parsed['debit_total'];
+                $financialYear = FinancialYear::where('company_id', $companyId)
+                    ->whereKey($original->financial_year_id)
+                    ->firstOrFail();
+                $reason = trim($request->cancel_reason);
+                $reversal = Journal::create([
+                    'company_id' => $companyId,
+                    'financial_year_id' => $financialYear->id,
+                    'journal_no' => $this->generateJournalNo($companyId, $financialYear),
+                    'journal_date' => $original->journal_date,
+                    'reference_no' => $original->reference_no,
+                    'total_amount' => $original->total_amount,
+                    'note' => 'Reversal of ' . $original->journal_no . ': ' . $reason,
+                    'created_by' => auth()->id(),
+                    'posted_by' => auth()->id(),
+                    'posted_at' => now(),
+                    'reversal_of_journal_id' => $original->id,
+                    'status' => Journal::STATUS_POSTED,
+                ]);
 
-                foreach ($rows as $row) {
-                    $this->validateAccount($companyId, $row['account_id']);
+                foreach ($original->items as $originalItem) {
+                    $originalAccountTransaction = AccountTransaction::where('company_id', $companyId)
+                        ->where('reference_type', 'Journal')
+                        ->where('reference_id', $original->id)
+                        ->where('journal_item_id', $originalItem->id)
+                        ->where('status', 1)
+                        ->lockForUpdate()
+                        ->first();
 
-                    if ($row['sub_ledger_type'] && $row['sub_ledger_id']) {
-                        $this->validateSubLedgerEntity(
-                            $companyId,
-                            $row['sub_ledger_type'],
-                            $row['sub_ledger_id']
-                        );
+                    if (!$originalAccountTransaction) {
+                        throw new \Exception('Journal reversal requires transaction traceability for every original journal line.');
                     }
+
+                    $reversalItem = JournalItem::create([
+                        'company_id' => $companyId,
+                        'journal_id' => $reversal->id,
+                        'account_id' => $originalItem->account_id,
+                        'sub_ledger_type' => $originalItem->sub_ledger_type,
+                        'sub_ledger_id' => $originalItem->sub_ledger_id,
+                        'type' => $originalItem->type === JournalItem::TYPE_DEBIT ? JournalItem::TYPE_CREDIT : JournalItem::TYPE_DEBIT,
+                        'amount' => $originalItem->amount,
+                        'note' => 'Reversal of journal item #' . $originalItem->id,
+                        'status' => 1,
+                    ]);
+
+                    $description = 'Reversal of ' . $original->journal_no . ': ' . $reason;
+                    AccountBalanceService::createTransaction([
+                        'company_id' => $companyId,
+                        'financial_year_id' => $financialYear->id,
+                        'account_id' => $originalAccountTransaction->account_id,
+                        'transaction_date' => $original->journal_date->format('Y-m-d'),
+                        'voucher_no' => $reversal->journal_no,
+                        'reference_type' => 'Journal',
+                        'reference_id' => $reversal->id,
+                        'journal_item_id' => $reversalItem->id,
+                        'reversed_transaction_id' => $originalAccountTransaction->id,
+                        'description' => $description,
+                        'debit' => $originalAccountTransaction->credit,
+                        'credit' => $originalAccountTransaction->debit,
+                    ], false);
+
+                    $this->createReversalSubLedgerTransaction($original, $reversal, $originalItem, $reversalItem, $financialYear, $description, $companyId);
                 }
 
-                $this->removeJournalTransactions($journal);
-                $journal->items()->delete();
+                $original->update($this->appendUpdatedBy([
+                    'status' => Journal::STATUS_REVERSED,
+                    'cancelled_by' => auth()->id(),
+                    'cancelled_date' => now()->toDateString(),
+                    'cancel_reason' => $reason,
+                    'reversed_by' => auth()->id(),
+                    'reversed_at' => now(),
+                ], $original));
 
-                $folder = 'companies/' . $companyId . '/journals';
-                $file = FileUploadService::replaceFile(
-                    $request,
-                    'attachment',
-                    $journal->attachment,
-                    $folder
-                );
-
-                $journal->update($this->appendUpdatedBy([
-                    'journal_date'   => $request->journal_date,
-                    'reference_no'   => $request->reference_no,
-                    'total_amount'   => $debitTotal,
-                    'attachment'     => $file,
-                    'note'           => $request->note,
-                ], $journal));
-
-                $this->createJournalTransactions(
-                    $journal,
-                    $rows,
-                    $currentFy,
-                    $companyId,
-                    trim($request->note)
-                );
-
-                $this->logDocumentationEdit('Journal updated.', $journal);
+                return $reversal;
             });
 
-            return redirect()
-                ->route('company.journal.show', $id)
-                ->with('success', 'Journal entry updated successfully.');
-        } catch (\Exception $e) {
-            return back()
-                ->withInput()
-                ->with('error', $e->getMessage());
+            return redirect()->route('company.journal.show', $reversal->id)
+                ->with('success', 'Journal reversed successfully.');
+        } catch (\Throwable $e) {
+            return back()->with('error', $e->getMessage());
         }
+    }
+
+    protected function createReversalSubLedgerTransaction(
+        Journal $original,
+        Journal $reversal,
+        JournalItem $originalItem,
+        JournalItem $reversalItem,
+        FinancialYear $financialYear,
+        string $description,
+        int $companyId
+    ): void {
+        if (!in_array($originalItem->sub_ledger_type, [Account::SUB_LEDGER_CUSTOMER, Account::SUB_LEDGER_SUPPLIER], true)) {
+            return;
+        }
+
+        $transactionModel = $originalItem->sub_ledger_type === Account::SUB_LEDGER_CUSTOMER
+            ? CustomerTransaction::class
+            : SupplierTransaction::class;
+        $service = $originalItem->sub_ledger_type === Account::SUB_LEDGER_CUSTOMER
+            ? CustomerTransactionService::class
+            : SupplierTransactionService::class;
+        $originalTransaction = $transactionModel::where('company_id', $companyId)
+            ->where('reference_type', 'Journal')
+            ->where('reference_id', $original->id)
+            ->where('journal_item_id', $originalItem->id)
+            ->where('status', 1)
+            ->lockForUpdate()
+            ->firstOrFail();
+        $partyKey = $originalItem->sub_ledger_type === Account::SUB_LEDGER_CUSTOMER ? 'customer_id' : 'supplier_id';
+
+        $service::createTransaction([
+            'company_id' => $companyId,
+            'financial_year_id' => $financialYear->id,
+            $partyKey => $originalTransaction->{$partyKey},
+            'transaction_date' => $original->journal_date->format('Y-m-d'),
+            'voucher_no' => $reversal->journal_no,
+            'reference_type' => 'Journal',
+            'reference_id' => $reversal->id,
+            'journal_item_id' => $reversalItem->id,
+            'reversed_transaction_id' => $originalTransaction->id,
+            'reference_no' => $originalTransaction->reference_no,
+            'description' => $description,
+            'debit' => $originalTransaction->credit,
+            'credit' => $originalTransaction->debit,
+            'created_by' => auth()->id(),
+            'status' => 1,
+        ]);
     }
 
     public function print()

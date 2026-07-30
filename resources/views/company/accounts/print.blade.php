@@ -81,10 +81,14 @@ body {
     ACTIVE FILTER (only shown when a filter was actually applied)
     ========================================================= --}}
 
-    @if (request()->filled('search'))
+    @if (request()->filled('search') || request()->filled('account_group'))
         <div class="mb-2">
-            <span class="fw-bold">Filtered by Search :</span>
-            {{ request('search') }}
+            @if (request()->filled('account_group'))
+                <span class="fw-bold">Account Group :</span> {{ request('account_group') }}
+            @endif
+            @if (request()->filled('search'))
+                <span class="fw-bold ms-2">Search :</span> {{ request('search') }}
+            @endif
         </div>
     @endif
 
@@ -97,10 +101,9 @@ body {
             <tr>
                 <th>#</th>
                 <th>Image</th>
+                <th>Group</th>
                 <th>Type</th>
-                <th>Bank</th>
                 <th>Name</th>
-                <th>Account No</th>
                 <th class="text-end">Balance</th>
                 <th>Status</th>
             </tr>
@@ -119,16 +122,15 @@ body {
                                 class="print-thumb">
                         @endif
                     </td>
+                    <td>{{ $a->account_group ?: '-' }}</td>
                     <td>{{ $a->account_type ?: '-' }}</td>
-                    <td>{{ $a->bank_name ?: '-' }}</td>
                     <td>{{ $a->account_name }}</td>
-                    <td>{{ $a->account_no ?: '-' }}</td>
                     <td class="text-end">{{ number_format($a->current_balance, 2) }}</td>
                     <td>{{ $a->status == 'active' ? 'Active' : 'Inactive' }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8" class="text-center">No Accounts Found</td>
+                    <td colspan="7" class="text-center">No Accounts Found</td>
                 </tr>
             @endforelse
 

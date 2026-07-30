@@ -5,14 +5,28 @@
 <div class="row g-2">
 
     <div class="col-lg-4 col-md-6 col-12">
+        <label for="account_group" class="dg-label">Account Group</label>
+        <select name="account_group" id="account_group" class="form-select dg-select" required>
+            <option value="">Select Group</option>
+            @foreach ($accountGroups as $value => $label)
+                <option value="{{ $value }}" {{ old('account_group', optional($account)->account_group) === $value ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+        </select>
+    </div>
+
+    <div class="col-lg-4 col-md-6 col-12">
         <label for="account_type" class="dg-label">Account Type</label>
         <select name="account_type" id="account_type" class="form-select dg-select" required>
             <option value="">Select Type</option>
-            <option value="Cash" {{ optional($account)->account_type == 'Cash' ? 'selected' : '' }}>Cash</option>
-            <option value="Bank" {{ optional($account)->account_type == 'Bank' ? 'selected' : '' }}>Bank</option>
-            <option value="Wallet" {{ optional($account)->account_type == 'Wallet' ? 'selected' : '' }}>Wallet</option>
-            <option value="ATM" {{ optional($account)->account_type == 'ATM' ? 'selected' : '' }}>ATM</option>
+            @foreach ($accountTypes as $value => $label)
+                <option value="{{ $value }}" {{ old('account_type', optional($account)->account_type) === $value ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
         </select>
+    </div>
+
+    <div class="col-lg-4 col-md-6 col-12">
+        <label for="account_name" class="dg-label">Account Name</label>
+        <input type="text" name="account_name" id="account_name" value="{{ old('account_name', optional($account)->account_name) }}" class="form-control dg-input" required>
     </div>
 
     <div class="col-lg-4 col-md-6 col-12">
@@ -29,11 +43,6 @@
     <div class="col-lg-4 col-md-6 col-12">
         <label for="bank_name" class="dg-label">Bank Name</label>
         <input type="text" name="bank_name" id="bank_name" value="{{ optional($account)->bank_name }}" class="form-control dg-input">
-    </div>
-
-    <div class="col-lg-4 col-md-6 col-12">
-        <label for="account_name" class="dg-label">Account Name</label>
-        <input type="text" name="account_name" id="account_name" value="{{ optional($account)->account_name }}" class="form-control dg-input" required>
     </div>
 
     <div class="col-lg-4 col-md-6 col-12">
@@ -68,6 +77,11 @@
     <div class="col-lg-4 col-md-6 col-12">
         <label for="opening_balance" class="dg-label">Opening Balance</label>
         <input type="number" step="0.01" name="opening_balance" id="opening_balance" value="{{ optional($account)->opening_balance ?? 0 }}" class="form-control dg-input">
+    </div>
+
+    <div class="col-lg-4 col-md-6 col-12">
+        <label for="current_balance" class="dg-label">Current Balance</label>
+        <input type="number" step="0.01" id="current_balance" value="{{ optional($account)->current_balance ?? 0 }}" class="form-control dg-input" readonly aria-readonly="true">
     </div>
 
     <div class="col-lg-4 col-md-6 col-12">

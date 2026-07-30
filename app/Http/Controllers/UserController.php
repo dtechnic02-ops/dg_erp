@@ -7,9 +7,11 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\StaffUserService;
 use App\Services\SubscriptionService;
+use App\Services\JobRoleVisibilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -38,7 +40,7 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
-            'job_role' => 'required|in:cashier,receiver,accountant,manager',
+            'job_role' => ['required', Rule::in(array_keys(JobRoleVisibilityService::jobRoles()))],
         ]);
 
         $authUser = auth()->user();
@@ -78,7 +80,7 @@ class UserController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'job_role' => 'required|in:cashier,receiver,accountant,manager',
+            'job_role' => ['required', Rule::in(array_keys(JobRoleVisibilityService::jobRoles()))],
         ]);
 
         $user->update([

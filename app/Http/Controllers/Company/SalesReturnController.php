@@ -13,6 +13,8 @@ use App\Models\SalesReturnItem;
 use App\Services\InvoiceNumberService;
 use App\Services\SalesReturnSyncService;
 use App\Services\StockService;
+use App\Services\SalesInventoryRestorationService;
+use App\Services\Accounting\Integrations\SalesReturnCogsAccountingIntegrationService;
 use App\Services\ValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +24,13 @@ use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 class SalesReturnController extends Controller
 {
     use HandlesTransactionDocumentationEdit;
+
+    public function __construct(
+        private readonly SalesInventoryRestorationService $salesInventoryRestorationService,
+        private readonly SalesReturnCogsAccountingIntegrationService $salesReturnCogsAccountingIntegrationService
+    ) {
+    }
+
     public function index(Request $request)
     {
         $companyId = auth()->user()->company_id;
@@ -387,7 +396,7 @@ class SalesReturnController extends Controller
                         $returnItemData['product_id'] = $product->id;
                         $returnItemData['service_id'] = null;
 
-                        SalesReturnItem::create($returnItemData);
+                        $returnItem = SalesReturnItem::create($returnItemData);
 
                         $salesItem->update([
                             'returned_qty' => round(
@@ -396,16 +405,9 @@ class SalesReturnController extends Controller
                             ),
                         ]);
 
-                        StockService::increase(
-                            $product,
-                            $returnQty,
-                            'sales_return',
-                            $return->return_no,
-                            $activeFy->id,
-                            $return->return_date,
-                            $salesItem->unit_price,
-                            'Sales Return'
-                        );
+                        $snapshot = \App\Models\SalesCostSnapshot::where('company_id', $companyId)->where('sales_item_id', $salesItem->id)->first();
+                        if (! $snapshot) throw new \Exception('The original sales cost snapshot is required for every returned product.');
+                        $this->salesInventoryRestorationService->restore($snapshot, $returnQty, SalesReturnItem::class, $returnItem->id, 'created', $return->return_no, $activeFy->id, $return->return_date->format('Y-m-d'), auth()->id());
 
                         continue;
                     }
@@ -442,6 +444,7 @@ class SalesReturnController extends Controller
                 ]);
 
                 SalesReturnSyncService::sync($return, true);
+                $this->salesReturnCogsAccountingIntegrationService->postReturn($return);
 
                 return $return;
             });
@@ -659,26 +662,17 @@ class SalesReturnController extends Controller
                     throw new \Exception('Cannot cancel a sales return with refund settlements.');
                 }
 
+                $this->salesReturnCogsAccountingIntegrationService->reverseReturn($return, $cancelBusinessDate, auth()->id());
+
                 foreach ($return->items as $item) {
                     if ((int) $item->status !== 1) {
                         continue;
                     }
 
                     if ($item->product_id) {
-                        $product = Product::where('company_id', $companyId)
-                            ->lockForUpdate()
-                            ->findOrFail($item->product_id);
-
-                        StockService::decrease(
-                            $product,
-                            $item->quantity,
-                            'sales_return_cancel',
-                            $return->return_no,
-                            $activeFy->id,
-                            $cancelBusinessDate,
-                            $item->unit_price,
-                            'Sales Return Cancel: ' . $cancelReason
-                        );
+                        $snapshot = \App\Models\SalesCostSnapshot::where('company_id', $companyId)->where('sales_item_id', $item->sales_item_id)->first();
+                        if (! $snapshot) throw new \Exception('The original sales cost snapshot is required to cancel this product return.');
+                        $this->salesInventoryRestorationService->reverseRestoration($snapshot, $item->quantity, $item->id, $return->return_no, $activeFy->id, $cancelBusinessDate);
                     }
 
                     if ($item->sales_item_id) {

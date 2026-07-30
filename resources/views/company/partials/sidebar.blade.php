@@ -8,21 +8,22 @@ $activeFinancialYear = $company
     : null;
 
 $userRole = $user?->role?->name ?? ($user?->job_role ?: 'User');
-
-$canViewLoanAccount = userCan('view_loan_account');
-$canViewLoanPayment = userCan('view_loan_payment');
-$canViewLoanSavingLedger = userCan('view_loan_saving_ledger');
-$canViewEmployee = userCan('employee.view');
-$canViewSalary = userCan('salary.view');
-$canViewSalaryPayment = userCan('salary.payment.view');
-$canViewDelivery = userCan('view_delivery');
-$canViewCrmDashboard = userCan('view_crm_dashboard');
-$canViewCrmContact = userCan('view_crm_contact');
-$canViewCrmLead = userCan('view_crm_lead');
-$canViewCrmOpportunity = userCan('view_crm_opportunity');
-$canViewCrmFollowUp = userCan('view_crm_follow_up');
-$canViewCrmMeeting = userCan('view_crm_meeting');
-$canViewCrmTask = userCan('view_crm_task');
+$jobRoleVisibility = app(\App\Services\JobRoleVisibilityService::class);
+$canSeeMenu = fn (string $menu): bool => $user && $jobRoleVisibility->canSeeMenu($user, $menu);
+$canViewLoanAccount = $canSeeMenu('loan');
+$canViewLoanPayment = $canSeeMenu('loan');
+$canViewLoanSavingLedger = $canSeeMenu('loan');
+$canViewEmployee = $canSeeMenu('hr');
+$canViewSalary = $canSeeMenu('hr');
+$canViewSalaryPayment = $canSeeMenu('hr');
+$canViewDelivery = $canSeeMenu('delivery');
+$canViewCrmDashboard = $canSeeMenu('crm');
+$canViewCrmContact = $canSeeMenu('crm');
+$canViewCrmLead = $canSeeMenu('crm');
+$canViewCrmOpportunity = $canSeeMenu('crm');
+$canViewCrmFollowUp = $canSeeMenu('crm');
+$canViewCrmMeeting = $canSeeMenu('crm');
+$canViewCrmTask = $canSeeMenu('crm');
 
 $subscriptionService = $company ? app(\App\Services\SubscriptionService::class) : null;
 $subscriptionAllowsCrm = $company && $subscriptionService?->canAccessModule($company, 'crm');
@@ -104,10 +105,13 @@ $reportsOpen = request()->routeIs(
 
 $settingsOpen = request()->routeIs(
     'company.profile',
-    'company.users.*',
-    'company.permissions.*',
     'company.financial-years.*',
     'company.maintenance.*'
+);
+
+$staffManagementOpen = request()->routeIs(
+    'company.users.*',
+    'company.staff-permissions.*'
 );
 
 $linkActive = fn (string ...$patterns): string => request()->routeIs(...$patterns) ? 'dg-sidebar-active' : '';
@@ -151,6 +155,27 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
 
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
 
+                @if($canSeeMenu('staff_management'))
+                <div class="dg-sidebar-section">
+                    <div class="dg-sidebar-group {{ $groupOpen($staffManagementOpen) }}">
+                        <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-staff-management" @if ($staffManagementOpen) checked @endif>
+                        <label for="dg-nav-staff-management" class="dg-sidebar-parent">
+                            <span class="dg-sidebar-icon" aria-hidden="true"><i class="bi bi-people"></i></span>
+                            <span class="dg-sidebar-label">Staff Management</span>
+                            <span class="dg-sidebar-chevron" aria-hidden="true"></span>
+                        </label>
+                        <div class="dg-sidebar-submenu">
+                            <div class="dg-sidebar-child">
+                                <a href="{{ route('company.users.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.users.*') }}">Staff List</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
+                <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
+
+                @if($canSeeMenu('sales'))
                 <div class="dg-sidebar-section">
                     <div class="dg-sidebar-group {{ $groupOpen($salesOpen) }}">
                         <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-sales" @if ($salesOpen) checked @endif>
@@ -178,10 +203,11 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                         </div>
                     </div>
                 </div>
+                @endif
 
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
 
-                @if ($subscriptionAllowsCrm && ($canViewCrmDashboard || $canViewCrmLead || $canViewCrmContact || $canViewCrmOpportunity || $canViewCrmFollowUp || $canViewCrmMeeting || $canViewCrmTask))
+                @if ($subscriptionAllowsCrm && $canSeeMenu('crm'))
                 <div class="dg-sidebar-section">
                     <div class="dg-sidebar-group {{ $groupOpen($crmOpen) }}">
                         <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-crm" @if ($crmOpen) checked @endif>
@@ -233,6 +259,7 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
                 @endif
 
+                @if($canSeeMenu('purchase'))
                 <div class="dg-sidebar-section">
                     <div class="dg-sidebar-group {{ $groupOpen($purchaseOpen) }}">
                         <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-purchase" @if ($purchaseOpen) checked @endif>
@@ -260,9 +287,11 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                         </div>
                     </div>
                 </div>
+                @endif
 
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
 
+                @if($canSeeMenu('inventory'))
                 <div class="dg-sidebar-section">
                     <div class="dg-sidebar-group {{ $groupOpen($inventoryOpen) }}">
                         <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-inventory" @if ($inventoryOpen) checked @endif>
@@ -296,9 +325,11 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                         </div>
                     </div>
                 </div>
+                @endif
 
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
 
+                @if($canSeeMenu('accounts') || $canSeeMenu('cash_accounts'))
                 <div class="dg-sidebar-section">
                     <div class="dg-sidebar-group {{ $groupOpen($accountsOpen) }}">
                         <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-accounts" @if ($accountsOpen) checked @endif>
@@ -308,45 +339,52 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                             <span class="dg-sidebar-chevron" aria-hidden="true"></span>
                         </label>
                         <div class="dg-sidebar-submenu">
-                            <div class="dg-sidebar-child">
-                                <a href="{{ route('company.accounts.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.accounts.*') }}">Accounts</a>
-                            </div>
+                            @if($canSeeMenu('accounts'))
+                                <div class="dg-sidebar-child">
+                                    <a href="{{ route('company.accounts.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.accounts.*') }}">Accounts</a>
+                                </div>
+                            @endif
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.cash.accounts.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.cash.accounts.*') }}">Cash Accounts</a>
                             </div>
-                            @if ($user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('view_account_transactions')))
+                            @if($canSeeMenu('account_transactions'))
                                 <div class="dg-sidebar-child">
                                     <a href="{{ route('company.account-transaction.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.account-transaction.*') }}">Account Transactions</a>
                                 </div>
                             @endif
-                            @if ($user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('view_income')))
+                            @if($canSeeMenu('income'))
                                 <div class="dg-sidebar-child">
                                     <a href="{{ route('company.income.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.income.*', 'company.income-category.*') }}">Income</a>
                                 </div>
                             @endif
-                            @if ($user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('view_expense')))
+                            @if($canSeeMenu('expense'))
                                 <div class="dg-sidebar-child">
                                     <a href="{{ route('company.expense.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.expense.*', 'company.expense-category.*') }}">Expenses</a>
                                 </div>
                             @endif
-                            @if ($user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('view_journal')))
+                            @if($canSeeMenu('journal'))
                                 <div class="dg-sidebar-child">
                                     <a href="{{ route('company.journal.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.journal.*') }}">Journal</a>
                                 </div>
                             @endif
-                            <div class="dg-sidebar-child">
-                                <a href="{{ route('company.contra.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.contra.*') }}">Contra</a>
-                            </div>
-                            <div class="dg-sidebar-child">
-                                <a href="{{ route('company.vats.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.vats.*') }}">VAT</a>
-                            </div>
+                            @if($canSeeMenu('contra'))
+                                <div class="dg-sidebar-child">
+                                    <a href="{{ route('company.contra.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.contra.*') }}">Contra</a>
+                                </div>
+                            @endif
+                            @if($canSeeMenu('vat'))
+                                <div class="dg-sidebar-child">
+                                    <a href="{{ route('company.vats.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.vats.*') }}">VAT</a>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
 
+                @endif
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
 
-                @if ($subscriptionAllowsLoan && ($canViewLoanAccount || $canViewLoanPayment || $canViewLoanSavingLedger))
+                @if ($subscriptionAllowsLoan && $canSeeMenu('loan'))
                 <div class="dg-sidebar-section">
                     <div class="dg-sidebar-group {{ $groupOpen($loanOpen) }}">
                         <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-loan" @if ($loanOpen) checked @endif>
@@ -381,6 +419,7 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
                 @endif
 
+                @if ($subscriptionAllowsHr && $canSeeMenu('hr'))
                 <div class="dg-sidebar-section">
                     <div class="dg-sidebar-group {{ $groupOpen($hrOpen) }}">
                         <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-hr" @if ($hrOpen) checked @endif>
@@ -409,8 +448,11 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                     </div>
                 </div>
 
+                @endif
+
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
 
+                @if($canSeeMenu('reports'))
                 <div class="dg-sidebar-section">
                     <div class="dg-sidebar-group {{ $groupOpen($reportsOpen) }}">
                         <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-reports" @if ($reportsOpen) checked @endif>
@@ -441,8 +483,11 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                     </div>
                 </div>
 
+                @endif
+
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
 
+                @if($canSeeMenu('settings'))
                 <div class="dg-sidebar-section">
                     <div class="dg-sidebar-group {{ $groupOpen($settingsOpen) }}">
                         <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-settings" @if ($settingsOpen) checked @endif>
@@ -452,32 +497,24 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                             <span class="dg-sidebar-chevron" aria-hidden="true"></span>
                         </label>
                         <div class="dg-sidebar-submenu">
-                            @if(auth()->user()->hasPermission('view_company_profile'))
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.profile') }}" class="dg-sidebar-child-link {{ $linkActive('company.profile') }}">Profile</a>
                             </div>
-                            @endif
-                            @if(auth()->user()->hasPermission('view_users'))
-                            <div class="dg-sidebar-child">
-                                <a href="{{ route('company.users.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.users.*') }}">Staff</a>
-                            </div>
-                            @endif
-                            @if(auth()->user()->hasPermission('manage_users'))
-                            <div class="dg-sidebar-child">
-                                <a href="{{ route('company.permissions.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.permissions.*') }}">Permissions</a>
-                            </div>
-                            @endif
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.financial-years.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.financial-years.*') }}">Financial Years</a>
                             </div>
+                            @if($jobRoleVisibility->canSeeMaintenance($user))
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.maintenance.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.maintenance.*') }}">Maintenance</a>
                             </div>
+                            @endif
                         </div>
                     </div>
                 </div>
 
-                @if ($subscriptionAllowsDelivery && $canViewDelivery)
+                @endif
+
+                @if ($subscriptionAllowsDelivery && $canSeeMenu('delivery'))
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
 
                 <div class="dg-sidebar-section">

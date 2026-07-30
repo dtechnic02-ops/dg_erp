@@ -14,6 +14,7 @@ use App\Services\AccountBalanceService;
 use App\Services\FileUploadService;
 use App\Services\InvoiceNumberService;
 use App\Services\PurchaseInvoicePaymentStateService;
+use App\Services\Accounting\Integrations\PurchasePaymentAccountingIntegrationService;
 use App\Services\SupplierTransactionService;
 use App\Services\ValidationService;
 use Illuminate\Http\Request;
@@ -24,6 +25,12 @@ use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 class PurchasePaymentController extends Controller
 {
     use HandlesTransactionDocumentationEdit;
+
+    public function __construct(
+        private readonly PurchasePaymentAccountingIntegrationService $purchasePaymentAccountingIntegrationService
+    ) {
+    }
+
     public function index(Request $request)
     {
         $companyId = auth()->user()->company_id;
@@ -325,6 +332,10 @@ class PurchasePaymentController extends Controller
                 ]);
 
                 PurchaseInvoicePaymentStateService::syncInvoicePaymentState($invoice);
+
+                $this->purchasePaymentAccountingIntegrationService->postPayment(
+                    $payment->fresh()
+                );
             });
 
             return redirect()
@@ -440,6 +451,12 @@ class PurchasePaymentController extends Controller
                 ]);
 
                 PurchaseInvoicePaymentStateService::syncInvoicePaymentState($invoice);
+
+                $this->purchasePaymentAccountingIntegrationService->reversePayment(
+                    $payment,
+                    $cancelBusinessDate,
+                    auth()->id()
+                );
             });
 
             return back()->with('success', 'Payment cancelled successfully.');

@@ -49,6 +49,7 @@ class SalesReturnRefund extends Model
         'sales_return_id',
         'customer_id',
         'account_id',
+        'idempotency_key',
         'refund_no',
         'refund_date',
         'refund_amount',
@@ -68,6 +69,7 @@ class SalesReturnRefund extends Model
         'refund_amount'  => 'decimal:2',
         'adjust_amount'  => 'decimal:2',
         'cash_amount'    => 'decimal:2',
+        'idempotency_key' => 'string',
         'status'         => 'integer',
     ];
 

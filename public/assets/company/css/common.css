@@ -4730,6 +4730,501 @@ body.dg-sidebar-collapsed .dg-sidebar-button
 19. MASTER ADMIN LAYOUT — Super Admin shell
 =========================================================*/
 
+/*=========================================================
+18c. USER PERMISSION MANAGEMENT — Reusable presentation
+=========================================================*/
+
+.dg-permission-summary
+{
+    margin-bottom:16px;
+}
+
+/* Reusable list-page structure. */
+.dg-page-header
+{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:16px;
+}
+
+.dg-form-row,
+.dg-filter
+{
+    display:flex;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:10px;
+}
+
+.dg-form-group
+{
+    min-width:0;
+}
+
+.dg-search
+{
+    flex:1 1 240px;
+}
+
+.dg-form-inline
+{
+    display:flex;
+    align-items:center;
+    gap:6px;
+}
+
+.dg-form-inline .dg-input
+{
+    width:80px;
+}
+
+.dg-btn-sm
+{
+    min-width:auto;
+    min-height:31px;
+    padding:4px 9px;
+    font-size:12px;
+}
+
+.dg-status
+{
+    display:inline-block;
+    margin-top:3px;
+    font-size:11px;
+    font-weight:600;
+}
+
+.dg-status-warning
+{
+    color:#9a6700;
+}
+
+.dg-status-danger
+{
+    color:#b42318;
+}
+
+.dg-empty-state
+{
+    padding:28px 16px;
+    color:var(--muted);
+    text-align:center;
+}
+
+.dg-modal .modal-content
+{
+    border:0;
+    border-radius:var(--dg-radius);
+    box-shadow:0 12px 30px rgba(0,0,0,.16);
+}
+
+.dg-modal .modal-header,
+.dg-modal .modal-footer
+{
+    border-color:#dee2e6;
+}
+
+.dg-presence
+{
+    display:inline-block;
+    width:8px;
+    height:8px;
+    margin-right:5px;
+    border-radius:50%;
+}
+
+.dg-presence-online
+{
+    background:#198754;
+}
+
+.dg-presence-offline
+{
+    background:#6c757d;
+}
+
+/* Reusable dashboard presentation. */
+.dg-dashboard
+{
+    max-width:1600px;
+}
+
+.dg-page-header-content
+{
+    min-width:0;
+}
+
+.dg-section-header
+{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:12px;
+}
+
+.dg-section-title
+{
+    margin:0;
+    color:var(--dark);
+    font-size:16px;
+    font-weight:700;
+}
+
+.dg-section-subtitle
+{
+    margin:3px 0 0;
+    color:var(--muted);
+    font-size:12px;
+}
+
+.dg-dashboard-grid
+{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));
+    gap:14px;
+}
+
+.dg-stat-card
+{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    min-height:142px;
+    padding:16px;
+    overflow:hidden;
+    border:1px solid #dee2e6;
+    border-radius:var(--dg-radius);
+    background:#ffffff;
+    box-shadow:0 2px 8px rgba(0,0,0,.04);
+}
+
+.dg-stat-card-header
+{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    min-width:0;
+}
+
+.dg-stat-card-icon
+{
+    display:inline-flex;
+    flex:0 0 auto;
+    align-items:center;
+    justify-content:center;
+    width:32px;
+    height:32px;
+    border-radius:8px;
+    background:#e9ecef;
+    color:#495057;
+    font-size:16px;
+}
+
+.dg-stat-card-label
+{
+    overflow-wrap:anywhere;
+    color:var(--muted);
+    font-size:12px;
+    font-weight:600;
+}
+
+.dg-stat-card-value
+{
+    margin-top:18px;
+    color:var(--dark);
+    font-size:28px;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    line-height:1;
+}
+
+.dg-stat-card-meta
+{
+    margin:9px 0 0;
+    color:var(--muted);
+    font-size:11px;
+    line-height:1.35;
+}
+
+.dg-stat-card-primary .dg-stat-card-icon { background:#e7f0ff; color:#0d6efd; }
+.dg-stat-card-success .dg-stat-card-icon { background:#e8f5ee; color:#198754; }
+.dg-stat-card-warning .dg-stat-card-icon { background:#fff4d6; color:#9a6700; }
+.dg-stat-card-danger .dg-stat-card-icon { background:#fce8e6; color:#b42318; }
+.dg-stat-card-info .dg-stat-card-icon { background:#e0f2fe; color:#0369a1; }
+.dg-stat-card-neutral .dg-stat-card-icon { background:#e9ecef; color:#495057; }
+
+/* Reusable settings presentation. */
+.dg-tabs
+{
+    gap:6px;
+    overflow-x:auto;
+    flex-wrap:nowrap;
+    padding-bottom:2px;
+}
+
+.dg-tabs .nav-link
+{
+    flex:0 0 auto;
+    color:var(--dark);
+    font-size:13px;
+    white-space:nowrap;
+}
+
+.dg-tabs .nav-link:hover,
+.dg-tabs .nav-link:focus
+{
+    background:#e9ecef;
+}
+
+.dg-upload-preview
+{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    color:var(--muted);
+    font-size:12px;
+}
+
+.dg-upload-preview img
+{
+    width:46px;
+    height:46px;
+    border:1px solid #dee2e6;
+    border-radius:6px;
+    object-fit:contain;
+}
+
+.dg-secret-status
+{
+    margin-top:5px;
+    color:var(--muted);
+    font-size:11px;
+}
+
+.dg-provider-row td
+{
+    vertical-align:middle;
+}
+
+.dg-gateway-card
+{
+    height:100%;
+}
+
+/* Reusable A4 record presentation. */
+.dg-record-sheet { max-width:210mm; margin:0 auto; background:#fff; }
+.dg-record-header { display:flex; justify-content:space-between; gap:16px; padding:20px; border-bottom:2px solid #1e3a5f; }
+.dg-record-brand { display:flex; align-items:center; gap:14px; min-width:0; }
+.dg-record-logo, .dg-record-logo-fallback { width:56px; height:56px; border:1px solid #dee2e6; border-radius:8px; object-fit:contain; }
+.dg-record-logo-fallback { display:inline-flex; align-items:center; justify-content:center; color:#1e3a5f; background:#e7f0ff; font-size:24px; font-weight:700; }
+.dg-record-title { margin:0; color:#1e3a5f; font-size:22px; font-weight:700; }
+.dg-record-subtitle, .dg-record-id { display:block; margin:3px 0 0; color:var(--muted); font-size:12px; }
+.dg-record-status { display:flex; flex-direction:column; align-items:flex-end; gap:6px; text-align:right; }
+.dg-record-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; padding:20px; }
+.dg-record-section { min-width:0; padding:14px; border:1px solid #dee2e6; border-radius:8px; }
+.dg-record-section-title { margin:0 0 10px; color:#1e3a5f; font-size:14px; font-weight:700; }
+.dg-record-list { display:grid; gap:8px; margin:0; }
+.dg-record-list div { display:grid; grid-template-columns:130px minmax(0, 1fr); gap:8px; }
+.dg-record-list dt { color:var(--muted); font-size:12px; font-weight:600; }
+.dg-record-list dd { margin:0; overflow-wrap:anywhere; font-size:12px; }
+.dg-record-footer { padding:12px 20px; border-top:1px solid #dee2e6; color:var(--muted); font-size:11px; text-align:right; }
+
+@media (max-width:767.98px) { .dg-record-header { flex-direction:column; } .dg-record-status { align-items:flex-start; text-align:left; } .dg-record-grid { grid-template-columns:1fr; padding:14px; } }
+
+@media print { @page { size:A4 portrait; margin:8mm; } body:has(.dg-record-print) .dg-sidebar, body:has(.dg-record-print) .dg-header, body:has(.dg-record-print) .dg-print-hide { display:none !important; } body:has(.dg-record-print) .dg-main, body:has(.dg-record-print) .dg-main-content, body:has(.dg-record-print) .dg-page { width:100%; margin:0; padding:0; } .dg-record-sheet { max-width:none; border:0; box-shadow:none; } .dg-record-header { padding:8px 12px; gap:10px; } .dg-record-logo, .dg-record-logo-fallback { width:36px; height:36px; font-size:16px; } .dg-record-title { font-size:16px; } .dg-record-subtitle, .dg-record-id { margin-top:1px; font-size:9px; } .dg-record-grid { gap:8px; padding:10px 12px; } .dg-record-section { padding:8px; break-inside:avoid; } .dg-record-section-title { margin-bottom:5px; font-size:11px; } .dg-record-list { gap:3px; } .dg-record-list div { grid-template-columns:96px minmax(0, 1fr); gap:6px; } .dg-record-list dt, .dg-record-list dd { font-size:9px; line-height:1.25; } .dg-record-footer { padding:7px 12px; font-size:9px; } }
+
+@media (max-width:575.98px)
+{
+    .dg-page-header
+    {
+        display:block;
+    }
+
+    .dg-form-row,
+    .dg-filter
+    {
+        align-items:stretch;
+    }
+
+    .dg-form-group,
+    .dg-form-group .dg-btn
+    {
+        width:100%;
+    }
+
+    .dg-dashboard-grid
+    {
+        grid-template-columns:1fr;
+    }
+
+    .dg-stat-card
+    {
+        min-height:128px;
+    }
+}
+
+.dg-permission-summary-item
+{
+    margin-bottom:12px;
+}
+
+.dg-permission-summary-item dt
+{
+    margin-bottom:3px;
+    color:var(--muted);
+    font-size:11px;
+    font-weight:600;
+    text-transform:uppercase;
+}
+
+.dg-permission-summary-item dd
+{
+    margin-bottom:0;
+    font-size:13px;
+    font-weight:600;
+    overflow-wrap:anywhere;
+}
+
+.dg-permission-module
+{
+    margin-bottom:16px;
+}
+
+.dg-permission-module:last-child
+{
+    margin-bottom:0;
+}
+
+.dg-permission-module-header
+{
+    display:flex;
+    align-items:center;
+    min-height:44px;
+}
+
+.dg-permission-table th:first-child
+{
+    width:55%;
+}
+
+.dg-permission-table th:not(:first-child),
+.dg-permission-table td:not(:first-child)
+{
+    width:15%;
+    min-width:105px;
+}
+
+.dg-permission-choice
+{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    margin:0;
+    white-space:nowrap;
+}
+
+.dg-permission-choice .form-check-input
+{
+    margin:0;
+}
+
+.dg-permission-responsive
+{
+    margin-bottom:0;
+}
+
+@media (max-width:767.98px)
+{
+    .dg-permission-summary-item
+    {
+        margin-bottom:10px;
+    }
+
+    .dg-permission-table
+    {
+        min-width:620px;
+    }
+
+    .dg-permission-module .dg-card-body
+    {
+        padding:12px;
+    }
+}
+
+/*=========================================================
+18d. COMPANY DASHBOARD — Reusable dashboard presentation
+=========================================================*/
+
+.dg-dashboard-page
+{
+    padding:20px;
+}
+
+.dg-dashboard-page .dg-container
+{
+    margin-top:0;
+}
+
+.dg-dashboard-heading
+{
+    margin-bottom:20px !important;
+}
+
+.dg-dashboard-page .dg-card
+{
+    height:100%;
+    padding:16px;
+    background:#ffffff;
+}
+
+.dg-dashboard-page .dg-dashboard-card
+{
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    min-height:116px;
+}
+
+.dg-dashboard-page .dg-title
+{
+    color:var(--muted);
+    font-size:12px;
+    font-weight:600;
+}
+
+.dg-dashboard-page .dg-value
+{
+    margin-top:10px;
+    color:var(--dark);
+    font-size:24px;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    line-height:1.15;
+}
+
+.dg-dashboard-page .table
+{
+    margin-bottom:0;
+}
+
+@media (max-width:767.98px)
+{
+    .dg-dashboard-page
+    {
+        padding:14px;
+    }
+
+    .dg-dashboard-page .dg-value
+    {
+        font-size:21px;
+    }
+}
+
 .dg-admin-body
 {
     margin:0;

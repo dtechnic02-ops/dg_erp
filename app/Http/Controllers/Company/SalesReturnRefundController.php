@@ -17,15 +17,22 @@ use App\Services\CustomerTransactionService;
 use App\Services\FileUploadService;
 use App\Services\InvoiceNumberService;
 use App\Services\SalesReturnSyncService;
+use App\Services\Accounting\Integrations\SalesReturnRefundAccountingIntegrationService;
 use App\Services\ValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
 class SalesReturnRefundController extends Controller
 {
     use HandlesTransactionDocumentationEdit;
+
+    public function __construct(
+        private readonly SalesReturnRefundAccountingIntegrationService $salesReturnRefundAccountingIntegrationService
+    ) {
+    }
     public function index(Request $request)
     {
         $companyId = auth()->user()->company_id;
@@ -185,7 +192,7 @@ class SalesReturnRefundController extends Controller
                 'refundNo',
                 'remainingAmount',
                 'outstandingInvoices'
-            )
+            ) + ['idempotencyKey' => (string) Str::uuid()]
         );
     }
 
@@ -195,6 +202,7 @@ class SalesReturnRefundController extends Controller
 
         $request->validate([
             'sales_return_id'     => 'required|exists:sales_returns,id,company_id,' . $companyId,
+            'idempotency_key'     => 'required|uuid',
             'refund_date'         => 'required|date',
             'sales_invoice_id'    => 'nullable|array',
             'sales_invoice_id.*'  => 'nullable|integer',
@@ -215,6 +223,9 @@ class SalesReturnRefundController extends Controller
             'Settlement amount exceeds remaining refund.',
             'Invoice adjustment exceeds invoice due amount.',
             'Invalid invoice selected for adjustment.',
+            'Duplicate invoice selected for adjustment.',
+            'Invoice adjustment must belong to the active financial year.',
+            'This refund request has already been submitted.',
             'Refund account is required when cash refund is due.',
             'Insufficient account balance.',
             'Nothing to refund.',
@@ -235,6 +246,13 @@ class SalesReturnRefundController extends Controller
                     ->lockForUpdate()
                     ->findOrFail($request->sales_return_id);
 
+                if (SalesReturnRefund::where('company_id', $companyId)
+                    ->where('idempotency_key', $request->idempotency_key)
+                    ->lockForUpdate()
+                    ->exists()) {
+                    throw new \Exception('This refund request has already been submitted.');
+                }
+
                 $remainingRefund = $this->calculateRemainingRefundLocked($return);
 
                 if ($remainingRefund <= 0) {
@@ -245,7 +263,8 @@ class SalesReturnRefundController extends Controller
                     $request,
                     $companyId,
                     $return->customer_id,
-                    $remainingRefund
+                    $remainingRefund,
+                    $activeFy
                 );
 
                 $totalAdjustment = collect($adjustments)->sum('amount');
@@ -316,6 +335,7 @@ class SalesReturnRefundController extends Controller
                     'sales_return_id'   => $return->id,
                     'customer_id'       => $return->customer_id,
                     'account_id'        => $account?->id,
+                    'idempotency_key'   => $request->idempotency_key,
                     'refund_no'         => $refundNo,
                     'refund_date'       => $request->refund_date,
                     'refund_amount'     => $settlementTotal,
@@ -398,6 +418,8 @@ class SalesReturnRefundController extends Controller
                 }
 
                 SalesReturnSyncService::sync($return, true);
+
+                $this->salesReturnRefundAccountingIntegrationService->postRefund($refund->fresh());
 
                 return $refund;
             });
@@ -541,6 +563,8 @@ class SalesReturnRefundController extends Controller
                     ], $refund)
                 );
 
+                $this->synchronizeRefundBusinessDate($refund, $request->refund_date);
+
                 $this->logDocumentationEdit(
                     'Sales return refund documentation updated.',
                     $refund
@@ -636,6 +660,8 @@ class SalesReturnRefundController extends Controller
                     throw new \Exception('Refund already cancelled.');
                 }
 
+                $this->assertExpectedCancellationTransactions($refund, $companyId);
+
                 foreach ($refund->adjustments as $adjustment) {
                     if ((int) $adjustment->status !== 1) {
                         continue;
@@ -715,6 +741,12 @@ class SalesReturnRefundController extends Controller
                 if ($salesReturn) {
                     SalesReturnSyncService::sync($salesReturn, true);
                 }
+
+                $this->salesReturnRefundAccountingIntegrationService->reverseRefund(
+                    $refund,
+                    $cancelBusinessDate,
+                    auth()->id()
+                );
             });
 
             return redirect()
@@ -797,14 +829,26 @@ class SalesReturnRefundController extends Controller
         Request $request,
         int $companyId,
         int $customerId,
-        float $remainingRefund
+        float $remainingRefund,
+        FinancialYear $activeFy
     ): array {
         $invoiceIds = $request->input('sales_invoice_id', []);
         $amounts = $request->input('adjust_amount', []);
         $adjustments = [];
         $totalAdjustment = 0;
+        $selectedInvoiceIds = [];
 
         foreach ($invoiceIds as $index => $invoiceId) {
+            if ($invoiceId !== null && $invoiceId !== '') {
+                $invoiceKey = (string) $invoiceId;
+
+                if (isset($selectedInvoiceIds[$invoiceKey])) {
+                    throw new \Exception('Duplicate invoice selected for adjustment.');
+                }
+
+                $selectedInvoiceIds[$invoiceKey] = true;
+            }
+
             $amount = round((float) ($amounts[$index] ?? 0), 2);
 
             if ($amount <= 0) {
@@ -821,6 +865,10 @@ class SalesReturnRefundController extends Controller
 
             if (!$invoice) {
                 throw new \Exception('Invalid invoice selected for adjustment.');
+            }
+
+            if ((int) $invoice->financial_year_id !== (int) $activeFy->id) {
+                throw new \Exception('Invoice adjustment must belong to the active financial year.');
             }
 
             if ($amount > (float) $invoice->due_amount) {
@@ -876,5 +924,121 @@ class SalesReturnRefundController extends Controller
         }
 
         return 'unpaid';
+    }
+
+    protected function synchronizeRefundBusinessDate(
+        SalesReturnRefund $refund,
+        string $refundDate
+    ): void {
+        $date = \Carbon\Carbon::parse($refundDate)->toDateString();
+
+        AccountTransaction::where('company_id', $refund->company_id)
+            ->where('reference_type', 'sales_return_refund')
+            ->where('reference_id', $refund->id)
+            ->where('status', 1)
+            ->update(['transaction_date' => $date]);
+
+        CustomerTransaction::where('company_id', $refund->company_id)
+            ->whereIn('reference_type', [
+                'sales_return_refund',
+                'sales_return_refund_adjustment',
+            ])
+            ->where('reference_id', $refund->id)
+            ->where('status', 1)
+            ->update(['transaction_date' => $date]);
+
+        \App\Models\AccountingEntry::where('company_id', $refund->company_id)
+            ->whereIn('source_type', [
+                'sales_return_refund',
+                SalesReturnRefund::class,
+            ])
+            ->where('source_id', $refund->id)
+            ->where('source_event', 'created')
+            ->where('status', 'posted')
+            ->whereNull('reversal_of_id')
+            ->update(['entry_date' => $date]);
+    }
+
+    protected function assertExpectedCancellationTransactions(
+        SalesReturnRefund $refund,
+        int $companyId
+    ): void {
+        $cashAmount = round((float) $refund->cash_amount, 2);
+        $adjustAmount = round((float) $refund->adjust_amount, 2);
+
+        $this->assertExpectedCustomerTransaction(
+            $refund,
+            $companyId,
+            'sales_return_refund_adjustment',
+            $adjustAmount
+        );
+
+        $this->assertExpectedCustomerTransaction(
+            $refund,
+            $companyId,
+            'sales_return_refund',
+            $cashAmount
+        );
+
+        $accountTransactions = AccountTransaction::where('company_id', $companyId)
+            ->where('reference_type', 'sales_return_refund')
+            ->where('reference_id', $refund->id)
+            ->where('status', 1)
+            ->get();
+
+        if ($cashAmount <= 0) {
+            if ($accountTransactions->isNotEmpty()) {
+                throw new \Exception('Refund account transaction does not match the refund settlement.');
+            }
+
+            return;
+        }
+
+        if ($accountTransactions->count() !== 1) {
+            throw new \Exception('Expected refund account transaction is missing or duplicated.');
+        }
+
+        $transaction = $accountTransactions->first();
+
+        if ((int) $transaction->account_id !== (int) $refund->account_id
+            || (int) $transaction->financial_year_id !== (int) $refund->financial_year_id
+            || round((float) $transaction->debit, 2) !== 0.0
+            || round((float) $transaction->credit, 2) !== $cashAmount) {
+            throw new \Exception('Refund account transaction does not match the refund settlement.');
+        }
+    }
+
+    protected function assertExpectedCustomerTransaction(
+        SalesReturnRefund $refund,
+        int $companyId,
+        string $referenceType,
+        float $expectedCredit
+    ): void {
+        $transactions = CustomerTransaction::where('company_id', $companyId)
+            ->where('reference_type', $referenceType)
+            ->where('reference_id', $refund->id)
+            ->where('status', 1)
+            ->get();
+
+        if ($expectedCredit <= 0) {
+            if ($transactions->isNotEmpty()) {
+                throw new \Exception('Refund customer transaction does not match the refund settlement.');
+            }
+
+            return;
+        }
+
+        if ($transactions->count() !== 1) {
+            throw new \Exception('Expected refund customer transaction is missing or duplicated.');
+        }
+
+        $transaction = $transactions->first();
+
+        if ((int) $transaction->customer_id !== (int) $refund->customer_id
+            || (int) $transaction->financial_year_id !== (int) $refund->financial_year_id
+            || round((float) $transaction->debit, 2) !== 0.0
+            || round((float) $transaction->credit, 2) !== $expectedCredit) {
+            throw new \Exception('Refund customer transaction does not match the refund settlement.');
+        }
     }
 }

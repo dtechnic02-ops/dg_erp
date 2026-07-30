@@ -25,6 +25,8 @@ class AccountTransaction extends Model
         'reference_type',
 
         'reference_id',
+        'journal_item_id',
+        'reversed_transaction_id',
 
         'description',
 

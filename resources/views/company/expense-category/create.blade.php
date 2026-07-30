@@ -49,6 +49,17 @@
                                     <input type="text" name="name" id="name" class="form-control dg-input" value="{{ old('name') }}" required>
                                 </div>
                                 <div class="col-md-6">
+                                    <label class="form-label" for="chart_account_id">Chart Account <span class="text-danger">*</span></label>
+                                    <select name="chart_account_id" id="chart_account_id" class="form-select dg-select" required>
+                                        <option value="">Select Expense Chart Account</option>
+                                        @foreach ($chartAccounts as $chartAccount)
+                                            <option value="{{ $chartAccount->id }}" @selected(old('chart_account_id') == $chartAccount->id)>
+                                                {{ $chartAccount->code }} - {{ $chartAccount->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
                                     <label class="form-label" for="status">Status</label>
                                     <select name="status" id="status" class="form-select dg-select">
                                         <option value="1" @selected(old('status', '1') == '1')>Active</option>

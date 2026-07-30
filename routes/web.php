@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\SubscriptionPaymentController;
 use App\Http\Controllers\Admin\SubscriptionReportController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\PlatformSettingController;
 use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\RolePermissionController;
 use App\Http\Controllers\Company\CustomerController;
@@ -81,7 +82,7 @@ use App\Http\Controllers\Company\SupplierLedgerController;
 use App\Http\Controllers\Company\MaintenanceController;
 use App\Http\Controllers\Company\SupplierStatementController;
 use App\Http\Controllers\Company\CustomerStatementController;
-
+use App\Http\Controllers\Company\UserPermissionController;
 
 
 Route::get('/login', fn() => view('login'))->name('login');
@@ -104,6 +105,12 @@ Route::post('/login', function (Request $request) {
             return back()->with('error', 'Access denied');
         }
 
+        $user->update([
+            'login_at' => now(),
+            'last_seen' => now(),
+            'logout_at' => null,
+        ]);
+
         return app(LoginRedirectService::class)->redirectAfterLogin($user);
     }
 
@@ -112,6 +119,10 @@ Route::post('/login', function (Request $request) {
 })->name('login.post');
 
 Route::post('/logout', function (Request $request) {
+    if ($user = Auth::user()) {
+        $user->update(['logout_at' => now()]);
+    }
+
     Auth::logout();
 
     $request->session()->invalidate();   // 🔥 must
@@ -133,17 +144,36 @@ Route::post('/logout', function (Request $request) {
 
 Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_STAFF_ID])->prefix('admin')->group(function () {
 
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware('role:' . Role::SUPER_ADMIN_ID)
+        ->name('admin.dashboard');
 
-    Route::get('/companies', [CompanyController::class, 'index'])->middleware('permission:view_company')->name('admin.companies');
+    Route::view('/no-access', 'admin.no_access')->name('admin.no-access');
 
-    Route::post('/company/block/{id}', [CompanyController::class, 'block'])->middleware('permission:block_company')->name('admin.company.block');
-    Route::post('/company/unblock/{id}', [CompanyController::class, 'unblock'])->middleware('permission:unblock_company')->name('admin.company.unblock');
+    Route::middleware('role:' . Role::SUPER_ADMIN_ID)->prefix('platform-settings')->name('admin.platform-settings.')->group(function () {
+        Route::get('/', [PlatformSettingController::class, 'index'])->name('index');
+        Route::put('/general', [PlatformSettingController::class, 'updateGeneral'])->name('general.update');
+        Route::put('/branding', [PlatformSettingController::class, 'updateBranding'])->name('branding.update');
+        Route::put('/social-links', [PlatformSettingController::class, 'updateSocialLinks'])->name('social.update');
+        Route::put('/smtp', [PlatformSettingController::class, 'updateSmtp'])->name('smtp.update');
+        Route::post('/smtp/test', [PlatformSettingController::class, 'testSmtp'])->name('smtp.test');
+        Route::put('/payment-gateway', [PlatformSettingController::class, 'updatePaymentGateway'])->name('gateway.update');
+    });
+
+    Route::get('/companies', [CompanyController::class, 'index'])->name('admin.companies');
+    Route::get('/company/{company}', [CompanyController::class, 'show'])->name('admin.company.show');
+
+    Route::post('/company/block/{id}', [CompanyController::class, 'block'])->name('admin.company.block');
+    Route::post('/company/unblock/{id}', [CompanyController::class, 'unblock'])->name('admin.company.unblock');
     Route::post('/company/delete/{id}', [CompanyController::class, 'delete'])->middleware('permission:delete_company')->name('admin.company.delete');
 
     Route::post('/company/limit/{id}', [CompanyController::class, 'updateLimit'])->middleware('permission:edit_company')->name('admin.company.limit');
     Route::post('/company/customer-limit/{id}', [CompanyController::class, 'updateCustomerLimit'])->middleware('permission:edit_company')->name('admin.company.customer.limit');
-    Route::post('/company/reset/{id}', [App\Http\Controllers\Admin\CompanyController::class, 'resetPassword'])->middleware('permission:reset_company_password')->name('admin.company.reset');
+    Route::post('/company/reset/{company}', [CompanyController::class, 'requestPasswordReset'])->middleware('permission:reset_company_password')->name('admin.company.reset');
+    Route::get('/company/{company}/reset/verify', [CompanyController::class, 'showPasswordResetVerification'])->middleware('permission:reset_company_password')->name('admin.company.reset.verify.form');
+    Route::post('/company/{company}/reset/verify', [CompanyController::class, 'verifyPasswordResetOtp'])->middleware('permission:reset_company_password')->name('admin.company.reset.verify');
+    Route::get('/company/{company}/reset/password', [CompanyController::class, 'showPasswordResetForm'])->middleware('permission:reset_company_password')->name('admin.company.reset.password.form');
+    Route::post('/company/{company}/reset/password', [CompanyController::class, 'completePasswordReset'])->middleware('permission:reset_company_password')->name('admin.company.reset.password');
 
 
     // Subscription Module
@@ -187,22 +217,43 @@ Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_ST
     Route::get('/invoice/{id}', [SubscriptionPaymentController::class, 'invoice'])->name('admin.invoice');
 
      //company Rgistetion
-         Route::get('/registrations', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'index'])
-        ->middleware('permission:view_company')
-        ->name('admin.registrations');
+         Route::get('/registrations', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'index'])->name('admin.registrations');
+    Route::get('/registration/{registration}', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'show'])->name('admin.registration.show');
 
-    Route::post('/approve/{id}', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'approve'])->middleware('permission:approve_company')->name('admin.approve');
-    Route::post('/reject/{id}', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'reject'])->middleware('permission:approve_company')->name('admin.reject');
+    Route::post('/approve/{id}', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'approve'])->name('admin.approve');
+    Route::post('/reject/{id}', [App\Http\Controllers\Admin\CompanyApprovalController::class, 'reject'])->name('admin.reject');
     
         //Payments legacy removed — use subscription-payments routes
 
+    Route::middleware('role:' . Role::SUPER_ADMIN_ID)
+        ->prefix('super-staff')
+        ->name('admin.super-staff.')
+        ->controller(\App\Http\Controllers\Admin\SuperStaffController::class)
+        ->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/create', 'create')->name('create');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{user}', 'show')->name('show');
+            Route::get('/{user}/edit', 'edit')->name('edit');
+            Route::put('/{user}', 'update')->name('update');
+            Route::post('/{user}/block', 'block')->name('block');
+            Route::post('/{user}/unblock', 'unblock')->name('unblock');
+            Route::get('/{user}/permissions', 'editPermissions')->name('permissions.edit');
+            Route::put('/{user}/permissions', 'updatePermissions')->name('permissions.update');
+        });
+
        //Admin Users
         Route::get('/users', [App\Http\Controllers\Admin\UserController::class, 'index'])->name('admin.users');
+        Route::get('/user/{user}', [AdminUserController::class, 'show'])->name('admin.user.show');
 
-      Route::get('/user/block/{id}', [UserController::class, 'block'])->name('admin.user.block');
-     Route::get('/user/unblock/{id}', [UserController::class, 'unblock'])->name('admin.user.unblock');
+      Route::post('/user/{id}/block', [AdminUserController::class, 'block'])->name('admin.user.block');
+     Route::post('/user/{id}/unblock', [AdminUserController::class, 'unblock'])->name('admin.user.unblock');
       Route::post('/user/delete/{id}', [UserController::class, 'delete'])->name('admin.user.delete');
-      Route::get('/user/reset/{id}', [AdminUserController::class, 'reset'])->name('admin.user.reset');
+      Route::post('/user/{user}/reset', [AdminUserController::class, 'requestPasswordReset'])->name('admin.user.reset');
+      Route::get('/user/{user}/reset/verify', [AdminUserController::class, 'showPasswordResetVerification'])->name('admin.user.reset.verify.form');
+      Route::post('/user/{user}/reset/verify', [AdminUserController::class, 'verifyPasswordResetOtp'])->name('admin.user.reset.verify');
+      Route::get('/user/{user}/reset/password', [AdminUserController::class, 'showPasswordResetForm'])->name('admin.user.reset.password.form');
+      Route::post('/user/{user}/reset/password', [AdminUserController::class, 'completePasswordReset'])->name('admin.user.reset.password');
 });
 
 
@@ -269,6 +320,26 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
         Route::post('/reset/{id}', [UserController::class, 'resetPassword'])
             ->middleware('permission:reset_password')
             ->name('reset');
+
+    });
+    Route::prefix('staff-permissions')
+    ->name('staff-permissions.')
+    ->group(function () {
+
+        Route::get('/{user}', [UserPermissionController::class, 'edit'])
+            ->name('edit');
+
+        Route::put('/{user}', [UserPermissionController::class, 'update'])
+            ->name('update');
+
+        Route::post('/{user}/assign/{permission}', [UserPermissionController::class, 'assign'])
+            ->name('assign');
+
+        Route::post('/{user}/deny/{permission}', [UserPermissionController::class, 'deny'])
+            ->name('deny');
+
+        Route::delete('/{user}/revoke/{permission}', [UserPermissionController::class, 'revoke'])
+            ->name('revoke');
 
     });
 
@@ -1532,6 +1603,7 @@ Route::prefix('income')
         Route::get('/show/{id}', 'show')->name('show');
         Route::get('/edit/{id}', 'edit')->name('edit');
         Route::post('/update/{id}', 'update')->name('update');
+        Route::post('/reverse/{id}', 'reverse')->name('reverse');
         Route::get('/print', 'print')->name('print');
         Route::get('/print/{id}', 'printVoucher')->name('print-voucher');
     });
@@ -1697,4 +1769,3 @@ Route::get(
 
 
 });
-

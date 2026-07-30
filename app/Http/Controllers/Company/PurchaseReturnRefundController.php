@@ -17,6 +17,7 @@ use App\Services\FileUploadService;
 use App\Services\InvoiceNumberService;
 use App\Services\PurchaseInvoicePaymentStateService;
 use App\Services\PurchaseReturnSyncService;
+use App\Services\Accounting\Integrations\PurchaseReturnRefundAccountingIntegrationService;
 use App\Services\SupplierTransactionService;
 use App\Services\ValidationService;
 use Illuminate\Http\Request;
@@ -26,6 +27,10 @@ use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
 class PurchaseReturnRefundController extends Controller
 {
+    public function __construct(
+        private readonly PurchaseReturnRefundAccountingIntegrationService $purchaseReturnRefundAccountingIntegrationService
+    ) {
+    }
     use HandlesTransactionDocumentationEdit;
     public function index(Request $request)
     {
@@ -404,6 +409,8 @@ class PurchaseReturnRefundController extends Controller
 
                 PurchaseReturnSyncService::sync($return, true);
 
+                $this->purchaseReturnRefundAccountingIntegrationService->postRefund($refund->fresh());
+
                 return $refund;
             });
 
@@ -716,6 +723,12 @@ class PurchaseReturnRefundController extends Controller
                 if ($purchaseReturn) {
                     PurchaseReturnSyncService::sync($purchaseReturn, true);
                 }
+
+                $this->purchaseReturnRefundAccountingIntegrationService->reverseRefund(
+                    $refund,
+                    $cancelBusinessDate,
+                    auth()->id()
+                );
             });
 
             return redirect()

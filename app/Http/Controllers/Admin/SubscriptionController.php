@@ -19,6 +19,7 @@ use App\Models\CompanySubscription;
 use App\Models\SubscriptionPlan;
 
 use App\Services\SubscriptionService;
+use App\Services\PlatformAuthorizationService;
 
 use Illuminate\Http\Request;
 
@@ -34,7 +35,10 @@ class SubscriptionController extends Controller
 
 
 
-    public function __construct(private SubscriptionService $subscriptionService)
+    public function __construct(
+        private SubscriptionService $subscriptionService,
+        private PlatformAuthorizationService $platformAuthorization
+    )
 
     {
 
@@ -46,7 +50,7 @@ class SubscriptionController extends Controller
 
     {
 
-        $this->authorizeAdminSubscriptionView();
+        $this->authorizePlatform('platform_subscriptions_view');
 
 
 
@@ -296,6 +300,11 @@ class SubscriptionController extends Controller
 
         return back()->with('success', 'Subscription cancelled.');
 
+    }
+
+    private function authorizePlatform(string $permission): void
+    {
+        abort_unless($this->platformAuthorization->can(auth()->user(), $permission), 403);
     }
 
 }

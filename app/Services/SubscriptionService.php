@@ -17,9 +17,17 @@ use RuntimeException;
 
 class SubscriptionService
 {
-    public function startRegisterTrial(Company $company, ?User $performedBy = null): CompanySubscription
+    public function startRegisterTrial(
+        Company $company,
+        SubscriptionPlan $trialPlan,
+        ?User $performedBy = null
+    ): CompanySubscription
     {
-        return $this->withCompanySubscriptionLock($company, function (Company $lockedCompany) use ($performedBy) {
+        if ($trialPlan->code !== 'trial' || ! $trialPlan->is_active) {
+            throw new RuntimeException('The required Trial subscription plan is missing or inactive.');
+        }
+
+        return $this->withCompanySubscriptionLock($company, function (Company $lockedCompany) use ($trialPlan, $performedBy) {
             $this->expireActiveSubscriptions($lockedCompany, $performedBy, 'Superseded by register trial');
 
             $startDate = now()->toDateString();
@@ -28,6 +36,7 @@ class SubscriptionService
             $subscription = CompanySubscription::create([
                 'company_id' => $lockedCompany->id,
                 'subscription_type' => 'register_trial',
+                'subscription_plan_id' => $trialPlan->id,
                 'status' => 'active',
                 'start_date' => $startDate,
                 'expiry_date' => $expiryDate,
@@ -601,6 +610,30 @@ class SubscriptionService
         }
 
         return $subscription->hidden_modules ?? [];
+    }
+
+    public function resolvePermissionModule(string $permissionName): ?string
+    {
+        $tokens = preg_split('/[._-]+/', strtolower($permissionName));
+
+        foreach (config('subscription.permission_module_map', []) as $module => $aliases) {
+            if (array_intersect($tokens, $aliases)) {
+                return $module;
+            }
+        }
+
+        return null;
+    }
+
+    public function canAccessPermission(Company $company, string $permissionName): bool
+    {
+        if (! $this->isSubscriptionOperational($company)) {
+            return false;
+        }
+
+        $module = $this->resolvePermissionModule($permissionName);
+
+        return $module === null || ! in_array($module, $this->getHiddenModules($company), true);
     }
 
     public function canCreateStaff(Company $company): bool

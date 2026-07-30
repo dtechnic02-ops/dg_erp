@@ -979,6 +979,212 @@ When `refund_amount` reaches zero, the return is fully refunded.
 
 ---
 
+## 7A. Sales Return Refund Accounting — FINAL / FREEZE
+
+### 7A.1 Sales Return Responsibility
+
+Sales Return is an operational product or service return event only. It SHALL validate the original Sales Invoice and returnable quantities, create the Return header and items, restore stock for returned inventory products, preserve company and Financial Year isolation, and maintain status and audit information.
+
+Sales Return creation SHALL NOT directly create accounting journal entries. The Return event alone is not a completed financial settlement.
+
+```text
+Sales Return
+    → Product or Service Return
+    → Stock Increase for returned inventory products
+    → No Accounting Posting
+```
+
+This rule is FINAL and FROZEN.
+
+### 7A.2 Sales Return Refund Responsibility
+
+Sales Return Refund is the financial settlement event for a Sales Return. Supported settlement methods are:
+
+- cash or approved operational-account refund;
+- Sales Invoice adjustment;
+- mixed settlement containing both account refund and invoice adjustment; and
+- partial settlement through one or more Refund records.
+
+Accounting recognition SHALL occur through Sales Return Refund, not through Sales Return creation.
+
+```text
+Sales Return Refund
+    → Financial Settlement
+    → Incremental Accounting Posting
+```
+
+### 7A.3 Partial Settlement Rule — Option A
+
+Option A is approved and frozen. Every Sales Return Refund record SHALL create accounting only for the amount settled by that individual Refund event.
+
+Example:
+
+```text
+Sales Return Grand Total: Rs. 1,000.00
+First cash refund:       Rs.   300.00
+Second invoice adjustment: Rs. 400.00
+Final account refund:    Rs.   300.00
+```
+
+Accounting SHALL be posted independently for Rs. 300.00, Rs. 400.00, and Rs. 300.00. No Refund event may repost accounting recognized by an earlier Refund event.
+
+### 7A.4 Settlement Amount and Source Data
+
+For one `SalesReturnRefund` record:
+
+```text
+settlement_amount = adjust_amount + cash_amount
+```
+
+Settlement amount SHALL be greater than zero, shall not exceed the remaining unsettled Sales Return amount, and shall not cause cumulative settlement to exceed the Sales Return Grand Total. It SHALL use decimal-safe monetary calculations and persisted, validated server-side data only.
+
+Accounting SHALL use persisted Sales Return, Sales Return item, original Sales Invoice, tax, discount, customer, account, and Refund data. Blade values, JavaScript totals, unvalidated request totals, display-only values, and floating-point approximations SHALL NOT be accounting source data.
+
+### 7A.5 Proportional Accounting Ratio
+
+For each Refund event:
+
+```text
+settlement_ratio = current_refund_settlement_amount ÷ sales_return_grand_total
+```
+
+Product sales return amount, service sales return amount, output-tax reversal, discount allocation, customer receivable effect, operational-account settlement, and Sales Invoice adjustment settlement SHALL be recognized proportionally using this ratio where applicable.
+
+The cumulative active Refund accounting recognition SHALL equal the accounting value of the complete Sales Return. Rounding SHALL be deterministic. The final settlement event SHALL post the exact remaining unrecognized component amounts so that no rounding residue remains.
+
+Where discount exists, implementation SHALL use one approved deterministic discount-allocation rule for every partial settlement, final settlement, cancellation, and reversal. This is a mandatory implementation requirement; this standard does not claim that a required allocation field already exists.
+
+### 7A.6 Cash or Operational-Account Refund
+
+For the cash or operational-account portion:
+
+- `cash_amount` is the actual amount leaving the selected operational account.
+- `account_id` is mandatory when `cash_amount` is greater than zero.
+- The account SHALL belong to the same company and be active.
+- The account type SHALL be supported by the approved accounting mapping.
+- Sufficient operational account balance SHALL be validated where required.
+- The operational `AccountTransaction` and accounting journal entry SHALL represent the same Refund event and amount.
+
+### 7A.7 Sales Invoice Adjustment and Mixed Settlement
+
+For the invoice-adjustment portion:
+
+- `adjust_amount` is settlement applied against one or more eligible Sales Invoices of the same customer and company.
+- Each adjustment SHALL NOT exceed the selected invoice due amount.
+- Target invoice paid amount, due amount, and payment status SHALL be updated consistently.
+- Every adjustment SHALL be persisted through `SalesReturnRefundAdjustment`.
+- Accounting SHALL use the total valid persisted adjustment amount belonging to the current Refund record.
+
+Invoice adjustment is a financial settlement and SHALL receive accounting recognition even when no cash leaves an operational account.
+
+One Refund record may contain both invoice adjustment and cash/account refund. It is one `SalesReturnRefund` source event with multiple settlement destinations, not two unrelated Sales Return recognition events.
+
+### 7A.8 Duplicate Protection and Transaction Rule
+
+Every Sales Return Refund accounting posting SHALL have one stable, company-scoped, unique accounting source identity based on the persisted `sales_return_refunds.id`.
+
+```text
+source_type = sales_return_refund
+source_id   = sales_return_refunds.id
+```
+
+Controller retries, browser resubmission, queue retries, repeated service calls, and other retries SHALL NOT duplicate accounting. `AccountingPostingService` remains the final duplicate-posting authority.
+
+The following SHALL succeed or fail atomically inside one database transaction:
+
+- Sales Return Refund creation;
+- Sales Return Refund Adjustment creation;
+- target Sales Invoice balance update;
+- operational AccountTransaction creation;
+- CustomerTransaction creation;
+- Sales Return settlement synchronization; and
+- accounting journal posting.
+
+Accounting SHALL be called after all required Refund and Adjustment records have been persisted and validated, and before the transaction commits. Accounting posting outside the Refund transaction is prohibited.
+
+### 7A.9 Cancellation and Edit Rule
+
+Cancelling an active Sales Return Refund SHALL create an exact accounting reversal of that Refund’s original accounting posting. Cancellation SHALL also reverse the applicable operational AccountTransaction effect, CustomerTransaction effect, Sales Invoice adjustment effect, and Sales Return cumulative settlement values.
+
+Cancellation SHALL reference the original `SalesReturnRefund` and its original accounting posting. It SHALL reverse the exact persisted original accounting amounts and SHALL NOT recalculate historical accounting using changed master data or changed account mappings. A cancelled Refund SHALL NOT remain included in cumulative settlement or accounting recognition.
+
+Financial amounts, settlement destinations, customer, Sales Return, and invoice-adjustment allocations of a completed Refund SHALL NOT be silently edited. Documentation-only fields may be edited only where this Sales Module Standard permits. Financial correction requires cancellation of the incorrect Refund followed by creation of a new correct Refund.
+
+### 7A.10 Accounting Architecture and Controller Integration
+
+Sales Return Refund accounting SHALL follow the frozen DG ERP accounting architecture:
+
+```text
+SalesReturnRefundController
+    ↓
+SalesReturnRefundAccountingIntegrationService
+    ↓
+SalesReturnRefundPostingProfile
+    ↓
+SalesReturnRefundAccountingDataBuilder
+    ↓
+AccountingPostingService
+```
+
+Responsibilities:
+
+- `SalesReturnRefundAccountingDataBuilder` loads and validates persisted business data, and calculates normalized settlement and proportional components. It performs no accounting database writes.
+- `SalesReturnRefundPostingProfile` maps Builder output to approved ChartAccount system codes and returns only the `AccountingPostingService` payload.
+- `SalesReturnRefundAccountingIntegrationService` orchestrates Builder, Profile, and Posting Service without duplicated business calculation or direct journal writes.
+- `AccountingPostingService` validates the normalized payload, enforces debit-credit balance and source-key uniqueness, and is the only accounting writer.
+
+The integration service SHALL be invoked exactly once for each successfully created `SalesReturnRefund`, inside the existing Refund transaction, after Refund, Adjustment, account, customer, and synchronization writes, and before commit. The controller SHALL NOT construct journal lines, resolve ChartAccount codes, calculate accounting debit/credit lines, or write accounting entries directly.
+
+### 7A.11 Chart Account, Financial Year, and Precision Rules
+
+Only approved ChartAccount system codes may be used. Possible required codes include:
+
+- `SALES_RETURNS`;
+- `SALES_REVENUE`;
+- `SERVICE_REVENUE`;
+- `OUTPUT_TAX_PAYABLE`;
+- `ACCOUNTS_RECEIVABLE`;
+- `CASH_IN_HAND`;
+- `BANK_ACCOUNTS`; and
+- another formally approved operational-account mapping code.
+
+A generic liability or clearing account SHALL NOT be used unless explicitly approved and designated by the accounting standard. Hard-coded `chart_account_id` is prohibited.
+
+The Refund accounting entry SHALL use the Financial Year resolved for the approved Refund accounting date under the Financial Year and Date Standard. Adjusting an invoice from another Financial Year SHALL follow that standard and SHALL NOT be decided implicitly inside a controller.
+
+Company isolation is mandatory across Sales Return, Sales Return Refund, Sales Invoice, customer, operational account, ChartAccount, accounting entry, and Financial Year.
+
+Binary float SHALL NOT be the authoritative financial calculation method. All normalized accounting values SHALL use standard monetary precision. The final settlement SHALL absorb permitted rounding residue so that cumulative recognized amount equals complete Sales Return accounting amount and total debits equal total credits.
+
+### 7A.11A Sales Return Refund Contra-Revenue Clarification
+
+Under the current ChartAccount design, `SALES_RETURNS` is the sole contra-revenue account for both product and service Sales Return Refund recognition. `SERVICE_REVENUE` is an original-sale revenue account and SHALL NOT be debited by Sales Return Refund accounting.
+
+The allocated return discount SHALL reduce the `SALES_RETURNS` debit unless a separately approved discount ChartAccount and frozen posting rule are introduced. Each normalized Refund payload SHALL retain returned eligible amount, allocated discount, net return amount, tax reversal, and settlement amount.
+
+For final partial settlement, every posted accounting component SHALL equal its full Sales Return component less the sum of actual prior active original posted Refund accounting lines. Cancelled Refunds, reversed originals, reversal entries, draft entries, and cancelled accounting entries SHALL NOT contribute to cumulative recognition.
+
+The accounting source identity is `company_id`, `source_type`, `source_id`, and `source_event`. `source_key` remains a deterministic derived identifier and an additional duplicate safeguard; it is not the only logical duplicate predicate.
+
+New Sales Return Refund postings SHALL use the canonical `source_type` value `sales_return_refund`. The legacy `App\Models\SalesReturnRefund` source type is supported only to read, prevent duplicates against, and reverse existing historical postings. Final approval requires focused automated tests that persist and verify Refund accounting entries and lines, including exact final component residue and legacy reversal compatibility.
+
+### 7A.12 Final Frozen Decision
+
+The following rules are FINAL:
+
+- Sales Return creation performs product/service return and stock increase only.
+- Sales Return creation does not directly post accounting.
+- Sales Return Refund is the accounting recognition event.
+- Every partial Refund uses proportional incremental accounting.
+- Cash refund, Sales Invoice adjustment, and mixed settlement are supported.
+- Every Refund uses a unique accounting source identity.
+- Every cancelled Refund requires an exact accounting reversal.
+- Accounting runs inside the same Refund database transaction.
+- `AccountingPostingService` is the only accounting writer.
+- Duplicate accounting posting is prohibited.
+
+---
+
 ## 8. Refund Cancel Workflow
 
 This is the official sequence for voiding a previously recorded sales return refund.

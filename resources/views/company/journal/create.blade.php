@@ -81,6 +81,7 @@
             <form method="POST" action="{{ route('company.journal.store') }}" enctype="multipart/form-data">
 
                 @csrf
+                <input type="hidden" name="submission_token" value="{{ $submissionToken }}">
 
 
 

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Services\InventoryValuationService;
 
 
 class StockService
@@ -67,7 +68,7 @@ $qty
 
             $freshProduct->current_stock;
 
-        StockMovement::create([
+        $movement = StockMovement::create([
 
             'company_id'   =>
 
@@ -111,6 +112,11 @@ auth()->id() ?? 1,
 
         ]);
 
+        if (in_array($type, ['opening_stock', 'purchase'], true)) {
+            app(InventoryValuationService::class)->recordIncomingMovement($movement);
+        }
+
+        return $movement;
 
 
 
@@ -184,7 +190,7 @@ $freshProduct->decrement(
 );
 
 $freshProduct->refresh();
-StockMovement::create([
+$movement = StockMovement::create([
 
     'company_id' => $freshProduct->company_id,
 
@@ -227,6 +233,8 @@ StockMovement::create([
         auth()->id() ?? 1,
 
 ]);
+
+return $movement;
 
 
 

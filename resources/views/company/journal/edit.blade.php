@@ -12,15 +12,15 @@
 
 @php
 
-    if (old('account_id')) {
+    if (old('ledger_selection')) {
 
-        $detailRows = collect(old('account_id'))->map(function ($accountId, $index) {
+        $detailRows = collect(old('ledger_selection'))->map(function ($ledgerSelection, $index) {
 
             return [
 
-                'account_id'    => $accountId,
+                'account_id'    => old('account_id.' . $index, ''),
 
-                'sub_ledger_id' => old('sub_ledger_id.' . $index, ''),
+                'ledger_selection' => $ledgerSelection,
 
                 'debit'         => old('debit.' . $index, ''),
 
@@ -40,7 +40,7 @@
 
                 'account_id'    => $item->account_id,
 
-                'sub_ledger_id' => $item->sub_ledger_id,
+                'ledger_selection' => ($item->sub_ledger_type ?: 'account') . ':' . ($item->sub_ledger_id ?: $item->account_id),
 
                 'debit'         => $item->type === 'debit' ? $item->amount : '',
 
@@ -174,7 +174,7 @@
 
                                     <label for="reference_no" class="form-label">Reference No</label>
 
-                                    <input type="text" name="reference_no" id="reference_no" class="form-control dg-input" value="{{ old('reference_no', $journal->reference_no) }}" maxlength="100">
+                                    <input type="text" id="reference_no" class="form-control dg-input" value="{{ $journal->reference_no }}" readonly>
 
                                 </div>
 
@@ -182,7 +182,7 @@
 
                                     <label for="attachment" class="form-label">Attachment</label>
 
-                                    <input type="file" name="attachment" id="attachment" class="form-control dg-input" accept=".jpg,.jpeg,.png,.pdf">
+                                    <input type="text" id="attachment" class="form-control dg-input" value="{{ $journal->attachment ? 'Attachment preserved' : '-' }}" readonly>
 
                                     @if ($journal->attachment)
 
@@ -226,6 +226,8 @@
 
                         <div class="card-body dg-card-body">
 
+                            <fieldset disabled aria-label="Posted journal accounting details are locked">
+
                             @includeIsolated('company.journal.partials.detail-grid', [
                                 'chartAccounts' => $chartAccounts,
                                 'customers'     => $customers,
@@ -234,6 +236,8 @@
                                 'parties'       => $parties,
                                 'detailRows'    => $detailRows,
                             ])
+
+                            </fieldset>
 
                         </div>
 
@@ -249,7 +253,7 @@
 
                         <a href="{{ route('company.journal.show', $journal->id) }}" class="btn btn-outline-secondary dg-btn">Cancel</a>
 
-                        <button type="submit" id="journalSaveBtn" class="btn btn-primary dg-btn" disabled>Update Journal</button>
+                        <button type="submit" id="journalSaveBtn" class="btn btn-primary dg-btn">Update Journal</button>
 
                     </div>
 

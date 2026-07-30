@@ -22,7 +22,14 @@
                 </div>
 
                 <div class="flex-fill d-flex justify-content-end align-items-center gap-2">
-                    <form method="GET" class="d-flex gap-2">
+                    <form method="GET" class="d-flex flex-wrap gap-2">
+                        <label for="account_group_filter" class="visually-hidden">Filter by Account Group</label>
+                        <select name="account_group" id="account_group_filter" class="form-select dg-select">
+                            <option value="">All Groups</option>
+                            @foreach ($accountGroups as $value => $label)
+                                <option value="{{ $value }}" {{ request('account_group') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
                         <label for="search" class="visually-hidden">Search Accounts</label>
                         <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Search Accounts" class="form-control dg-input">
                         <button type="submit" class="btn btn-primary dg-btn">Search</button>
@@ -52,11 +59,10 @@
                                 <thead class="dg-head">
                                     <tr>
                                         <th scope="col">Image</th>
-                                        <th scope="col">Type</th>
-                                        <th scope="col">Bank</th>
-                                        <th scope="col">Name</th>
-                                        <th scope="col">Account No</th>
-                                        <th scope="col">Balance</th>
+                                        <th scope="col">Account Group</th>
+                                        <th scope="col">Account Type</th>
+                                        <th scope="col">Account Name</th>
+                                        <th scope="col">Current Balance</th>
                                         <th scope="col">Status</th>
                                         <th scope="col" width="170">Action</th>
                                     </tr>
@@ -70,10 +76,9 @@
                                                     <img src="{{ asset($account->image_path) }}" alt="{{ $account->account_name }}" width="40" height="40">
                                                 @endif
                                             </td>
+                                            <td>{{ $account->account_group ?: '-' }}</td>
                                             <td>{{ $account->account_type }}</td>
-                                            <td>{{ $account->bank_name }}</td>
                                             <td>{{ $account->account_name }}</td>
-                                            <td>{{ $account->account_no }}</td>
                                             <td class="text-end">{{ number_format($account->current_balance, 2) }}</td>
                                             <td>
                                                 @if ($account->status == 'active')
@@ -97,7 +102,7 @@
                                         </tr>
                                     @empty
                                         <tr class="dg-row">
-                                            <td colspan="8" class="text-center">No Accounts Found</td>
+                                            <td colspan="7" class="text-center">No Accounts Found</td>
                                         </tr>
                                     @endforelse
                                 </tbody>

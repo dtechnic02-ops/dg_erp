@@ -11,16 +11,25 @@ use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\FinancialYear;
 use App\Services\AccountBalanceService;
+use App\Services\Accounting\Integrations\ExpenseAccountingIntegrationService;
 use App\Services\FileUploadService;
 use App\Services\ValidationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ExpenseController extends Controller
 {
     use AuthorizesCompanyPermission;
     use HandlesTransactionDocumentationEdit;
+
+    private const EXPENSE_PAYMENT_ACCOUNT_TYPES = ['Cash', 'Bank', 'ATM', 'Wallet'];
+
+    public function __construct(
+        private readonly ExpenseAccountingIntegrationService $expenseAccountingIntegrationService
+    ) {
+    }
 
     protected function buildExpenseQuery(Request $request, int $companyId)
     {
@@ -104,16 +113,39 @@ class ExpenseController extends Controller
 
     protected function validateCategory(int $companyId, int $categoryId): ExpenseCategory
     {
-        return ExpenseCategory::where('company_id', $companyId)
+        $category = ExpenseCategory::where('company_id', $companyId)
             ->where('status', ExpenseCategory::STATUS_ACTIVE)
-            ->findOrFail($categoryId);
+            ->whereNotNull('chart_account_id')
+            ->whereHas('chartAccount', function ($query) use ($companyId) {
+                $query->where('company_id', $companyId)
+                    ->where('status', 'active')
+                    ->where('account_class', 'expense');
+            })
+            ->find($categoryId);
+
+        if ($category === null) {
+            throw ValidationException::withMessages([
+                'expense_category_id' => 'Select an active expense category mapped to an active expense chart account.',
+            ]);
+        }
+
+        return $category;
     }
 
     protected function validateAccount(int $companyId, int $accountId): Account
     {
-        return Account::where('company_id', $companyId)
+        $account = Account::where('company_id', $companyId)
             ->where('status', 1)
-            ->findOrFail($accountId);
+            ->whereIn('account_type', self::EXPENSE_PAYMENT_ACCOUNT_TYPES)
+            ->find($accountId);
+
+        if ($account === null) {
+            throw ValidationException::withMessages([
+                'account_id' => 'Select an active Cash, Bank, ATM, or Wallet account for the expense payment.',
+            ]);
+        }
+
+        return $account;
     }
 
     public function index(Request $request)
@@ -188,6 +220,7 @@ class ExpenseController extends Controller
 
         $accounts = Account::where('company_id', $companyId)
             ->where('status', 1)
+            ->whereIn('account_type', self::EXPENSE_PAYMENT_ACCOUNT_TYPES)
             ->orderBy('account_name')
             ->get();
 
@@ -272,6 +305,8 @@ class ExpenseController extends Controller
                     'credit'            => $request->amount,
                 ]);
 
+                $this->expenseAccountingIntegrationService->postExpense($expense);
+
                 return $expense;
             });
 
@@ -330,6 +365,7 @@ class ExpenseController extends Controller
 
         $accounts = Account::where('company_id', $companyId)
             ->where('status', 1)
+            ->whereIn('account_type', self::EXPENSE_PAYMENT_ACCOUNT_TYPES)
             ->orderBy('account_name')
             ->get();
 
@@ -429,6 +465,11 @@ class ExpenseController extends Controller
                     'note'                => $request->note,
                 ], $expense));
 
+                $this->expenseAccountingIntegrationService->syncExpenseEdit(
+                    $expense,
+                    auth()->id()
+                );
+
                 $this->logDocumentationEdit('Expense updated.', $expense);
             });
 
@@ -495,6 +536,12 @@ class ExpenseController extends Controller
                     'cancel_reason'  => $cancelReason,
                     'note'           => trim(($expense->note ?? '') . ' [Cancelled: ' . $cancelReason . ']'),
                 ]);
+
+                $this->expenseAccountingIntegrationService->reverseExpense(
+                    $expense,
+                    $cancelBusinessDate,
+                    auth()->id()
+                );
             });
 
             return back()->with('success', 'Expense cancelled successfully.');

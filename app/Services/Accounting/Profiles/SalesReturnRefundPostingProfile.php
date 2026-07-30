@@ -1,0 +1,28 @@
+<?php
+
+namespace App\Services\Accounting\Profiles;
+
+use App\Models\SalesReturnRefund;
+use InvalidArgumentException;
+use RuntimeException;
+
+class SalesReturnRefundPostingProfile
+{
+    public function build(array $data): array
+    {
+        $companyId=$this->id($data['company_id']??null,'company_id');$refundId=$this->id($data['refund_id']??null,'refund_id');$date=$this->text($data['refund_date']??null,'refund_date');$number=$this->text($data['refund_number']??null,'refund_number');$customerId=$this->id($data['customer_id']??null,'customer_id');$adjust=$this->money($data['adjust_amount']??null,'adjust_amount');$cash=$this->money($data['cash_amount']??null,'cash_amount');$settlement=$this->money($data['settlement_amount']??null,'settlement_amount');$components=$data['components']??null;
+        if(!is_array($components)||!$this->same($this->add($adjust,$cash),$settlement))throw new InvalidArgumentException('Normalized refund settlement data is invalid.');
+        $netReturn=$this->money($components['net_return']??null,'net return component');$tax=$this->money($components['tax']??null,'tax component');$discount=$this->money($components['discount']??null,'discount component');$grossEligible=$this->money($components['gross_eligible']??null,'gross eligible component');
+        if(!$this->same($this->sub($grossEligible,$discount),$netReturn)||!$this->same($this->add($netReturn,$tax),$settlement))throw new InvalidArgumentException('Normalized return discount and settlement data is invalid.');
+        $lines=[];
+        if(!$this->zero($netReturn))$lines[]=$this->line('SALES_RETURNS',null,'Sales return contra-revenue - '.$number,$netReturn,'0.0000');
+        if(!$this->zero($tax))$lines[]=$this->line('OUTPUT_TAX_PAYABLE',null,'Output tax reversal - '.$number,$tax,'0.0000');
+        if(!$this->zero($adjust))$lines[]=$this->line('ACCOUNTS_RECEIVABLE',null,'Sales return invoice adjustment - '.$number,'0.0000',$adjust,'customer',$customerId);
+        if(!$this->zero($cash)){$type=$this->text($data['account_type']??null,'account_type');$accountId=$this->id($data['account_id']??null,'account_id');$code=match($type){'Cash'=>'CASH_IN_HAND','Bank','ATM','Wallet'=>'BANK_ACCOUNTS',default=>throw new RuntimeException('Unsupported operational account type for sales return refund accounting.')};$lines[]=$this->line($code,$accountId,'Sales return cash refund - '.$number,'0.0000',$cash);}
+        $this->validate($lines,$settlement);
+        return ['company_id'=>$companyId,'entry_date'=>$date,'reference_number'=>$number,'source_module'=>'sales_return_refund','source_type'=>'sales_return_refund','source_type_aliases'=>[SalesReturnRefund::class],'source_id'=>$refundId,'source_event'=>'created','source_key'=>'sales_return_refund:'.$refundId.':created','description'=>'Sales return refund - '.$number,'posted_by'=>$data['created_by']??null,'lines'=>$lines];
+    }
+    private function line(string $code,?int $account,string $description,string $debit,string $credit,?string $type=null,?int $id=null):array{return ['chart_account_system_code'=>$code,'operational_account_id'=>$account,'description'=>$description,'debit'=>$debit,'credit'=>$credit,'subledger_type'=>$type,'subledger_id'=>$id];}
+    private function validate(array $lines,string $settlement):void{if(count($lines)<2)throw new RuntimeException('Sales return refund accounting requires at least two non-zero lines.');$d='0.0000';$c='0.0000';foreach($lines as $line){$debit=$this->money($line['debit'],'line debit');$credit=$this->money($line['credit'],'line credit');if($this->zero($debit)&&$this->zero($credit)||(!$this->zero($debit)&&!$this->zero($credit)))throw new RuntimeException('A refund accounting line is invalid.');$d=$this->add($d,$debit);$c=$this->add($c,$credit);}if(!$this->same($d,$c)||!$this->same($d,$settlement))throw new RuntimeException('Sales return refund accounting debit and credit totals must equal settlement amount.');}
+    private function text(mixed $v,string $n):string{if(!is_string($v)||trim($v)==='')throw new InvalidArgumentException("The {$n} value is required.");return trim($v);}private function id(mixed $v,string $n):int{if(filter_var($v,FILTER_VALIDATE_INT)===false||(int)$v<1)throw new InvalidArgumentException("The {$n} value must be a positive integer.");return(int)$v;}private function money(mixed $v,string $n):string{if(!is_string($v)||!preg_match('/^\d+\.\d{4}$/',$v))throw new InvalidArgumentException("The {$n} value must be a four-decimal string.");[$w,$f]=explode('.',$v,2);return(ltrim($w,'0')?:'0').'.'.$f;}private function zero(string $v):bool{return $this->scaled($v)==='0';}private function same(string $a,string $b):bool{return $this->scaled($a)===$this->scaled($b);}private function scaled(string $v):string{[$w,$f]=explode('.',$v,2);return ltrim($w.$f,'0')?:'0';}private function add(string $a,string $b):string{$a=$this->scaled($a);$b=$this->scaled($b);$c=0;$r='';while($a!==''||$b!==''||$c){$s=($a===''?0:(int)substr($a,-1))+($b===''?0:(int)substr($b,-1))+$c;$r=($s%10).$r;$c=intdiv($s,10);$a=substr($a,0,-1);$b=substr($b,0,-1);}return $this->decimal($r);}private function sub(string $a,string $b):string{$a=$this->scaled($a);$b=$this->scaled($b);if(strlen($a)<strlen($b)||(strlen($a)===strlen($b)&&$a<$b))throw new InvalidArgumentException('A normalized accounting amount cannot become negative.');$borrow=0;$r='';for($i=strlen($a)-1,$j=strlen($b)-1;$i>=0;$i--){$d=(int)$a[$i]-($j>=0?(int)$b[$j--]:0)-$borrow;if($d<0){$d+=10;$borrow=1;}else $borrow=0;$r=$d.$r;}return $this->decimal($r);}private function decimal(string $v):string{$v=str_pad(ltrim($v,'0')?:'0',5,'0',STR_PAD_LEFT);return substr($v,0,-4).'.'.substr($v,-4);}
+}

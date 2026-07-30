@@ -11,6 +11,8 @@
 
 **Revision 1.2:** Added Sub Ledger Architecture — current implementation, future roadmap, accounting rules, voucher display, General Ledger grouping, and backward compatibility.
 
+**Revision 1.3:** Business Owner decision — Customer and Supplier statement posting, Draft/Posted edit boundaries, reversal preservation, and duplicate-prevention requirements.
+
 ---
 
 ## Document Hierarchy
@@ -438,7 +440,7 @@ Set updated_by
 | Reference No | Yes |
 | Narration | Yes |
 | Attachment | Yes — replace via approved upload service |
-| Detail rows (account, debit, credit, remark) | Yes — journal must remain balanced |
+| Detail rows (account, debit, credit, remark) | Draft only — never editable after posting |
 
 ### 6.2 Non-Editable Fields
 
@@ -783,7 +785,7 @@ AccountBalanceService
 General Ledger
 ```
 
-Sub Ledger data is stored as **reference metadata** on journal detail rows. It is **not** a second posting destination.
+Sub Ledger data is stored on Journal detail rows for audit and display. Customer and Supplier selections additionally require synchronized statement transactions under Section 12.9; these do not replace the Account Transaction posting destination.
 
 ### 12.3 Current Implementation (Approved)
 
@@ -828,7 +830,7 @@ When Sub Ledger applies, the Journal Detail row stores:
 | `sub_ledger_type` | Copied from Account configuration (`customer`, `supplier`, `employee`, `party`) |
 | `sub_ledger_id` | ID of the selected Customer, Supplier, Employee Account, or Party Account |
 
-Sub Ledger fields are **reference only**. They do **not** create Customer Transactions, Supplier Transactions, Employee Transactions, or Party Transactions from the Journal Module.
+Customer and Supplier sub-ledger fields require corresponding Customer Statement or Supplier Statement transactions when the Journal is posted. Employee and Party sub-ledger fields remain reference metadata unless a future Business Owner decision explicitly approves their posting architecture.
 
 #### 12.3.3 Validation (Current)
 
@@ -837,7 +839,7 @@ Sub Ledger fields are **reference only**. They do **not** create Customer Transa
 | Required when configured | If Account has Sub Ledger Type, `sub_ledger_id` is **mandatory** on that row |
 | Not allowed when unset | If Account has no Sub Ledger Type, Sub Ledger fields must be empty |
 | Company scope | Selected entity must belong to the same company and be active |
-| Posting account | Account Transaction always posts to the selected **Account** only |
+| Posting account | Account Transaction always posts to the selected **Account**; required Customer/Supplier Statement posting is additional subsidiary-ledger synchronization, not a replacement for the Account Transaction |
 
 ### 12.4 Future Architecture (Roadmap)
 
@@ -869,10 +871,10 @@ Any future enhancement must extend configuration and UI only. It **must not** re
 
 | Concept | Rule |
 |---------|------|
-| **Sub Ledger** | Reference and subsidiary tracking only — **not** the posting account |
+| **Sub Ledger** | Customer/Supplier selections create the required subsidiary statement posting; they never replace the posting account |
 | **Posting Account** | Always the selected **Chart of Account** (`account_id`) |
 | **Account Transaction** | Always linked to `account_id` |
-| **Direct posting to Customer / Supplier / Employee / Party** | **Forbidden** from Journal Module |
+| **Customer / Supplier posting** | Required through the existing CustomerTransactionService or SupplierTransactionService when the Journal line selects that entity; Employee/Party direct posting remains unapproved |
 
 **Why:** General Ledger integrity depends on a single posting path through Account Transactions. Sub Ledger provides analytical detail without duplicating ledger ownership.
 
@@ -915,12 +917,46 @@ Sub Ledger analytical reports **must not** assume Sub Ledger rows were posted as
 |------|------|
 | Current implementation | Remains **fully valid** |
 | Existing Journal Entries | **No migration required** |
-| Accounting behaviour | **No change** |
-| Business workflow | **No change** |
+| Accounting behaviour | Existing entries remain valid; future Journal posting follows the final rules in Section 12.9 |
+| Business workflow | Future implementation follows the Draft/Posted and reversal rules in Section 12.9 |
 | Accounts without Sub Ledger Type | Continue to work without Sub Ledger fields |
 | Future multi-type enhancement | Must not invalidate v1.2 single-type entries |
 
 ---
+
+### 12.9 Final Business Owner Posting, Edit, and Reversal Rules
+
+This section is FINAL. It replaces every conflicting Journal edit, cancellation, sub-ledger, and duplicate-posting statement elsewhere in this document.
+
+#### Customer and Supplier Statement Posting
+
+When a Posted Journal line selects a Customer, the Journal must create a Customer Statement debit or credit matching that Journal line. When it selects a Supplier, it must create a Supplier Statement debit or credit matching that Journal line. The existing `CustomerTransactionService` and `SupplierTransactionService` must be reused; no parallel statement architecture is permitted.
+
+Every required statement must use the existing schema and retain Company scope, Financial Year, business date, voucher/reference, narration, debit, credit, source/reference type, source ID, status, and traceability to the Journal. Journal-specific records must not duplicate transactions owned by Sales, Purchase, Income, Expense, Loan, or another source module.
+
+#### Account Transaction Posting and Atomicity
+
+Every valid accounting line must create its Account Transaction through `AccountBalanceService`. Journal header, detail rows, Account Transactions, Customer Statements, and Supplier Statements must post in one database transaction. If any required posting fails, the entire Journal operation must roll back without partial records.
+
+#### Draft and Posted Edit Boundary
+
+A Draft Journal may be edited or deleted by an authorized user before posting. Draft edits still require valid company ownership, active Financial Year, business date, balanced non-zero single-sided lines, and applicable permissions.
+
+A Posted Journal may not change accounts, Customer/Supplier selection, debit, credit, detail rows, voucher number, company, Financial Year, or status. An authorized user may edit only date and narration/note. A Posted date edit must remain in the same active, unlocked Financial Year and atomically synchronize the Journal header, Account Transaction, Customer Statement, and Supplier Statement dates. A narration change may synchronize descriptions only where the existing architecture requires it. No financial records may be newly created by a date/note-only edit.
+
+#### Cancel and Reversal
+
+A Posted Journal must never be hard-deleted. An authorized cancellation or reversal must preserve the original header and detail rows, negate every original Account, Customer Statement, and Supplier Statement effect using the opposite debit/credit direction, remain traceable to the original Journal, and run atomically. A cancelled or reversed Journal is excluded from active balances and cannot be reversed again unless a separately approved workflow permits it.
+
+#### Audit History and Duplicate Prevention
+
+Posted Journal details must never be physically removed during edit, cancel, or reversal. Audit history must preserve original header/details, amounts, source, creator, poster, cancellation/reversal information, users, and timestamps.
+
+Future implementation must use server-side duplicate-request protection, voucher-number locking, repeated-submission protection, safe retry behavior, and protection against duplicate Account, Customer, or Supplier postings for the same Journal. Frontend button disabling alone is insufficient. These are required future implementation rules; this documentation update does not claim they are already implemented.
+
+#### Company, Financial Year, and Permission Isolation
+
+Every Journal and related transaction must belong to the authenticated company, use the Journal’s valid Financial Year and business date, reject cross-company Account/Customer/Supplier IDs, preserve existing branch and job-role restrictions, and retain separate Journal view, create, edit, post, cancel/reverse, delete-draft, and print permissions where available. Platform users gain no Company accounting access through these rules.
 
 ## 13. Financial Year Rules
 
@@ -973,7 +1009,7 @@ Row-level detail rules are defined in **Section 9 (Journal Detail Validation)**.
 - When Account has a configured Sub Ledger Type, `sub_ledger_id` is **mandatory** on that detail row.
 - When Account has no Sub Ledger Type, Sub Ledger fields must remain empty.
 - Selected Sub Ledger entity must belong to the same company and be active.
-- Sub Ledger validation is **reference-only** — it does not alter Account Transaction posting rules (Section 12).
+- Customer and Supplier selections require synchronized statement posting in addition to Account Transaction posting; they never replace Account Transaction posting rules (Section 12).
 
 ### 14.4 Narration Validation
 
@@ -1031,12 +1067,12 @@ All rules below are approved business policy for the Journal Module.
 
 See also **Section 8 (Journal Edit Rule)** for the full constitution policy.
 
-1. Only **Active** journals may be edited.
-2. Cancelled journals are **not** editable.
-3. Edit must keep journal balanced.
-4. Edit must synchronize all Account Transactions through `AccountBalanceService`.
+1. Draft journals may be edited while they remain unposted.
+2. Posted journals allow date/note-only edits under Section 12.9; Cancelled or Reversed journals are not editable.
+3. Draft edits must keep the journal balanced.
+4. Posted date/note edits must synchronize existing related records without creating duplicate postings.
 5. `updated_by` must be set on every successful edit.
-6. Journal No and Financial Year must never change after create.
+6. Journal No, Company, Financial Year, and Posted accounting values never change after posting.
 
 ### 15.3 Journal Cancel Rules
 
@@ -1155,11 +1191,11 @@ The following actions are **strictly forbidden**. Violation may cause irreversib
 
 ---
 
-### ❌ Post Directly to Sub Ledger Entity
+### ❌ Replace Account Transaction with Sub Ledger Posting
 
-**Forbidden:** Creating Customer Transactions, Supplier Transactions, Employee Transactions, or Party Transactions from the Journal Module in place of Account Transactions.
+**Forbidden:** Omitting the required Account Transaction when a Customer or Supplier Statement is created from a Journal line, or directly posting Employee/Party transactions without a separately approved architecture.
 
-**Why:** Sub Ledger is reference and subsidiary tracking only. General Ledger posting must remain on the selected Chart of Account through `AccountBalanceService` (Section 12).
+**Why:** Customer/Supplier statements are synchronized subsidiary postings. General Ledger posting remains on the selected Chart of Account through `AccountBalanceService` (Section 12).
 
 ---
 

@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\ChartAccount;
 use App\Services\ValidationService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ExpenseCategoryController extends Controller
 {
@@ -29,7 +31,7 @@ class ExpenseCategoryController extends Controller
             $query->where('status', (int) $request->status);
         }
 
-        $categories = $query->latest()->paginate(20)->withQueryString();
+        $categories = $query->with('chartAccount')->latest()->paginate(20)->withQueryString();
 
         return view('company.expense-category.index', compact('categories'));
     }
@@ -38,7 +40,9 @@ class ExpenseCategoryController extends Controller
     {
         $this->authorizeCompanyPermission('manage_expense_categories');
 
-        return view('company.expense-category.create');
+        $chartAccounts = $this->expenseChartAccounts(auth()->user()->company_id);
+
+        return view('company.expense-category.create', compact('chartAccounts'));
     }
 
     public function store(Request $request)
@@ -46,13 +50,18 @@ class ExpenseCategoryController extends Controller
         $this->authorizeCompanyPermission('manage_expense_categories');
 
         $request->validate([
+            'chart_account_id' => 'required|integer',
             'name'        => ValidationService::requiredString(100),
             'description' => ValidationService::text(),
             'status'      => 'nullable|in:0,1',
         ]);
 
+        $companyId = auth()->user()->company_id;
+        $this->validateExpenseChartAccount($companyId, (int) $request->chart_account_id);
+
         ExpenseCategory::create([
-            'company_id'  => auth()->user()->company_id,
+            'company_id'  => $companyId,
+            'chart_account_id' => $request->chart_account_id,
             'name'        => $request->name,
             'description' => $request->description,
             'status'      => $request->input('status', ExpenseCategory::STATUS_ACTIVE),
@@ -71,7 +80,9 @@ class ExpenseCategoryController extends Controller
         $category = ExpenseCategory::where('company_id', auth()->user()->company_id)
             ->findOrFail($id);
 
-        return view('company.expense-category.edit', compact('category'));
+        $chartAccounts = $this->expenseChartAccounts(auth()->user()->company_id);
+
+        return view('company.expense-category.edit', compact('category', 'chartAccounts'));
     }
 
     public function update(Request $request, $id)
@@ -79,15 +90,21 @@ class ExpenseCategoryController extends Controller
         $this->authorizeCompanyPermission('manage_expense_categories');
 
         $request->validate([
+            'chart_account_id' => 'required|integer',
             'name'        => ValidationService::requiredString(100),
             'description' => ValidationService::text(),
             'status'      => 'required|in:0,1',
         ]);
 
-        $category = ExpenseCategory::where('company_id', auth()->user()->company_id)
+        $companyId = auth()->user()->company_id;
+
+        $category = ExpenseCategory::where('company_id', $companyId)
             ->findOrFail($id);
 
+        $this->validateExpenseChartAccount($companyId, (int) $request->chart_account_id);
+
         $category->update([
+            'chart_account_id' => $request->chart_account_id,
             'name'        => $request->name,
             'description' => $request->description,
             'status'      => (int) $request->status,
@@ -116,5 +133,32 @@ class ExpenseCategoryController extends Controller
         $category->delete();
 
         return back()->with('success', 'Expense category deleted successfully.');
+    }
+
+    private function expenseChartAccounts(int $companyId)
+    {
+        return ChartAccount::query()
+            ->forCompany($companyId)
+            ->active()
+            ->ofClass('expense')
+            ->orderBy('code')
+            ->get();
+    }
+
+    private function validateExpenseChartAccount(int $companyId, int $chartAccountId): ChartAccount
+    {
+        $chartAccount = ChartAccount::query()
+            ->forCompany($companyId)
+            ->active()
+            ->ofClass('expense')
+            ->find($chartAccountId);
+
+        if ($chartAccount === null) {
+            throw ValidationException::withMessages([
+                'chart_account_id' => 'Select an active expense chart account for this category.',
+            ]);
+        }
+
+        return $chartAccount;
     }
 }

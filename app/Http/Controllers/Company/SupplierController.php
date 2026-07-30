@@ -11,10 +11,16 @@ use App\Services\FileUploadService;
 use App\Services\ValidationService;
 
 use App\Services\SupplierTransactionService;
+use App\Services\Accounting\Integrations\SupplierOpeningBalanceAccountingIntegrationService;
 use App\Models\FinancialYear;
 use Illuminate\Support\Facades\DB;
 class SupplierController extends Controller
 {
+    public function __construct(
+        private readonly SupplierOpeningBalanceAccountingIntegrationService $openingBalanceAccounting
+    ) {
+    }
+
     // 🔥 SHARED FILTERED QUERY
     // Used by index() and any other action (e.g. summary totals)
     // so the filter logic is defined in exactly one place.
@@ -216,6 +222,8 @@ public function store(Request $request)
                     1,
 
             ]);
+
+            $this->openingBalanceAccounting->postOpeningBalance($supplier);
         }
 
         DB::commit();

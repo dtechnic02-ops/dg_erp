@@ -41,12 +41,12 @@
             <section class="dg-section">
                 <div class="dg-summary d-flex flex-row flex-nowrap justify-content-center align-items-center gap-3 mb-0 w-100">
                     <div class="dg-summary-item mb-0 border-0 p-0">
-                        <span>Active Total :</span>
+                        <span>Posted Total :</span>
                         <span class="fw-bold">{{ number_format($totalAmount, 2) }}</span>
                     </div>
                     <span>|</span>
                     <div class="dg-summary-item mb-0 border-0 p-0">
-                        <span>Active Entries :</span>
+                        <span>Posted Entries :</span>
                         <span class="fw-bold">{{ $activeCount }}</span>
                     </div>
                     <span>|</span>
@@ -98,7 +98,7 @@
                                     <label for="status" class="dg-filter-label">Status</label>
                                     <select name="status" id="status" class="form-select dg-select dg-filter-control">
                                         <option value="" @selected(request()->has('status') && request('status') === '')>All</option>
-                                        <option value="1" @selected(!request()->has('status') || request('status') === '1')>Active</option>
+                                        <option value="1" @selected(!request()->has('status') || request('status') === '1')>Posted</option>
                                         <option value="0" @selected(request('status') === '0')>Cancelled</option>
                                     </select>
                                 </div>
@@ -163,8 +163,10 @@
                                             <td>{{ $journal->journal_date?->format('d-m-Y') ?? '-' }}</td>
                                             <td>{{ number_format($journal->total_amount, 2) }}</td>
                                             <td>
-                                                @if ($journal->isActive())
-                                                    <span class="badge bg-success">Active</span>
+                                                @if ($journal->isPosted())
+                                                    <span class="badge bg-success">Posted</span>
+                                                @elseif ($journal->status === \App\Models\Journal::STATUS_REVERSED)
+                                                    <span class="badge bg-secondary">Reversed</span>
                                                 @else
                                                     <span class="badge bg-secondary">Cancelled</span>
                                                 @endif

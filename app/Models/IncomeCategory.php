@@ -12,6 +12,7 @@ class IncomeCategory extends Model
 
     protected $fillable = [
         'company_id',
+        'chart_account_id',
         'name',
         'code',
         'note',
@@ -26,6 +27,11 @@ class IncomeCategory extends Model
     public function incomes()
     {
         return $this->hasMany(Income::class, 'income_category_id');
+    }
+
+    public function chartAccount()
+    {
+        return $this->belongsTo(ChartAccount::class, 'chart_account_id');
     }
 
     public function isActive(): bool

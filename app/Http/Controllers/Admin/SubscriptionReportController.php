@@ -9,6 +9,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Concerns\AuthorizesAdminSubscription;
 
 use App\Http\Controllers\Controller;
+use App\Services\PlatformAuthorizationService;
 
 use App\Models\Company;
 
@@ -28,13 +29,20 @@ class SubscriptionReportController extends Controller
 
     use AuthorizesAdminSubscription;
 
+    public function __construct(private PlatformAuthorizationService $platformAuthorization)
+    {
+    }
+
 
 
     public function index()
 
     {
 
-        $this->authorizeAdminSubscriptionView();
+        abort_unless(
+            $this->platformAuthorization->can(auth()->user(), 'platform_subscription_reports_view'),
+            403
+        );
 
 
 

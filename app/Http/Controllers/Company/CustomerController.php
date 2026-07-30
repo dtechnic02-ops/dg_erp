@@ -7,10 +7,17 @@ use Illuminate\Http\Request;
 use App\Models\Customer;
 use App\Models\FinancialYear;
 use App\Services\CustomerTransactionService;
+use App\Services\Accounting\Integrations\CustomerOpeningBalanceAccountingIntegrationService;
 use App\Services\ValidationService;
+use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
+public function __construct(
+    private readonly CustomerOpeningBalanceAccountingIntegrationService $openingBalanceAccounting
+) {
+}
+
 
 /* =====================
 
@@ -342,24 +349,26 @@ $name;
 
 
 
-$customer = Customer::create(
-    $data
-);
-if (
-    $customer->opening_balance > 0
-)
-{
-    $activeFy = FinancialYear::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->where(
-        'is_active',
-        1
-    )
-    ->firstOrFail();
+$customer = DB::transaction(function () use ($data) {
+    $customer = Customer::create(
+        $data
+    );
 
-    CustomerTransactionService::createTransaction([
+    if (
+        $customer->opening_balance > 0
+    )
+    {
+        $activeFy = FinancialYear::where(
+            'company_id',
+            auth()->user()->company_id
+        )
+        ->where(
+            'is_active',
+            1
+        )
+        ->firstOrFail();
+
+        CustomerTransactionService::createTransaction([
 
         'company_id'        =>
             auth()->user()->company_id,
@@ -400,8 +409,13 @@ if (
         'status'            =>
             1,
 
-    ]);
-}
+        ]);
+
+        $this->openingBalanceAccounting->postOpeningBalance($customer);
+    }
+
+    return $customer;
+});
 
 return back()
 

@@ -79,7 +79,7 @@
                                 <div class="dg-invoice-field-row">
                                     <span class="dg-invoice-field-label">Status</span>
                                     <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                    <span class="dg-invoice-field-value">{{ $journal->isActive() ? 'Active' : 'Cancelled' }}</span>
+                                    <span class="dg-invoice-field-value">{{ $journal->isPosted() ? 'Posted' : ($journal->status === \App\Models\Journal::STATUS_REVERSED ? 'Reversed' : 'Cancelled') }}</span>
                                 </div>
                                 @if (!empty($journal->financialYear?->name))
                                     <div class="dg-invoice-field-row">

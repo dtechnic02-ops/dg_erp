@@ -3,13 +3,24 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CompleteAdminUserPasswordResetRequest;
+use App\Http\Requests\VerifyAdminUserPasswordResetOtpRequest;
+use App\Mail\AdminUserPasswordResetCompletedMail;
+use App\Mail\AdminUserPasswordResetOtpMail;
 use App\Models\Role;
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Services\AdminUserPasswordResetOtpService;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 
 class UserController extends Controller
 {
+    private const PASSWORD_RESET_SESSION_KEY = 'admin_user_password_reset';
+
+    public function __construct(private AdminUserPasswordResetOtpService $resetOtp)
+    {
+    }
     // 🔥 USER LIST
     public function index(Request $request)
     {
@@ -38,6 +49,15 @@ class UserController extends Controller
         $users = $query->latest()->paginate(10);
 
         return view('admin.users', compact('users'));
+    }
+
+    public function show(User $user)
+    {
+        abort_unless(auth()->check() && (int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+
+        $user->load(['company', 'role']);
+
+        return view('admin.users_show', compact('user'));
     }
 
     // 🔥 DELETE USER
@@ -88,22 +108,137 @@ class UserController extends Controller
         return back()->with('success', 'User Activated');
     }
 
-    // 🔐 RESET PASSWORD
-    public function reset($id)
+    public function requestPasswordReset(User $user)
     {
-        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+        $this->authorizeSuperAdmin();
+        $this->assertResetTarget($user);
 
-        $user = User::findOrFail($id);
+        [$requestId, $otp] = $this->resetOtp->issue(auth()->id(), $user->id);
 
-        // ❗ Prevent self reset
-        if ($user->id == auth()->id()) {
-            return back()->with('error', 'You cannot reset your own password');
+        try {
+            Mail::to(auth()->user()->email)->send(new AdminUserPasswordResetOtpMail($otp, $user->name));
+        } catch (\Throwable) {
+            $this->resetOtp->invalidate($requestId, auth()->id(), $user->id);
+
+            return back()->with('error', 'Unable to send the password reset OTP. No password was changed.');
         }
 
-        // 🔐 Secure hashing
-        $user->password = Hash::make('123456');
-        $user->save();
+        session()->put(self::PASSWORD_RESET_SESSION_KEY, [
+            'request_id' => $requestId,
+            'target_user_id' => $user->id,
+            'admin_user_id' => auth()->id(),
+            'verified' => false,
+        ]);
 
-        return back()->with('success', 'Password reset to 123456');
+        return redirect()
+            ->route('admin.user.reset.verify.form', $user)
+            ->with('success', 'A verification code was sent to your registered email address.');
+    }
+
+    public function showPasswordResetVerification(User $user)
+    {
+        $this->resetContext($user);
+
+        return view('admin.user_password_reset_verify', compact('user'));
+    }
+
+    public function verifyPasswordResetOtp(VerifyAdminUserPasswordResetOtpRequest $request, User $user)
+    {
+        $context = $this->resetContext($user);
+        $result = $this->resetOtp->verify(
+            $context['request_id'],
+            (int) $context['admin_user_id'],
+            (int) $context['target_user_id'],
+            $request->validated('otp')
+        );
+
+        if ($result !== 'verified') {
+            if (in_array($result, ['expired', 'locked'], true)) {
+                $this->forgetResetState();
+            }
+
+            $message = match ($result) {
+                'expired' => 'The OTP has expired. Request a new password reset OTP.',
+                'locked' => 'Maximum OTP attempts exceeded. Request a new password reset OTP.',
+                'used' => 'This OTP has already been used. Request a new password reset OTP.',
+                default => 'The OTP is invalid. Please try again.',
+            };
+
+            return back()->withErrors(['otp' => $message]);
+        }
+
+        session()->put(self::PASSWORD_RESET_SESSION_KEY.'.verified', true);
+
+        return redirect()->route('admin.user.reset.password.form', $user);
+    }
+
+    public function showPasswordResetForm(User $user)
+    {
+        $context = $this->resetContext($user);
+
+        if (! ($context['verified'] ?? false) || ! $this->resetOtp->isVerified($context['request_id'], auth()->id(), $user->id)) {
+            $this->forgetResetState();
+
+            return redirect()->route('admin.users')->with('error', 'Password reset OTP verification is required.');
+        }
+
+        return view('admin.user_password_reset_password', compact('user'));
+    }
+
+    public function completePasswordReset(CompleteAdminUserPasswordResetRequest $request, User $user)
+    {
+        $context = $this->resetContext($user);
+
+        if (! ($context['verified'] ?? false) || ! $this->resetOtp->isVerified($context['request_id'], auth()->id(), $user->id)) {
+            $this->forgetResetState();
+
+            return redirect()->route('admin.users')->with('error', 'Password reset OTP verification is required.');
+        }
+
+        $user->update(['password' => Hash::make($request->validated('password'))]);
+        $this->resetOtp->invalidate($context['request_id'], auth()->id(), $user->id);
+        $this->forgetResetState();
+
+        try {
+            Mail::to($user->email)->send(new AdminUserPasswordResetCompletedMail($user->name));
+        } catch (\Throwable) {
+            return redirect()->route('admin.user.show', $user)
+                ->with('warning', 'Password reset completed, but the account notification email could not be sent.');
+        }
+
+        return redirect()->route('admin.user.show', $user)->with('success', 'Password reset completed successfully.');
+    }
+
+    private function authorizeSuperAdmin(): void
+    {
+        abort_unless(auth()->check() && (int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+    }
+
+    private function assertResetTarget(User $user): void
+    {
+        abort_if($user->id === auth()->id(), 422, 'You cannot reset your own password.');
+    }
+
+    private function resetContext(User $user): array
+    {
+        $this->authorizeSuperAdmin();
+        $this->assertResetTarget($user);
+
+        $context = session(self::PASSWORD_RESET_SESSION_KEY);
+
+        abort_unless(
+            is_array($context)
+            && (int) ($context['admin_user_id'] ?? 0) === auth()->id()
+            && (int) ($context['target_user_id'] ?? 0) === $user->id
+            && ! empty($context['request_id']),
+            403
+        );
+
+        return $context;
+    }
+
+    private function forgetResetState(): void
+    {
+        session()->forget(self::PASSWORD_RESET_SESSION_KEY);
     }
 }

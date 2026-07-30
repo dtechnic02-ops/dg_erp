@@ -14,11 +14,14 @@ use App\Models\CompanyRegistration;
 
 use App\Models\Company;
 
+use App\Models\SubscriptionPlan;
+
 use App\Models\Role;
 
 use App\Models\User;
 
 use App\Services\SubscriptionService;
+use App\Services\PlatformAuthorizationService;
 
 use Illuminate\Support\Facades\DB;
 
@@ -38,7 +41,10 @@ class CompanyApprovalController extends Controller
 
 
 
-    public function __construct(private SubscriptionService $subscriptionService)
+    public function __construct(
+        private SubscriptionService $subscriptionService,
+        private PlatformAuthorizationService $platformAuthorization
+    )
 
     {
 
@@ -50,7 +56,7 @@ class CompanyApprovalController extends Controller
 
     {
 
-        $this->authorizeViewCompany();
+        $this->authorizePlatform('platform_registrations_view');
 
 
 
@@ -62,13 +68,20 @@ class CompanyApprovalController extends Controller
 
     }
 
+    public function show(CompanyRegistration $registration)
+    {
+        $this->authorizePlatform('platform_registrations_view');
+
+        return view('admin.registration_show', compact('registration'));
+    }
+
 
 
     public function approve($id)
 
     {
 
-        $this->authorizeApproveCompany();
+        $this->authorizePlatform('platform_registrations_approve');
 
 
 
@@ -112,6 +125,16 @@ class CompanyApprovalController extends Controller
 
                 );
 
+                $trialPlan = SubscriptionPlan::active()
+                    ->where('code', 'trial')
+                    ->first();
+
+                if (! $trialPlan) {
+                    throw new RuntimeException(
+                        'The required Trial subscription plan is missing or inactive. Company approval cannot continue.'
+                    );
+                }
+
 
 
                 $folderPath = public_path('companies/' . $company->id);
@@ -152,7 +175,7 @@ class CompanyApprovalController extends Controller
 
 
 
-                $this->subscriptionService->startRegisterTrial($company, auth()->user());
+                $this->subscriptionService->startRegisterTrial($company, $trialPlan, auth()->user());
 
 
 
@@ -180,7 +203,7 @@ class CompanyApprovalController extends Controller
 
     {
 
-        $this->authorizeApproveCompany();
+        $this->authorizePlatform('platform_registrations_reject');
 
 
 
@@ -204,6 +227,11 @@ class CompanyApprovalController extends Controller
 
             ->with('success', 'Company Rejected');
 
+    }
+
+    private function authorizePlatform(string $permission): void
+    {
+        abort_unless($this->platformAuthorization->can(auth()->user(), $permission), 403);
     }
 
 }

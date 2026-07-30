@@ -129,48 +129,33 @@ class PermissionSeeder extends Seeder
         $permissionIds = collect($permissions)->pluck('id')->all();
 
         $platformPermissionNames = [
-            'view_subscription_module',
-            'manage_subscription_module',
-            'view_company',
-            'create_company',
-            'edit_company',
-            'approve_company',
-            'block_company',
-            'unblock_company',
-            'delete_company',
-            'reset_company_password',
+            'platform_companies_view',
+            'platform_companies_block',
+            'platform_companies_unblock',
+            'platform_registrations_view',
+            'platform_registrations_approve',
+            'platform_registrations_reject',
+            'platform_subscriptions_view',
+            'platform_subscription_payments_view',
+            'platform_subscription_payments_invoice_view',
+            'platform_subscription_reports_view',
         ];
 
-        Permission::query()->update(['scope' => Permission::SCOPE_COMPANY]);
-        Permission::query()
-            ->whereIn('name', $platformPermissionNames)
-            ->update(['scope' => Permission::SCOPE_PLATFORM]);
+        foreach ($platformPermissionNames as $platformPermissionName) {
+            Permission::firstOrCreate(
+                ['name' => $platformPermissionName],
+                ['scope' => Permission::SCOPE_PLATFORM]
+            );
+        }
 
         $companyPermissionIds = Permission::company()->pluck('id')->all();
 
         $superAdmin = Role::where('name', 'super_admin')->first();
-        $superStaff = Role::where('name', 'super_staff')->first();
         $admin = Role::where('name', 'company_admin')->first();
         $staff = Role::where('name', 'staff')->first();
 
         if ($superAdmin) {
             $superAdmin->permissions()->syncWithoutDetaching($permissionIds);
-        }
-
-        if ($superStaff) {
-            $superStaff->permissions()->syncWithoutDetaching(
-                Permission::platform()
-                    ->whereIn('name', [
-                        'view_subscription_module',
-                        'manage_subscription_module',
-                        'view_company',
-                        'approve_company',
-                        'block_company',
-                        'unblock_company',
-                    ])
-                    ->pluck('id')
-                    ->all()
-            );
         }
 
         if ($admin) {

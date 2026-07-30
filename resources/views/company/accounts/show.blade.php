@@ -97,7 +97,7 @@
                                     <div>
                                         <div>{{ $account->account_name }}</div>
 
-                                        <div class="dg-label mb-1">{{ $account->account_type ?: '-' }}</div>
+                                        <div class="dg-label mb-1">{{ $account->account_group ?: '-' }} / {{ $account->account_type ?: '-' }}</div>
 
                                         <div class="mb-1">
                                             @if ($account->status == 'active')
@@ -133,6 +133,13 @@
                                 <h6 class="mb-1">Basic Information</h6>
 
                                 <div class="row">
+
+                                    <div class="col-md-6">
+                                        <div class="dg-row">
+                                            <span class="dg-label d-inline mb-0">Account Group :</span>
+                                            {{ $account->account_group ?: '-' }}
+                                        </div>
+                                    </div>
 
                                     <div class="col-md-6">
                                         <div class="dg-row">

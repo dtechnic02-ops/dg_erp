@@ -22,6 +22,10 @@ class SupplierTransaction extends Model
 
         'reference_id',
 
+        'journal_item_id',
+
+        'reversed_transaction_id',
+
         'reference_no',
 
         'description',

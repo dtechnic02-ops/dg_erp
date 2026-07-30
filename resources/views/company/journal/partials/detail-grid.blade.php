@@ -1,10 +1,10 @@
 @php
     if (!isset($detailRows)) {
-        if (old('account_id')) {
-            $detailRows = collect(old('account_id'))->map(function ($accountId, $index) {
+        if (old('ledger_selection')) {
+            $detailRows = collect(old('ledger_selection'))->map(function ($ledgerSelection, $index) {
                 return [
-                    'account_id'    => $accountId,
-                    'sub_ledger_id' => old('sub_ledger_id.' . $index, ''),
+                    'account_id'    => old('account_id.' . $index, ''),
+                    'ledger_selection' => $ledgerSelection,
                     'debit'         => old('debit.' . $index, ''),
                     'credit'        => old('credit.' . $index, ''),
                     'note'          => old('row_note.' . $index, ''),
@@ -13,7 +13,7 @@
         } else {
             $detailRows = array_fill(0, 2, [
                 'account_id'    => '',
-                'sub_ledger_id' => '',
+                'ledger_selection' => '',
                 'debit'         => '',
                 'credit'        => '',
                 'note'          => '',
@@ -26,20 +26,6 @@
     $suppliers = $suppliers ?? collect();
     $employees = $employees ?? collect();
     $parties = $parties ?? collect();
-
-    $journalRelatedPartyOptions = [
-        'customer' => $customers->map(fn ($item) => ['id' => $item->id, 'name' => $item->name])->values()->all(),
-        'supplier' => $suppliers->map(fn ($item) => ['id' => $item->id, 'name' => $item->name])->values()->all(),
-        'employee' => $employees->map(fn ($item) => ['id' => $item->id, 'name' => trim($item->full_name)])->values()->all(),
-        'party'    => $parties->map(fn ($item) => ['id' => $item->id, 'name' => $item->name])->values()->all(),
-    ];
-
-    $journalRelatedPartyPlaceholders = [
-        'customer' => 'Select Customer',
-        'supplier' => 'Select Supplier',
-        'employee' => 'Select Employee',
-        'party'    => 'Select Party',
-    ];
 
     $formatJournalAccountBalance = static function ($balance): string {
         $balance = (float) $balance;
@@ -73,7 +59,6 @@
                 <tr>
                     <th scope="col" class="dg-journal-col-num">#</th>
                     <th scope="col" class="dg-journal-col-account">Account</th>
-                    <th scope="col" class="dg-journal-col-related-party">Related Party</th>
                     <th scope="col" class="dg-journal-col-balance dg-col-num">Balance</th>
                     <th scope="col" class="dg-journal-col-debit dg-col-num">Debit</th>
                     <th scope="col" class="dg-journal-col-credit dg-col-num">Credit</th>
@@ -86,27 +71,34 @@
                     <tr class="dg-row journal-detail-row">
                         <td class="journal-row-num dg-journal-col-num">{{ $loop->iteration }}</td>
                         <td class="dg-journal-col-account">
-                            <select name="account_id[]" class="form-select dg-select journal-account-select" required aria-label="Account">
+                            <select name="ledger_selection[]" class="form-select dg-select journal-account-select" required aria-label="Account">
                                 <option value="">Select Account</option>
-                                @foreach ($chartAccounts as $chartAccount)
-                                    <option
-                                        value="{{ $chartAccount->id }}"
-                                        data-balance="{{ $chartAccount->current_balance }}"
-                                        data-balance-display="{{ $formatJournalAccountBalance($chartAccount->current_balance) }}"
-                                        data-account-name="{{ $chartAccount->account_name }}"
-                                        data-sub-ledger-type="{{ $chartAccount->sub_ledger_type ?? '' }}"
-                                        @selected((string) $row['account_id'] === (string) $chartAccount->id)
-                                    >{{ $chartAccount->account_name }}</option>
-                                @endforeach
+                                <optgroup label="Accounts">
+                                    @foreach ($chartAccounts->filter(fn ($chartAccount) => empty($chartAccount->sub_ledger_type)) as $chartAccount)
+                                        <option value="account:{{ $chartAccount->id }}" data-balance-display="{{ $formatJournalAccountBalance($chartAccount->current_balance) }}" @selected(($row['ledger_selection'] ?? '') === 'account:' . $chartAccount->id)>{{ $chartAccount->account_name }}</option>
+                                    @endforeach
+                                </optgroup>
+                                <optgroup label="Customers">
+                                    @foreach ($customers as $customer)
+                                        <option value="customer:{{ $customer->id }}" @selected(($row['ledger_selection'] ?? '') === 'customer:' . $customer->id)>Customer: {{ $customer->name }}</option>
+                                    @endforeach
+                                </optgroup>
+                                <optgroup label="Suppliers">
+                                    @foreach ($suppliers as $supplier)
+                                        <option value="supplier:{{ $supplier->id }}" @selected(($row['ledger_selection'] ?? '') === 'supplier:' . $supplier->id)>Supplier: {{ $supplier->name }}</option>
+                                    @endforeach
+                                </optgroup>
+                                <optgroup label="Employees">
+                                    @foreach ($employees as $employee)
+                                        <option value="employee:{{ $employee->id }}" @selected(($row['ledger_selection'] ?? '') === 'employee:' . $employee->id)>Employee: {{ trim($employee->full_name) }}</option>
+                                    @endforeach
+                                </optgroup>
+                                <optgroup label="Parties">
+                                    @foreach ($parties as $party)
+                                        <option value="party:{{ $party->id }}" @selected(($row['ledger_selection'] ?? '') === 'party:' . $party->id)>Party: {{ $party->name }}</option>
+                                    @endforeach
+                                </optgroup>
                             </select>
-                        </td>
-                        <td class="dg-journal-col-related-party">
-                            <select name="sub_ledger_id[]" class="form-select dg-select journal-related-party-select" aria-label="Related Party" hidden>
-                                <option value="">Select</option>
-                            </select>
-                            @if (!empty($row['sub_ledger_id']))
-                                <span class="journal-related-party-initial-value" data-value="{{ $row['sub_ledger_id'] }}" hidden></span>
-                            @endif
                         </td>
                         <td class="dg-journal-col-balance dg-col-num">
                             <span class="journal-balance-display">{{ $resolveRowBalanceDisplay($row) }}</span>
@@ -167,22 +159,33 @@
     <tr class="dg-row journal-detail-row">
         <td class="journal-row-num dg-journal-col-num">0</td>
         <td class="dg-journal-col-account">
-            <select name="account_id[]" class="form-select dg-select journal-account-select" required aria-label="Account">
+            <select name="ledger_selection[]" class="form-select dg-select journal-account-select" required aria-label="Account">
                 <option value="">Select Account</option>
-                @foreach ($chartAccounts as $chartAccount)
-                    <option
-                        value="{{ $chartAccount->id }}"
-                        data-balance="{{ $chartAccount->current_balance }}"
-                        data-balance-display="{{ $formatJournalAccountBalance($chartAccount->current_balance) }}"
-                        data-account-name="{{ $chartAccount->account_name }}"
-                        data-sub-ledger-type="{{ $chartAccount->sub_ledger_type ?? '' }}"
-                    >{{ $chartAccount->account_name }}</option>
-                @endforeach
-            </select>
-        </td>
-        <td class="dg-journal-col-related-party">
-            <select name="sub_ledger_id[]" class="form-select dg-select journal-related-party-select" aria-label="Related Party" hidden>
-                <option value="">Select</option>
+                <optgroup label="Accounts">
+                    @foreach ($chartAccounts->filter(fn ($chartAccount) => empty($chartAccount->sub_ledger_type)) as $chartAccount)
+                        <option value="account:{{ $chartAccount->id }}" data-balance-display="{{ $formatJournalAccountBalance($chartAccount->current_balance) }}">{{ $chartAccount->account_name }}</option>
+                    @endforeach
+                </optgroup>
+                <optgroup label="Customers">
+                    @foreach ($customers as $customer)
+                        <option value="customer:{{ $customer->id }}">Customer: {{ $customer->name }}</option>
+                    @endforeach
+                </optgroup>
+                <optgroup label="Suppliers">
+                    @foreach ($suppliers as $supplier)
+                        <option value="supplier:{{ $supplier->id }}">Supplier: {{ $supplier->name }}</option>
+                    @endforeach
+                </optgroup>
+                <optgroup label="Employees">
+                    @foreach ($employees as $employee)
+                        <option value="employee:{{ $employee->id }}">Employee: {{ trim($employee->full_name) }}</option>
+                    @endforeach
+                </optgroup>
+                <optgroup label="Parties">
+                    @foreach ($parties as $party)
+                        <option value="party:{{ $party->id }}">Party: {{ $party->name }}</option>
+                    @endforeach
+                </optgroup>
             </select>
         </td>
         <td class="dg-journal-col-balance dg-col-num">
@@ -384,9 +387,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var template = document.getElementById('journalDetailRowTemplate');
     var addButton = document.getElementById('journalAddRow');
     var saveButton = document.getElementById('journalSaveBtn');
-    var journalRelatedPartyOptions = @json($journalRelatedPartyOptions);
-    var journalRelatedPartyPlaceholders = @json($journalRelatedPartyPlaceholders);
-
     function formatAmount(value) {
         return (Math.round(value * 100) / 100).toFixed(2);
     }
@@ -457,62 +457,14 @@ document.addEventListener('DOMContentLoaded', function () {
         display.textContent = option.getAttribute('data-balance-display') || '—';
     }
 
-    function updateRowRelatedParty(row, preferredValue) {
-        var accountSelect = row.querySelector('.journal-account-select');
-        var relatedPartySelect = row.querySelector('.journal-related-party-select');
-        var initialValueEl = row.querySelector('.journal-related-party-initial-value');
-
-        if (!accountSelect || !relatedPartySelect) {
-            return;
-        }
-
-        var option = accountSelect.options[accountSelect.selectedIndex];
-        var relatedPartyType = option?.getAttribute('data-sub-ledger-type') || '';
-        var selectedValue = preferredValue ?? initialValueEl?.getAttribute('data-value') ?? relatedPartySelect.value;
-
-        if (initialValueEl) {
-            initialValueEl.remove();
-        }
-
-        relatedPartySelect.innerHTML = '';
-        relatedPartySelect.removeAttribute('required');
-        relatedPartySelect.hidden = true;
-        relatedPartySelect.value = '';
-
-        if (!option?.value || !relatedPartyType) {
-            return;
-        }
-
-        var placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.textContent = journalRelatedPartyPlaceholders[relatedPartyType] || 'Select';
-        relatedPartySelect.appendChild(placeholder);
-
-        (journalRelatedPartyOptions[relatedPartyType] || []).forEach(function (item) {
-            var partyOption = document.createElement('option');
-            partyOption.value = String(item.id);
-            partyOption.textContent = item.name;
-            relatedPartySelect.appendChild(partyOption);
-        });
-
-        relatedPartySelect.hidden = false;
-        relatedPartySelect.required = true;
-
-        if (selectedValue) {
-            relatedPartySelect.value = String(selectedValue);
-        }
-    }
-
     function bindAccountBalance(row) {
         var select = row.querySelector('.journal-account-select');
 
         select?.addEventListener('change', function () {
             updateRowAccountBalance(row);
-            updateRowRelatedParty(row, '');
         });
 
         updateRowAccountBalance(row);
-        updateRowRelatedParty(row);
     }
 
     function bindDebitCreditExclusion(row) {

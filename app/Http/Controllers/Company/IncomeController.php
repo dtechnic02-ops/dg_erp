@@ -11,16 +11,25 @@ use App\Models\FinancialYear;
 use App\Models\Income;
 use App\Models\IncomeCategory;
 use App\Services\AccountBalanceService;
+use App\Services\Accounting\Integrations\IncomeAccountingIntegrationService;
 use App\Services\FileUploadService;
 use App\Services\ValidationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class IncomeController extends Controller
 {
     use AuthorizesCompanyPermission;
     use HandlesTransactionDocumentationEdit;
+
+    private const INCOME_RECEIPT_ACCOUNT_TYPES = ['Cash', 'Bank', 'ATM', 'Wallet'];
+
+    public function __construct(
+        private readonly IncomeAccountingIntegrationService $incomeAccountingIntegrationService
+    ) {
+    }
 
     protected function buildIncomeQuery(Request $request, int $companyId)
     {
@@ -111,9 +120,18 @@ class IncomeController extends Controller
 
     protected function validateAccount(int $companyId, int $accountId): Account
     {
-        return Account::where('company_id', $companyId)
+        $account = Account::where('company_id', $companyId)
             ->where('status', 1)
-            ->findOrFail($accountId);
+            ->whereIn('account_type', self::INCOME_RECEIPT_ACCOUNT_TYPES)
+            ->find($accountId);
+
+        if ($account === null) {
+            throw ValidationException::withMessages([
+                'account_id' => 'Select an active Cash, Bank, ATM, or Wallet account for the income receipt.',
+            ]);
+        }
+
+        return $account;
     }
 
     public function index(Request $request)
@@ -188,6 +206,7 @@ class IncomeController extends Controller
 
         $accounts = Account::where('company_id', $companyId)
             ->where('status', 1)
+            ->whereIn('account_type', self::INCOME_RECEIPT_ACCOUNT_TYPES)
             ->orderBy('account_name')
             ->get();
 
@@ -272,6 +291,8 @@ class IncomeController extends Controller
                     'credit'              => 0,
                 ], false);
 
+                $this->incomeAccountingIntegrationService->postIncome($income);
+
                 return $income;
             });
 
@@ -330,6 +351,7 @@ class IncomeController extends Controller
 
         $accounts = Account::where('company_id', $companyId)
             ->where('status', 1)
+            ->whereIn('account_type', self::INCOME_RECEIPT_ACCOUNT_TYPES)
             ->orderBy('account_name')
             ->get();
 
@@ -388,7 +410,8 @@ class IncomeController extends Controller
                 $this->validateCategory($companyId, (int) $request->income_category_id);
                 $this->validateAccount($companyId, (int) $request->account_id);
 
-                $transaction = AccountTransaction::where('reference_type', 'Income')
+                $transaction = AccountTransaction::where('company_id', $companyId)
+                    ->where('reference_type', 'Income')
                     ->where('reference_id', $income->id)
                     ->where('status', 1)
                     ->first();
@@ -427,6 +450,11 @@ class IncomeController extends Controller
                     'attachment'         => $file,
                     'note'               => $request->note,
                 ], $income));
+
+                $this->incomeAccountingIntegrationService->syncIncomeEdit(
+                    $income,
+                    auth()->id()
+                );
 
                 $this->logDocumentationEdit('Income updated.', $income);
             });
@@ -494,6 +522,12 @@ class IncomeController extends Controller
                     'cancel_reason'  => $cancelReason,
                     'note'           => trim(($income->note ?? '') . ' [Cancelled: ' . $cancelReason . ']'),
                 ]);
+
+                $this->incomeAccountingIntegrationService->reverseIncome(
+                    $income,
+                    $cancelBusinessDate,
+                    auth()->id()
+                );
             });
 
             return back()->with('success', 'Income cancelled successfully.');

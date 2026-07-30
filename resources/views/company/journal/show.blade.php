@@ -53,6 +53,19 @@
                 <div class="alert alert-danger dg-alert d-print-none" role="alert">{{ session('error') }}</div>
             @endif
 
+            @if ($canEdit && $journal->isPosted() && !$journal->reversal_of_journal_id)
+                <form method="POST" action="{{ route('company.journal.reverse', $journal->id) }}" class="card dg-card mb-3 d-print-none">
+                    @csrf
+                    <div class="card-body dg-card-body d-flex flex-wrap align-items-end gap-2">
+                        <div class="flex-grow-1">
+                            <label for="cancel_reason" class="form-label">Reversal Reason <span class="text-danger">*</span></label>
+                            <input type="text" name="cancel_reason" id="cancel_reason" class="form-control dg-input" maxlength="1000" required>
+                        </div>
+                        <button type="submit" class="btn btn-outline-danger dg-btn">Reverse Journal</button>
+                    </div>
+                </form>
+            @endif
+
             <article class="dg-invoice-sheet dg-print">
 
                 <h1 class="dg-invoice-doc-title">JOURNAL VOUCHER</h1>
@@ -108,8 +121,10 @@
                                 <span class="dg-invoice-field-label">Status</span>
                                 <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
                                 <span class="dg-invoice-field-value">
-                                    @if ($journal->isActive())
-                                        <span class="dg-badge dg-badge-status dg-badge-success">Active</span>
+                                    @if ($journal->isPosted())
+                                        <span class="dg-badge dg-badge-status dg-badge-success">Posted</span>
+                                    @elseif ($journal->status === \App\Models\Journal::STATUS_REVERSED)
+                                        <span class="dg-badge dg-badge-status dg-badge-secondary">Reversed</span>
                                     @else
                                         <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
                                     @endif

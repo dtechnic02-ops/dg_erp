@@ -17,6 +17,11 @@ class Permission extends Model
         return $this->belongsToMany(Role::class, 'permission_role');
     }
 
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'user_permissions')->withTimestamps();
+    }
+
     public function companies()
     {
         return $this->belongsToMany(Company::class, 'company_permission');
@@ -31,4 +36,5 @@ class Permission extends Model
     {
         return $query->where('scope', self::SCOPE_COMPANY);
     }
+
 }

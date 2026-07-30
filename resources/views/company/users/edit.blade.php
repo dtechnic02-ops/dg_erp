@@ -52,10 +52,9 @@
                             <div class="col-md-6">
                                 <label for="job_role" class="form-label">Job Role</label>
                                 <select name="job_role" id="job_role" class="form-select dg-select" required>
-                                    <option value="cashier" @selected(old('job_role', $user->job_role) === 'cashier')>Cashier</option>
-                                    <option value="receiver" @selected(old('job_role', $user->job_role) === 'receiver')>Receiver</option>
-                                    <option value="accountant" @selected(old('job_role', $user->job_role) === 'accountant')>Accountant</option>
-                                    <option value="manager" @selected(old('job_role', $user->job_role) === 'manager')>Manager</option>
+                                    @foreach(\App\Services\JobRoleVisibilityService::jobRoles() as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('job_role', $user->job_role) === $value)>{{ $label }}</option>
+                                    @endforeach
                                 </select>
                             </div>
 

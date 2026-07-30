@@ -12,6 +12,7 @@ class ExpenseCategory extends Model
 
     protected $fillable = [
         'company_id',
+        'chart_account_id',
         'name',
         'description',
         'status',
@@ -25,6 +26,11 @@ class ExpenseCategory extends Model
     public function expenses()
     {
         return $this->hasMany(Expense::class, 'expense_category_id');
+    }
+
+    public function chartAccount()
+    {
+        return $this->belongsTo(ChartAccount::class, 'chart_account_id');
     }
 
     public function isActive(): bool

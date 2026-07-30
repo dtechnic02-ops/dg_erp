@@ -66,6 +66,12 @@ if ($checkBalance)
                 'reference_id' =>
                 $data['reference_id'],
 
+                'journal_item_id' =>
+                $data['journal_item_id'] ?? null,
+
+                'reversed_transaction_id' =>
+                $data['reversed_transaction_id'] ?? null,
+
                 'description' =>
                 $data['description'] ?? null,
 

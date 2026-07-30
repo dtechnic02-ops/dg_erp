@@ -11,6 +11,7 @@ use App\Models\ProductCategory;
 use App\Models\Brand;
 use App\Services\ValidationService;
 use App\Services\StockService;
+use App\Services\Accounting\Integrations\ProductOpeningStockAccountingIntegrationService;
 use App\Models\StockMovement;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ProductsExport;
@@ -22,6 +23,11 @@ use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
+    public function __construct(
+        private readonly ProductOpeningStockAccountingIntegrationService $openingStockAccounting
+    ) {
+    }
+
     // 🔥 PRODUCT LIST
 
 private function filteredProductQuery(Request $request)
@@ -432,7 +438,13 @@ StockService::increase(
 
     $activeFinancialYear->start_date
 
+    ,
+
+    $request->cost_price
+
 );
+
+$this->openingStockAccounting->postOpeningStock($product);
 
 }
 

@@ -51,6 +51,7 @@
                 @csrf
 
                 <input type="hidden" name="sales_return_id" value="{{ $return->id }}">
+                <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', $idempotencyKey) }}">
 
                 <div class="row g-3">
                     <div class="col-lg-8">

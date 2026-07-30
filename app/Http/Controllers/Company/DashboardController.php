@@ -16,6 +16,8 @@ use App\Models\PurchaseInvoice;
 use App\Models\Income;
 use App\Models\Expense;
 use App\Models\FinancialYear;
+use App\Models\LoanAccount;
+use App\Models\DeliveryNote;
 use App\Services\HrPayrollSummaryService;
 
 class DashboardController extends Controller
@@ -59,13 +61,10 @@ where('company_id',$companyId)
 
 ->where('status', 1)
 
-->whereMonth(
-'created_at',
-now()->month
-)
+->when($activeFy, fn ($query) => $query->where('financial_year_id', $activeFy->id))
 
 ->selectRaw(
-'DATE(created_at) as day'
+'DATE(sale_date) as day'
 )
 
 ->selectRaw(
@@ -84,13 +83,10 @@ $purchaseChart = PurchaseInvoice::
 
 where('company_id',$companyId)
 
-->whereMonth(
-'created_at',
-now()->month
-)
+->when($activeFy, fn ($query) => $query->where('financial_year_id', $activeFy->id))
 
 ->selectRaw(
-'DATE(created_at) as day'
+'DATE(purchase_date) as day'
 )
 
 ->selectRaw(
@@ -309,33 +305,66 @@ $companyId
 
 ];
 
-$hrSummary = $this->hrPayrollSummaryService->summary($companyId, $activeFy);
+$company = auth()->user()->company;
+
+$subscriptionService = app(\App\Services\SubscriptionService::class);
+
+$modules = [
+    'hr'       => $subscriptionService->canAccessModule($company, 'hr'),
+    'crm'      => $subscriptionService->canAccessModule($company, 'crm'),
+    'loan'     => $subscriptionService->canAccessModule($company, 'loan'),
+    'delivery' => $subscriptionService->canAccessModule($company, 'delivery'),
+];
+
+$hrSummary = null;
+$loanSummary = null;
+$deliverySummary = null;
+
+if ($modules['hr']) {
+    $hrSummary = $this->hrPayrollSummaryService->summary($companyId, $activeFy);
+}
+
+if ($modules['loan']) {
+    $loanQuery = LoanAccount::where('company_id', $companyId)
+        ->where('status', LoanAccount::STATUS_ACTIVE)
+        ->when($activeFy, fn ($query) => $query->where('financial_year_id', $activeFy->id));
+
+    $loanSummary = [
+        'active_loans' => (clone $loanQuery)->where('remaining_principal', '>', 0)->count(),
+        'remaining_principal' => (clone $loanQuery)->sum('remaining_principal'),
+    ];
+}
+
+if ($modules['delivery']) {
+    $deliveryQuery = DeliveryNote::where('company_id', $companyId)
+        ->when($activeFy, fn ($query) => $query->where('financial_year_id', $activeFy->id));
+
+    $deliverySummary = [
+        'ready' => (clone $deliveryQuery)->where('status', DeliveryNote::STATUS_READY)->count(),
+        'completed' => (clone $deliveryQuery)
+            ->whereIn('status', [DeliveryNote::STATUS_DELIVERED, DeliveryNote::STATUS_PARTIAL])
+            ->count(),
+    ];
+}
 
 return view(
-
-'company.dashboard',
-
-compact(
-
-'data',
-
-'hrSummary',
-
-'salesChart',
-
-'purchaseChart',
-
-'recentSales',
-
-'recentPurchases',
-
-'lowStock',
-
-'staffActivity'
-
-)
-
+    'company.dashboard',
+    compact(
+        'data',
+        'activeFy',
+        'modules',
+        'hrSummary',
+        'loanSummary',
+        'deliverySummary',
+        'salesChart',
+        'purchaseChart',
+        'recentSales',
+        'recentPurchases',
+        'lowStock',
+        'staffActivity'
+    )
 );
+
 
 }
 

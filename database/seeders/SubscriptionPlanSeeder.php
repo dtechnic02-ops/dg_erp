@@ -11,6 +11,15 @@ class SubscriptionPlanSeeder extends Seeder
     {
         $plans = [
             [
+                'code' => 'trial',
+                'name' => 'Trial',
+                'description' => 'Default plan assigned when a company registration is approved.',
+                'staff_limit' => 5,
+                'hidden_modules' => [],
+                'is_active' => true,
+                'sort_order' => 0,
+            ],
+            [
                 'code' => 'basic',
                 'name' => 'Basic',
                 'staff_limit' => 1,

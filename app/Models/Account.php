@@ -6,6 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class Account extends Model
 {
+    public const GROUP_ASSET = 'Asset';
+
+    public const GROUP_LIABILITY = 'Liability';
+
+    public const GROUP_INCOME = 'Income';
+
+    public const GROUP_EXPENSE = 'Expense';
+
+    public const GROUP_EQUITY = 'Equity';
+
     public const SUB_LEDGER_CUSTOMER = 'customer';
 
     public const SUB_LEDGER_SUPPLIER = 'supplier';
@@ -17,6 +27,8 @@ class Account extends Model
     protected $fillable = [
 
         'company_id',
+
+        'account_group',
 
         'account_type',
 
@@ -59,6 +71,28 @@ class Account extends Model
             self::SUB_LEDGER_SUPPLIER => 'Supplier',
             self::SUB_LEDGER_EMPLOYEE => 'Employee',
             self::SUB_LEDGER_PARTY    => 'Party',
+        ];
+    }
+
+    public static function accountGroupLabels(): array
+    {
+        return [
+            self::GROUP_ASSET     => 'Asset',
+            self::GROUP_LIABILITY => 'Liability',
+            self::GROUP_INCOME    => 'Income',
+            self::GROUP_EXPENSE   => 'Expense',
+            self::GROUP_EQUITY    => 'Equity',
+        ];
+    }
+
+    public static function accountTypeLabels(): array
+    {
+        return [
+            'Cash'   => 'Cash',
+            'Bank'   => 'Bank',
+            'ATM'    => 'ATM',
+            'Wallet' => 'Wallet',
+            'Other'  => 'Other',
         ];
     }
 

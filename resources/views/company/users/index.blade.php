@@ -88,10 +88,9 @@
                                 <label for="job_role" class="form-label">Job Role</label>
                                 <select name="job_role" id="job_role" class="form-select dg-select" required>
                                     <option value="">Select</option>
-                                    <option value="cashier" @selected(old('job_role') === 'cashier')>Cashier</option>
-                                    <option value="receiver" @selected(old('job_role') === 'receiver')>Receiver</option>
-                                    <option value="accountant" @selected(old('job_role') === 'accountant')>Accountant</option>
-                                    <option value="manager" @selected(old('job_role') === 'manager')>Manager</option>
+                                    @foreach(\App\Services\JobRoleVisibilityService::jobRoles() as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('job_role') === $value)>{{ $label }}</option>
+                                    @endforeach
                                 </select>
                             </div>
                             <div class="col-md-2 d-flex align-items-end">
@@ -127,10 +126,9 @@
                                     <label for="job_role" class="dg-filter-label">Job Role</label>
                                     <select name="job_role" id="job_role_filter" class="form-select dg-select dg-filter-control">
                                         <option value="">All</option>
-                                        <option value="cashier" @selected(request('job_role') === 'cashier')>Cashier</option>
-                                        <option value="receiver" @selected(request('job_role') === 'receiver')>Receiver</option>
-                                        <option value="accountant" @selected(request('job_role') === 'accountant')>Accountant</option>
-                                        <option value="manager" @selected(request('job_role') === 'manager')>Manager</option>
+                                        @foreach(\App\Services\JobRoleVisibilityService::jobRoles() as $value => $label)
+                                            <option value="{{ $value }}" @selected(request('job_role') === $value)>{{ $label }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
                                 <div class="dg-filter-actions">
@@ -161,7 +159,7 @@
                     </header>
                     <div class="card-body dg-card-body dg-list-card-body">
                         <div class="table-responsive">
-                            <table class="table dg-table">
+                            <table class="table dg-table dg-table-compact">
                                 <thead class="dg-head">
                                     <tr>
                                         <th scope="col">#</th>
@@ -195,33 +193,37 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <div class="d-flex flex-wrap gap-1">
+                                                <div class="d-flex flex-wrap dg-action-group">
                                                     @if($canEdit)
-                                                        <a href="{{ route('company.users.edit', $staff->id) }}" class="btn btn-sm btn-outline-warning dg-btn">Edit</a>
+                                                        <a href="{{ route('company.users.edit', $staff->id) }}" class="btn btn-sm btn-outline-warning dg-action-btn">Edit</a>
+                                                    @endif
+
+                                                    @if($canManage)
+                                                        <a href="{{ route('company.staff-permissions.edit', $staff->id) }}" class="btn btn-sm btn-outline-primary dg-action-btn">Permissions</a>
                                                     @endif
 
                                                     @if($canBlock)
                                                         @if($staff->account_status === 'active')
                                                             <form method="POST" action="{{ route('company.users.block', $staff->id) }}" class="d-inline" onsubmit="return confirm('Block this staff member?');">
                                                                 @csrf
-                                                                <button type="submit" class="btn btn-sm btn-outline-secondary dg-btn">Block</button>
+                                                                <button type="submit" class="btn btn-sm btn-outline-secondary dg-action-btn">Block</button>
                                                             </form>
                                                         @else
                                                             <form method="POST" action="{{ route('company.users.unblock', $staff->id) }}" class="d-inline" onsubmit="return confirm('Activate this staff member?');">
                                                                 @csrf
-                                                                <button type="submit" class="btn btn-sm btn-outline-success dg-btn">Unblock</button>
+                                                                <button type="submit" class="btn btn-sm btn-outline-success dg-action-btn">Unblock</button>
                                                             </form>
                                                         @endif
                                                     @endif
 
                                                     @if($canReset)
-                                                        <button type="button" class="btn btn-sm btn-outline-primary dg-btn" data-bs-toggle="modal" data-bs-target="#resetModal{{ $staff->id }}">Reset Password</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary dg-action-btn" data-bs-toggle="modal" data-bs-target="#resetModal{{ $staff->id }}">Reset Password</button>
                                                     @endif
 
                                                     @if($canDelete)
                                                         <form method="POST" action="{{ route('company.users.delete', $staff->id) }}" class="d-inline" onsubmit="return confirm('Delete this staff member?');">
                                                             @csrf
-                                                            <button type="submit" class="btn btn-sm btn-outline-danger dg-btn">Delete</button>
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger dg-action-btn">Delete</button>
                                                         </form>
                                                     @endif
                                                 </div>

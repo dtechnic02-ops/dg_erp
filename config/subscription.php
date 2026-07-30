@@ -28,6 +28,18 @@ return [
 
     ],
 
+    'permission_module_map' => [
+
+        'crm' => ['crm'],
+
+        'loan' => ['loan'],
+
+        'hr' => ['employee', 'salary', 'hr'],
+
+        'delivery' => ['delivery'],
+
+    ],
+
 
 
     'route_module_map' => [

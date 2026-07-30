@@ -1,5 +1,4 @@
 
-dd('middleware working');
 protected $middlewareGroups = [
     'web' => [
         \App\Http\Middleware\UpdateLastSeen::class,

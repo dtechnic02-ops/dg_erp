@@ -21,6 +21,10 @@ use App\Services\InvoiceNumberService;
 use App\Services\StockService;
 use App\Services\AccountBalanceService;
 use App\Services\CustomerTransactionService;
+use App\Services\Accounting\SalesAccountingIntegrationService;
+use App\Services\Accounting\Integrations\SalesCogsAccountingIntegrationService;
+use App\Services\SalesInventoryCostService;
+use App\Services\SalesInventoryRestorationService;
 use App\Models\AccountTransaction;
 use App\Models\CustomerTransaction;
 use App\Models\StockMovement;
@@ -31,6 +35,14 @@ use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 class SalesController extends Controller
 {
     use HandlesTransactionDocumentationEdit;
+
+    public function __construct(
+        private readonly SalesAccountingIntegrationService $salesAccountingIntegrationService,
+        private readonly SalesInventoryCostService $salesInventoryCostService,
+        private readonly SalesCogsAccountingIntegrationService $salesCogsAccountingIntegrationService,
+        private readonly SalesInventoryRestorationService $salesInventoryRestorationService
+    ) {
+    }
 
 public function index(Request $request)
 {
@@ -968,7 +980,7 @@ try {
 
             $serviceId = $lineItem['service_id'];
 
-            SalesItem::create([
+            $salesItem = SalesItem::create([
 
                 'created_by' =>
                     auth()->id(),
@@ -1037,7 +1049,7 @@ try {
                     );
                 }
 
-                StockService::decrease(
+                $stockMovement = StockService::decrease(
 
     $product,
 
@@ -1052,8 +1064,17 @@ try {
     $request->sale_date
 
 );
+
+                $this->salesInventoryCostService->snapshot(
+                    $invoice,
+                    $salesItem,
+                    $stockMovement
+                );
             }
         }
+
+        $this->salesAccountingIntegrationService->postSale($invoice);
+        $this->salesCogsAccountingIntegrationService->postSaleCogs($invoice);
 
         return $invoice;
 
@@ -1304,23 +1325,11 @@ public function cancel(Request $request, $id)
                 );
             }
 
-            foreach ($invoice->items as $item)
+            foreach ($invoice->items->where('item_type', 'product')->sortBy('product_id') as $item)
             {
-                if ($item->item_type != 'product')
-                {
-                    continue;
-                }
-
-                StockService::increase(
-                    $item->product,
-                    $item->quantity,
-                    'sales_cancel',
-                    $invoice->invoice_no,
-                    $activeFy->id,
-                    $cancelBusinessDate,
-                    $item->unit_price,
-                    'Sales Cancel: ' . $cancelReason
-                );
+                $snapshot = \App\Models\SalesCostSnapshot::where('company_id', $companyId)->where('sales_item_id', $item->id)->first();
+                if (! $snapshot) throw new \Exception('The original sales cost snapshot is required to cancel this product sale.');
+                $this->salesInventoryRestorationService->restore($snapshot, $item->quantity, SalesItem::class, $item->id, 'cancelled', $invoice->invoice_no, $activeFy->id, $cancelBusinessDate, auth()->id());
             }
 
             CustomerTransactionService::deleteByReference(
@@ -1331,6 +1340,9 @@ public function cancel(Request $request, $id)
                 $activeFy->id,
                 $cancelReason
             );
+
+            $this->salesAccountingIntegrationService->reverseSale($invoice, $cancelBusinessDate, auth()->id());
+            $this->salesCogsAccountingIntegrationService->reverseSaleCogs($invoice, $cancelBusinessDate, auth()->id());
 
             $invoice->update([
                 'status' => 0,

@@ -20,6 +20,7 @@ use App\Services\InvoiceNumberService;
 use App\Services\StockService;
 use App\Services\AccountBalanceService;
 use App\Services\SupplierTransactionService;
+use App\Services\Accounting\PurchaseAccountingIntegrationService;
 use App\Models\SupplierTransaction;
 use App\Models\StockMovement;
 
@@ -29,6 +30,11 @@ use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 class PurchaseController extends Controller
 {
     use HandlesTransactionDocumentationEdit;
+
+    public function __construct(
+        private readonly PurchaseAccountingIntegrationService $purchaseAccountingIntegrationService
+    ) {
+    }
 
 public function index(Request $request)
 {
@@ -984,7 +990,7 @@ try {
 
             $serviceId = $lineItem['service_id'];
 
-            PurchaseItem::create([
+            $purchaseItem = PurchaseItem::create([
 
                 'created_by' =>
                     auth()->id(),
@@ -1060,11 +1066,15 @@ try {
 
     $activeFy->id,
 
-    $request->purchase_date
+    $request->purchase_date,
+
+    $purchaseItem->unit_price
 
 );
             }
         }
+
+        $this->purchaseAccountingIntegrationService->postPurchase($invoice);
 
         return $invoice;
 
@@ -1435,6 +1445,12 @@ public function cancel(Request $request, $id)
                 }
 
             }
+
+            $this->purchaseAccountingIntegrationService->reversePurchase(
+                $invoice,
+                $cancelBusinessDate,
+                auth()->id()
+            );
 
             $invoice->update([
                 'status' => 0,

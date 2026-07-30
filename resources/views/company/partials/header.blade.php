@@ -1,6 +1,9 @@
 @php
 $user = auth()->user();
 $pageTitle = trim($__env->yieldContent('title')) ?: 'DG ERP';
+$planCode = $headerSubscription?->plan?->code;
+$displayPlanCode = $planCode ? str_replace(['_', '-'], ' ', strtoupper($planCode)) : 'N/A';
+$subscriptionExpiry = $headerSubscription?->expiry_date;
 @endphp
 
 <header class="dg-header" role="banner">
@@ -23,6 +26,7 @@ $pageTitle = trim($__env->yieldContent('title')) ?: 'DG ERP';
                 <h1 class="dg-header-title">{{ $pageTitle }}</h1>
             @endif
         </div>
+        
 
         <div class="dg-header-end">
             <div class="dg-header-actions" aria-label="Quick actions">
@@ -30,6 +34,23 @@ $pageTitle = trim($__env->yieldContent('title')) ?: 'DG ERP';
                     @yield('header-actions')
                 @endif
             </div>
+
+            <div class="d-flex align-items-center gap-3 small" aria-label="Company status information">
+                <div class="border-start border-3 border-success ps-2 text-success-emphasis">
+                    <div>Plan : {{ $displayPlanCode }}</div>
+                    <div>Expires : {{ $headerSubscription ? ($subscriptionExpiry ? $subscriptionExpiry->format('Y-m-d') : 'Lifetime') : 'N/A' }}</div>
+                </div>
+                <div class="border-start border-3 border-danger ps-2 text-danger-emphasis text-end">
+                    {{ $headerFinancialYear ? 'FY : ' . $headerFinancialYear->name : 'No FY' }}
+                </div>
+            </div>
+
+                <div class="dg-online-staff">
+        🟢 Online Staff :
+       {{ $data['staff'] ?? 0 }}
+    </div>
+
+
 
             <div class="dg-header-notify" aria-label="Notifications">
                 <span class="dg-header-notify-icon" aria-hidden="true">🔔</span>

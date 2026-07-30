@@ -40,10 +40,16 @@ class AccountController extends Controller
             $query->where(function ($q) use ($search) {
 
                 $q->where('bank_name', 'like', "%{$search}%")
+                  ->orWhere('account_group', 'like', "%{$search}%")
                   ->orWhere('account_name', 'like', "%{$search}%")
                   ->orWhere('account_no', 'like', "%{$search}%")
                   ->orWhere('iban', 'like', "%{$search}%");
             });
+        }
+
+        if ($request->filled('account_group'))
+        {
+            $query->where('account_group', $request->account_group);
         }
 
         return $query;
@@ -52,6 +58,10 @@ class AccountController extends Controller
 
 public function index(Request $request)
 {
+
+    $accountGroups = Account::accountGroupLabels();
+
+    $accountTypes = Account::accountTypeLabels();
 
     $totalCurrentBalance = $this->filteredAccountQuery($request)
         ->sum('current_balance');
@@ -71,7 +81,9 @@ public function index(Request $request)
 
         compact(
             'accounts',
-            'totalCurrentBalance'
+            'totalCurrentBalance',
+            'accountGroups',
+            'accountTypes'
         )
 
     );
@@ -91,8 +103,13 @@ public function index(Request $request)
     {
 $request->validate([
 
-    'account_type' =>
+    'account_group' => [
         'required',
+        Rule::in(array_keys(Account::accountGroupLabels())),
+    ],
+
+    'account_type' =>
+        ['required', Rule::in(array_keys(Account::accountTypeLabels()))],
 
     'sub_ledger_type' =>
         'nullable|in:customer,supplier,employee,party',
@@ -160,6 +177,9 @@ try{
 
     'company_id' =>
         auth()->user()->company_id,
+
+    'account_group' =>
+        $request->account_group,
 
     'account_type' =>
         $request->account_type,
@@ -312,9 +332,14 @@ catch(\Exception $e){
 
        $request->validate([
 
+'account_group' => [
+    'required',
+    Rule::in(array_keys(Account::accountGroupLabels())),
+],
+
 
 'account_type' =>
-    'required',
+    ['required', Rule::in(array_keys(Account::accountTypeLabels()))],
 
 'sub_ledger_type' =>
     'nullable|in:customer,supplier,employee,party',
@@ -358,6 +383,10 @@ catch(\Exception $e){
 
 
         $data = [
+
+            'account_group' =>
+
+                $request->account_group,
 
             'account_type' =>
 
