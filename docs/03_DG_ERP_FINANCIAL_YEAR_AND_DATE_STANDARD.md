@@ -1133,5 +1133,52 @@ Dashboard
 Balances
 
 Financial Statements
+Default Financial Filters
+
+Every financial module should use the following standard filters where applicable:
+
+- Financial Year
+- Date From
+- Date To
+- Status
+- Customer (or the relevant master such as Supplier, Account, Employee, etc.)
+
+Default Values
+
+Financial Year = Active Financial Year
+
+Status = Active
+
+Customer = All
+
+Date From and Date To = User selected.
+
+Financial Year Filter
+
+The Financial Year filter shall provide:
+
+- Active Financial Year
+- All Financial Years
+
+When Active Financial Year is selected:
+
+- Only records belonging to the Active Financial Year shall be displayed.
+
+When All Financial Years is selected:
+
+- Records from all Financial Years may be displayed.
+- Date From and Date To shall determine the reporting period across Financial Years.
+
+Status Filter
+
+Status shall provide:
+
+- Active
+- Cancelled
+- All
+
+Default Status = Active.
+
+Filtering shall always use the module's Business Date.
 
 END OF DOCUMENT

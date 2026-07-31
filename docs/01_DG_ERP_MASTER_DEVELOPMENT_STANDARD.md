@@ -265,6 +265,34 @@ Every module must implement Cancel.
 Never implement Delete unless explicitly approved by the Constitution.
 
 =========================================================
+MASTER RECORD DELETE RULE
+=========================================================
+
+Master records may be physically deleted ONLY when they have never been referenced by any other record.
+
+Examples:
+
+- Customer with no Sales, Payment, Loan or other transactions.
+- Supplier with no Purchase or Payment.
+- Product with no Purchase, Sales, Return or Stock Movement.
+- Service with no transaction.
+- Employee with no related business records.
+
+If a master record has been referenced anywhere in the system:
+
+Physical Delete = PROHIBITED
+
+Use:
+
+- Cancel
+or
+- Inactive
+
+The record must remain available for history, audit, reporting and referential integrity.
+
+This rule applies to every master module in DG ERP.
+
+=========================================================
 NAMING RULE
 =========================================================
 
