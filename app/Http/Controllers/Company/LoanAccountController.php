@@ -15,6 +15,8 @@ use App\Models\PartyAccount;
 use App\Models\AccountTransaction;
 use App\Services\AccountBalanceService;
 use App\Services\ValidationService;
+use App\Services\Money;
+use App\Services\Accounting\Integrations\LoanAccountingIntegrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -45,12 +47,13 @@ class LoanAccountController extends Controller implements HasMiddleware
             'status'            => ValidationService::enum(['0', '1', 0, 1]),
             'attachment'        => ValidationService::document(5120),
             'note'              => ValidationService::text(),
+            'request_key'       => $isUpdate ? 'nullable|uuid' : 'required|uuid',
         ];
 
         if (!$isUpdate) {
             $rules = array_merge($rules, [
                 'loan_name'        => ValidationService::requiredString(255),
-                'loan_type'        => ValidationService::requiredEnum(['taken', 'given']),
+                'loan_type'        => ValidationService::requiredEnum([LoanAccount::TYPE_TAKEN, LoanAccount::TYPE_GIVEN]),
                 'party_account_id' => [
                     'required',
                     'integer',
@@ -146,6 +149,8 @@ class LoanAccountController extends Controller implements HasMiddleware
                 'cancelled' => $query->where('status', LoanAccount::STATUS_CANCELLED),
                 default => null,
             };
+        } else {
+            $query->where('status', LoanAccount::STATUS_ACTIVE);
         }
 
         if ($request->filled('date_from')) {
@@ -264,6 +269,10 @@ class LoanAccountController extends Controller implements HasMiddleware
             DB::transaction(function () use ($request, $companyId) {
                 $activeFy = $this->assertActiveFinancialYear($companyId);
 
+                if (LoanAccount::where('company_id', $companyId)->where('request_key', $request->request_key)->lockForUpdate()->exists()) {
+                    throw new \Exception('This Loan request has already been processed.');
+                }
+
                 if ((int) $request->financial_year_id !== (int) $activeFy->id) {
                     throw new \Exception('Financial year must be the active financial year.');
                 }
@@ -275,9 +284,11 @@ class LoanAccountController extends Controller implements HasMiddleware
                 );
 
                 $account = Account::where('company_id', $companyId)
+                    ->lockForUpdate()
                     ->findOrFail($request->account_id);
 
                 $party = PartyAccount::where('company_id', $companyId)
+                    ->lockForUpdate()
                     ->findOrFail($request->party_account_id);
 
                 $file = null;
@@ -310,6 +321,7 @@ class LoanAccountController extends Controller implements HasMiddleware
                     'company_id'          => $companyId,
                     'financial_year_id'   => $activeFy->id,
                     'loan_no'             => $loanNo,
+                    'request_key'         => $request->request_key,
                     'loan_name'           => $request->loan_name,
                     'loan_type'           => $request->loan_type,
                     'party_account_id'    => $request->party_account_id,
@@ -323,12 +335,12 @@ class LoanAccountController extends Controller implements HasMiddleware
                     'attachment'          => $file,
                     'note'                => $request->note,
                     'created_by'          => auth()->id(),
-                    'status'              => (int) ($request->status ?? LoanAccount::STATUS_ACTIVE),
+                    'status'              => LoanAccount::STATUS_ACTIVE,
                 ]);
 
-                $principal = (float) $request->principal_amount;
+                $principal = Money::normalize($request->principal_amount);
 
-                if ($request->loan_type == 'taken') {
+                if ($request->loan_type === LoanAccount::TYPE_TAKEN) {
                     $account->increment(
                         'current_balance',
                         $principal
@@ -353,7 +365,7 @@ class LoanAccountController extends Controller implements HasMiddleware
                         'created_by'        => auth()->id(),
                     ], false);
                 } else {
-                    if ((float) $account->current_balance < $principal) {
+                    if (Money::compare($account->current_balance, $principal) < 0) {
                         throw new \Exception('Insufficient balance.');
                     }
 
@@ -381,6 +393,8 @@ class LoanAccountController extends Controller implements HasMiddleware
                         'created_by'        => auth()->id(),
                     ], false);
                 }
+
+                app(LoanAccountingIntegrationService::class)->postLoanCreation($loan->fresh(['account']));
             });
         } catch (\Exception $e) {
             return back()
@@ -411,12 +425,12 @@ class LoanAccountController extends Controller implements HasMiddleware
 
         $totalSavingDeposit = $loan->savingLedgers()
             ->active()
-            ->where('type', 'deposit')
+            ->where('type', LoanSavingLedger::TYPE_DEPOSIT)
             ->sum('amount');
 
         $totalSavingWithdraw = $loan->savingLedgers()
             ->active()
-            ->where('type', 'withdraw')
+            ->where('type', LoanSavingLedger::TYPE_WITHDRAW)
             ->sum('amount');
 
         $currentSavingBalance = $loan->savingLedgers()
@@ -518,11 +532,12 @@ class LoanAccountController extends Controller implements HasMiddleware
             return false;
         }
 
-        if ($loan->savingLedgers()->active()->exists()) {
+        $savingBalance = $loan->savingLedgers()->active()->latest('id')->value('balance_after') ?? '0.00';
+        if (Money::compare($savingBalance, '0.00') !== 0) {
             return false;
         }
 
-        if ((float) $loan->remaining_principal !== (float) $loan->principal_amount) {
+        if (Money::compare($loan->remaining_principal, $loan->principal_amount) !== 0) {
             return false;
         }
 
@@ -546,13 +561,14 @@ class LoanAccountController extends Controller implements HasMiddleware
             throw new \Exception('Only active loans can be cancelled.');
         }
 
-        if ($loan->savingLedgers()->active()->exists()) {
+        $savingBalance = $loan->savingLedgers()->active()->latest('id')->value('balance_after') ?? '0.00';
+        if (Money::compare($savingBalance, '0.00') !== 0) {
             throw new \Exception(
                 'Loan cannot be cancelled because active saving ledger entries exist.'
             );
         }
 
-        if ((float) $loan->remaining_principal !== (float) $loan->principal_amount) {
+        if (Money::compare($loan->remaining_principal, $loan->principal_amount) !== 0) {
             throw new \Exception(
                 'Loan cannot be cancelled because the remaining principal differs from the original principal amount.'
             );
@@ -561,7 +577,7 @@ class LoanAccountController extends Controller implements HasMiddleware
 
     private function reverseLoanBalances(LoanAccount $loan, int $companyId): void
     {
-        $principal = (float) $loan->principal_amount;
+        $principal = Money::normalize($loan->principal_amount);
 
         $account = Account::where('company_id', $companyId)
             ->lockForUpdate()
@@ -571,16 +587,16 @@ class LoanAccountController extends Controller implements HasMiddleware
             ->lockForUpdate()
             ->findOrFail($loan->party_account_id);
 
-        if ($loan->loan_type === 'given') {
+        if ($loan->loan_type === LoanAccount::TYPE_GIVEN) {
             $account->increment('current_balance', $principal);
 
-            if ((float) $party->current_balance < $principal) {
+            if (Money::compare($party->current_balance, $principal) < 0) {
                 throw new \Exception('Insufficient party balance to cancel this loan.');
             }
 
             $party->decrement('current_balance', $principal);
         } else {
-            if ((float) $account->current_balance < $principal) {
+            if (Money::compare($account->current_balance, $principal) < 0) {
                 throw new \Exception('Insufficient account balance to cancel this loan.');
             }
 
@@ -589,11 +605,16 @@ class LoanAccountController extends Controller implements HasMiddleware
         }
     }
 
-    public function cancel($id)
+    public function cancel(Request $request, $id)
     {
         $this->authorizeCompanyPermission('cancel_loan_account');
 
         $companyId = auth()->user()->company_id;
+
+        $request->validate([
+            'cancel_date' => ValidationService::cancelDate(),
+            'cancel_reason' => ValidationService::cancelReason(),
+        ]);
 
         $loan = LoanAccount::where('company_id', $companyId)
             ->findOrFail($id);
@@ -605,35 +626,40 @@ class LoanAccountController extends Controller implements HasMiddleware
         }
 
         try {
-            DB::transaction(function () use ($loan, $companyId) {
+            DB::transaction(function () use ($request, $loan, $companyId) {
+                $activeFy = $this->assertActiveFinancialYear($companyId);
+                $this->assertDateWithinFinancialYear($request->cancel_date, $activeFy, 'Cancel date must belong to the active financial year.');
                 $lockedLoan = LoanAccount::where('company_id', $companyId)
                     ->lockForUpdate()
                     ->findOrFail($loan->id);
 
                 $this->assertLoanCanBeCancelled($lockedLoan);
 
+                $this->assertTransactionFinancialYear($lockedLoan, $activeFy, 'Only a Loan in the active financial year may be cancelled.');
+
+                $accountTransaction = $this->strictOriginalAccountTransaction($lockedLoan, $companyId);
+
                 $this->reverseLoanBalances($lockedLoan, $companyId);
 
-                $accountTransaction = AccountTransaction::where('company_id', $companyId)
-                    ->where('reference_type', 'LoanAccount')
-                    ->where('reference_id', $lockedLoan->id)
-                    ->where('status', 1)
-                    ->first();
+                AccountBalanceService::reverseTransaction(
+                    $accountTransaction,
+                    'loan_account_cancel',
+                    'Loan Account Cancel',
+                    $request->cancel_date,
+                    (int) $activeFy->id
+                );
 
-                if ($accountTransaction) {
-                    AccountBalanceService::reverseTransaction(
-                        $accountTransaction,
-                        'loan_account_cancel',
-                        'Loan Account Cancel',
-                        now()->toDateString(),
-                        (int) $lockedLoan->financial_year_id
-                    );
-                }
+                app(LoanAccountingIntegrationService::class)->reverse(
+                    'loan_account', $lockedLoan->id, $companyId, (int) $activeFy->id,
+                    $request->cancel_date, LoanAccount::EVENT_CREATED, $lockedLoan->loan_no, auth()->id()
+                );
 
                 $lockedLoan->update([
                     'status'       => LoanAccount::STATUS_CANCELLED,
                     'cancelled_by' => auth()->id(),
-                    'cancelled_at' => now(),
+                    'cancelled_at' => $request->cancel_date,
+                    'cancel_reason' => trim($request->cancel_reason),
+                    'note' => trim(($lockedLoan->note ?? '') . ' [Cancelled: ' . trim($request->cancel_reason) . ']'),
                     'updated_by'   => auth()->id(),
                 ]);
             });
@@ -644,5 +670,33 @@ class LoanAccountController extends Controller implements HasMiddleware
         return redirect()
             ->route('company.loan-account.show', $loan->id)
             ->with('success', 'Loan cancelled.');
+    }
+
+    private function strictOriginalAccountTransaction(LoanAccount $loan, int $companyId): AccountTransaction
+    {
+        $transactions = AccountTransaction::where('company_id', $companyId)
+            ->where('reference_type', 'LoanAccount')
+            ->where('reference_id', $loan->id)
+            ->where('status', 1)
+            ->whereNull('reversed_transaction_id')
+            ->lockForUpdate()
+            ->get();
+
+        if ($transactions->count() !== 1) {
+            throw new \RuntimeException('Loan cancellation integrity error: exactly one active original Cash/Bank transaction is required.');
+        }
+
+        $transaction = $transactions->first();
+        $amount = Money::normalize($loan->principal_amount);
+        $expectedDebit = $loan->loan_type === LoanAccount::TYPE_TAKEN ? $amount : '0.00';
+        $expectedCredit = $loan->loan_type === LoanAccount::TYPE_GIVEN ? $amount : '0.00';
+
+        if ((int) $transaction->account_id !== (int) $loan->account_id
+            || Money::compare($transaction->debit, $expectedDebit) !== 0
+            || Money::compare($transaction->credit, $expectedCredit) !== 0) {
+            throw new \RuntimeException('Loan cancellation integrity error: the original Cash/Bank transaction does not match the Loan source.');
+        }
+
+        return $transaction;
     }
 }

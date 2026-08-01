@@ -64,6 +64,7 @@
                 id="loanPaymentForm">
 
                 @csrf
+                <input type="hidden" name="request_key" value="{{ old('request_key', (string) \Illuminate\Support\Str::uuid()) }}">
                 <input type="hidden" name="loan_account_id" value="{{ $loan->id }}">
                 @if ($activeFy)
                     <input type="hidden" name="financial_year_id" value="{{ $activeFy->id }}">
@@ -112,7 +113,7 @@
                                 <div class="col-md-12">
                                     <label class="form-label dg-label d-block">Payment Source</label>
                                     <div class="d-flex flex-wrap gap-3">
-                                        <div class="form-check">
+                                        <div class="form-check" @if ($loan->loan_type !== \App\Models\LoanAccount::TYPE_TAKEN) hidden @endif>
                                             <input class="form-check-input" type="radio" name="payment_source" id="payment_source_account" value="account" @checked(old('payment_source', 'account') === 'account')>
                                             <label class="form-check-label" for="payment_source_account">Account</label>
                                         </div>
@@ -143,7 +144,7 @@
                                     <input type="number" step="0.01" min="0" name="fine_amount" id="fine_amount" value="{{ old('fine_amount', 0) }}" class="form-control dg-input payment-amount-field">
                                 </div>
 
-                                <div class="col-md-2" id="savingAmountWrap">
+                                <div class="col-md-2" id="savingAmountWrap" @if ($loan->loan_type !== \App\Models\LoanAccount::TYPE_TAKEN) hidden @endif>
                                     <label for="saving_amount" class="form-label dg-label">Saving</label>
                                     <input type="number" step="0.01" min="0" name="saving_amount" id="saving_amount" value="{{ old('saving_amount', 0) }}" class="form-control dg-input payment-amount-field">
                                 </div>

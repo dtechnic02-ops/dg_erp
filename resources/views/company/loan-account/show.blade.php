@@ -31,6 +31,10 @@
                     @if ($canCancelPermission && $canCancel)
                         <form method="POST" action="{{ route('company.loan-account.cancel', $loan->id) }}" class="d-inline" onsubmit="return confirm('Cancel this loan account? This will reverse the original loan balances.')">
                             @csrf
+                            <label class="visually-hidden" for="loan_cancel_date">Cancel Date</label>
+                            <input type="date" id="loan_cancel_date" name="cancel_date" value="{{ old('cancel_date', date('Y-m-d')) }}" required class="form-control form-control-sm d-inline-block w-auto">
+                            <label class="visually-hidden" for="loan_cancel_reason">Cancel Reason</label>
+                            <input type="text" id="loan_cancel_reason" name="cancel_reason" value="{{ old('cancel_reason') }}" required maxlength="500" placeholder="Cancel reason" class="form-control form-control-sm d-inline-block w-auto">
                             <button type="submit" class="btn btn-outline-danger dg-btn">Cancel Loan</button>
                         </form>
                     @endif
@@ -175,6 +179,10 @@
                                         <div class="dg-row">
                                             <span class="dg-label d-inline mb-0">Cancelled At :</span>
                                             {{ optional($loan->cancelled_at)->format('d-m-Y H:i') ?: '-' }}
+                                        </div>
+                                        <div class="dg-summary-bar-item">
+                                            <span class="dg-label d-inline mb-0">Cancel Reason :</span>
+                                            {{ $loan->cancel_reason ?? '-' }}
                                         </div>
                                     </div>
                                 @endif

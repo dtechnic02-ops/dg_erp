@@ -11,6 +11,7 @@ use App\Models\LoanAccount;
 use App\Models\LoanSavingLedger;
 use App\Models\PartyAccount;
 use Illuminate\Http\Request;
+use App\Services\Money;
 
 class LoanSavingLedgerController extends Controller implements HasMiddleware
 {
@@ -36,6 +37,12 @@ class LoanSavingLedgerController extends Controller implements HasMiddleware
             'account:id,company_id,account_name',
             'createdBy:id,name',
         ])->where('company_id', $companyId);
+
+        if ($request->status === 'cancelled') {
+            $query->where('status', LoanSavingLedger::STATUS_INACTIVE);
+        } elseif ($request->status !== 'all') {
+            $query->active();
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -96,9 +103,15 @@ class LoanSavingLedgerController extends Controller implements HasMiddleware
         $summaryQuery = (clone $filteredQuery)->active();
 
         $totalEntries = (clone $summaryQuery)->count();
-        $totalDeposit = (clone $summaryQuery)->where('type', 'deposit')->sum('amount');
-        $totalWithdraw = (clone $summaryQuery)->where('type', 'withdraw')->sum('amount');
-        $netBalance = (float) $totalDeposit - (float) $totalWithdraw;
+        $totalDeposit = (clone $summaryQuery)->where('type', LoanSavingLedger::TYPE_DEPOSIT)->sum('amount');
+        $totalWithdraw = (clone $summaryQuery)->whereIn('type', [LoanSavingLedger::TYPE_WITHDRAW, LoanSavingLedger::TYPE_LOAN_SETTLEMENT])->sum('amount');
+        $latestBalances = LoanSavingLedger::where('company_id', $companyId)
+            ->active()->orderBy('id')->get(['loan_account_id', 'balance_after'])
+            ->groupBy('loan_account_id')->map(fn ($entries) => $entries->last()->balance_after);
+        $netBalance = '0.00';
+        foreach ($latestBalances as $balance) {
+            $netBalance = Money::add($netBalance, $balance);
+        }
 
         $allowedPerPage = [10, 20, 50, 100, 200];
         $perPage = (int) $request->get('per_page', 10);

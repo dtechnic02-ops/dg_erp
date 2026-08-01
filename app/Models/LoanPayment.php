@@ -12,6 +12,9 @@ class LoanPayment extends Model
     public const STATUS_CANCELLED = 0;
 
     public const STATUS_ACTIVE = 1;
+    public const SOURCE_ACCOUNT = 'account';
+    public const SOURCE_SAVING = 'saving';
+    public const EVENT_CREATED = 'created';
 
     protected $fillable = [
         'company_id',
@@ -27,6 +30,7 @@ class LoanPayment extends Model
         'total_amount',
         'remaining_principal',
         'reference_no',
+        'request_key',
         'attachment',
         'note',
         'created_by',
@@ -115,12 +119,12 @@ class LoanPayment extends Model
         if ($this->relationLoaded('savingLedgers')) {
             return $this->savingLedgers
                 ->where('status', 1)
-                ->contains('type', 'withdraw');
+                ->contains('type', LoanSavingLedger::TYPE_LOAN_SETTLEMENT);
         }
 
         return $this->savingLedgers()
             ->where('status', 1)
-            ->where('type', 'withdraw')
+            ->where('type', LoanSavingLedger::TYPE_LOAN_SETTLEMENT)
             ->exists();
     }
 }

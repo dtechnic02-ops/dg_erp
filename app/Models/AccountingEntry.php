@@ -14,6 +14,7 @@ class AccountingEntry extends Model
 
     protected $fillable = [
         'company_id',
+        'financial_year_id',
         'entry_number',
         'entry_date',
         'reference_number',
@@ -37,6 +38,7 @@ class AccountingEntry extends Model
             'entry_date' => 'date',
             'posted_at' => 'datetime',
             'source_id' => 'integer',
+            'financial_year_id' => 'integer',
             'reversal_of_id' => 'integer',
         ];
     }

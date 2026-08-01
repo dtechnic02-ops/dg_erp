@@ -7,6 +7,7 @@ use App\Models\AccountingEntry;
 use App\Models\ChartAccount;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
@@ -16,6 +17,7 @@ class AccountingPostingService
     public function post(array $data): AccountingEntry
     {
         $companyId = $this->positiveInteger($data['company_id'] ?? null, 'company_id');
+        $financialYearId = $this->nullablePositiveInteger($data['financial_year_id'] ?? null, 'financial_year_id');
         $entryDate = $this->entryDate($data['entry_date'] ?? null);
         $sourceModule = $this->requiredString($data, 'source_module');
         $sourceType = $this->requiredString($data, 'source_type');
@@ -34,6 +36,7 @@ class AccountingPostingService
 
         return DB::transaction(function () use (
             $companyId,
+            $financialYearId,
             $entryDate,
             $sourceModule,
             $sourceType,
@@ -62,7 +65,7 @@ class AccountingPostingService
             $chartAccountIds = $this->resolveChartAccounts($companyId, $normalizedLines);
             $this->resolveOperationalAccounts($companyId, $normalizedLines);
 
-            $entry = AccountingEntry::create([
+            $entryData = [
                 'company_id' => $companyId,
                 'entry_number' => 'TMP-' . Str::uuid()->toString(),
                 'entry_date' => $entryDate,
@@ -76,7 +79,11 @@ class AccountingPostingService
                 'status' => 'posted',
                 'posted_at' => now(),
                 'posted_by' => $postedBy,
-            ]);
+            ];
+            if ($financialYearId !== null && Schema::hasColumn('accounting_entries', 'financial_year_id')) {
+                $entryData['financial_year_id'] = $financialYearId;
+            }
+            $entry = AccountingEntry::create($entryData);
 
             foreach ($normalizedLines as $lineNumber => $line) {
                 $entry->lines()->create([
@@ -98,6 +105,7 @@ class AccountingPostingService
     public function reverseBySource(array $data): AccountingEntry
     {
         $companyId = $this->positiveInteger($data['company_id'] ?? null, 'company_id');
+        $financialYearId = $this->nullablePositiveInteger($data['financial_year_id'] ?? null, 'financial_year_id');
         $entryDate = $this->entryDate($data['entry_date'] ?? null);
         $originalSourceKey = $this->requiredString($data, 'original_source_key');
         $reversalSourceKey = $this->requiredString($data, 'reversal_source_key');
@@ -109,7 +117,7 @@ class AccountingPostingService
         $originalSourceTypes = $this->sourceTypeAliases($data['original_source_types'] ?? [], $sourceType);
         $postedBy = $this->nullablePositiveInteger($data['posted_by'] ?? null, 'posted_by');
 
-        return DB::transaction(function () use ($companyId, $entryDate, $originalSourceKey, $reversalSourceKey, $sourceModule, $sourceType, $sourceId, $sourceEvent, $originalSourceEvent, $originalSourceTypes, $postedBy, $data): AccountingEntry {
+        return DB::transaction(function () use ($companyId, $financialYearId, $entryDate, $originalSourceKey, $reversalSourceKey, $sourceModule, $sourceType, $sourceId, $sourceEvent, $originalSourceEvent, $originalSourceTypes, $postedBy, $data): AccountingEntry {
             $original = AccountingEntry::query()
                 ->forCompany($companyId)
                 ->where('source_key', $originalSourceKey)
@@ -134,7 +142,7 @@ class AccountingPostingService
                 throw new RuntimeException('The original accounting entry has no lines to reverse.');
             }
 
-            $reversal = AccountingEntry::create([
+            $reversalData = [
                 'company_id' => $companyId,
                 'entry_number' => 'TMP-' . Str::uuid()->toString(),
                 'entry_date' => $entryDate,
@@ -149,7 +157,11 @@ class AccountingPostingService
                 'reversal_of_id' => $original->id,
                 'posted_at' => now(),
                 'posted_by' => $postedBy,
-            ]);
+            ];
+            if ($financialYearId !== null && Schema::hasColumn('accounting_entries', 'financial_year_id')) {
+                $reversalData['financial_year_id'] = $financialYearId;
+            }
+            $reversal = AccountingEntry::create($reversalData);
 
             foreach ($original->lines as $line) {
                 $reversal->lines()->create([

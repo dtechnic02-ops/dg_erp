@@ -38,6 +38,7 @@ action="{{ route(
 ) }}">
 
 @csrf
+<input type="hidden" name="request_key" value="{{ old('request_key', (string) \Illuminate\Support\Str::uuid()) }}">
 
 <input type="hidden" name="loan_account_id" value="{{ $loan->id }}">
 @if ($activeFy ?? null)

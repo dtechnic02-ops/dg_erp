@@ -16,6 +16,8 @@ use App\Models\LoanSavingLedger;
 use App\Models\PartyAccount;
 use App\Services\AccountBalanceService;
 use App\Services\ValidationService;
+use App\Services\Money;
+use App\Services\Accounting\Integrations\LoanAccountingIntegrationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -90,11 +92,11 @@ class LoanPaymentController extends Controller implements HasMiddleware
         if ($request->filled('payment_source')) {
             if ($request->payment_source === 'saving') {
                 $query->whereHas('savingLedgers', function ($ledgerQuery) {
-                    $ledgerQuery->active()->where('type', 'withdraw');
+                    $ledgerQuery->active()->where('type', LoanSavingLedger::TYPE_LOAN_SETTLEMENT);
                 });
             } elseif ($request->payment_source === 'account') {
                 $query->whereDoesntHave('savingLedgers', function ($ledgerQuery) {
-                    $ledgerQuery->active()->where('type', 'withdraw');
+                    $ledgerQuery->active()->where('type', LoanSavingLedger::TYPE_LOAN_SETTLEMENT);
                 });
             }
         }
@@ -117,6 +119,8 @@ class LoanPaymentController extends Controller implements HasMiddleware
             } elseif ($request->status === 'cancelled') {
                 $query->where('status', LoanPayment::STATUS_CANCELLED);
             }
+        } else {
+            $query->where('status', LoanPayment::STATUS_ACTIVE);
         }
 
         return $query->latest('payment_date')->latest('id');
@@ -170,14 +174,14 @@ class LoanPaymentController extends Controller implements HasMiddleware
                 'integer',
                 ValidationService::existsForCompany('accounts', $companyId),
             ],
-            'payment_date' => ValidationService::requiredDate(),
             'next_payment_date' => ValidationService::date(),
-            'principal_amount' => 'required|numeric|min:0.01',
+            'principal_amount' => 'required|numeric|min:0',
             'interest_amount' => ValidationService::amount(),
             'fine_amount' => ValidationService::amount(),
             'saving_amount' => ValidationService::amount(),
             'attachment' => ValidationService::document(5120),
             'note' => ValidationService::text(),
+            'request_key' => 'required|uuid',
         ]);
     }
 
@@ -297,15 +301,13 @@ class LoanPaymentController extends Controller implements HasMiddleware
                 $companyId = auth()->user()->company_id;
                 $activeFy = $this->assertActiveFinancialYear($companyId);
 
+                if (LoanPayment::where('company_id', $companyId)->where('request_key', $request->request_key)->lockForUpdate()->exists()) {
+                    throw new \Exception('This Loan payment request has already been processed.');
+                }
+
                 if ((int) $request->financial_year_id !== (int) $activeFy->id) {
                     throw new \Exception('Financial year must be the active financial year.');
                 }
-
-                $this->assertDateWithinFinancialYear(
-                    $request->payment_date,
-                    $activeFy,
-                    'Payment date must be inside the active financial year.'
-                );
 
                 if ($request->filled('next_payment_date')) {
                     $this->assertDateWithinFinancialYear(
@@ -320,23 +322,33 @@ class LoanPaymentController extends Controller implements HasMiddleware
                     ->lockForUpdate()
                     ->findOrFail($request->loan_account_id);
 
+                if (! $loan->isActive() || Money::compare($loan->remaining_principal, '0.00') <= 0) {
+                    throw new \Exception('Payment is allowed only for an active eligible Loan.');
+                }
+
                 $party = $loan->partyAccount;
 
                 if (!$party) {
                     throw new \Exception('Party account not found for this loan.');
                 }
 
-                if ((float) $request->principal_amount > (float) $loan->remaining_principal) {
+                if (Money::compare($request->principal_amount, $loan->remaining_principal) > 0) {
                     throw new \Exception('Principal exceeds remaining.');
                 }
 
-                $principal = (float) $request->principal_amount;
-                $interest = (float) ($request->interest_amount ?? 0);
-                $fine = (float) ($request->fine_amount ?? 0);
-                $savingAmount = (float) ($request->saving_amount ?? 0);
+                $principal = Money::normalize($request->principal_amount);
+                $interest = Money::normalize($request->interest_amount ?? '0');
+                $fine = Money::normalize($request->fine_amount ?? '0');
+                $savingAmount = Money::normalize($request->saving_amount ?? '0');
+                if (Money::isZero(Money::add($principal, $interest, $fine, $savingAmount))) {
+                    throw new \Exception('At least one payment component must be greater than zero.');
+                }
+                if ($loan->loan_type === LoanAccount::TYPE_GIVEN && ($paymentSource === LoanPayment::SOURCE_SAVING || ! Money::isZero($savingAmount))) {
+                    throw new \Exception('Saving functionality is available only for Loan Taken.');
+                }
                 $referenceNo = $this->generatePaymentReference($companyId, $activeFy);
                 $file = $this->storeAttachment($request, $companyId);
-                $newRemaining = (float) $loan->remaining_principal - $principal;
+                $newRemaining = Money::subtract($loan->remaining_principal, $principal);
 
                 if ($paymentSource === 'saving') {
                     $paymentId = $this->storeSavingWithdrawPayment(
@@ -351,6 +363,10 @@ class LoanPaymentController extends Controller implements HasMiddleware
                         $fine,
                         $newRemaining,
                         $file
+                    );
+
+                    app(LoanAccountingIntegrationService::class)->postPayment(
+                        LoanPayment::with(['loanAccount', 'account', 'savingLedgers'])->findOrFail($paymentId)
                     );
 
                     return;
@@ -369,6 +385,10 @@ class LoanPaymentController extends Controller implements HasMiddleware
                     $savingAmount,
                     $newRemaining,
                     $file
+                );
+
+                app(LoanAccountingIntegrationService::class)->postPayment(
+                    LoanPayment::with(['loanAccount', 'account', 'savingLedgers'])->findOrFail($paymentId)
                 );
             });
         } catch (\Exception $exception) {
@@ -467,21 +487,15 @@ class LoanPaymentController extends Controller implements HasMiddleware
                     $file = $this->storeAttachment($request, $companyId);
                 }
 
-                $paymentDate = Carbon::parse($request->payment_date)->toDateString();
                 $nextPaymentDate = $request->filled('next_payment_date')
                     ? Carbon::parse($request->next_payment_date)->toDateString()
                     : $payment->next_payment_date;
 
                 $payment->update($this->appendUpdatedBy([
-                    'payment_date' => $paymentDate,
                     'next_payment_date' => $nextPaymentDate,
                     'attachment' => $file,
                     'note' => $request->note,
                 ], $payment));
-
-                $payment->savingLedgers()
-                    ->active()
-                    ->update(['date' => $paymentDate]);
 
                 if ($nextPaymentDate) {
                     LoanAccount::where('company_id', $companyId)
@@ -534,7 +548,12 @@ class LoanPaymentController extends Controller implements HasMiddleware
                     throw new \Exception('Payment already cancelled.');
                 }
 
+                $this->assertTransactionFinancialYear($payment, $activeFy, 'Only a payment in the active financial year may be cancelled.');
                 $this->reversePaymentEffects($payment, $companyId, $cancelDate, $cancelReason);
+                app(LoanAccountingIntegrationService::class)->reverse(
+                    'loan_payment', $payment->id, $companyId, (int) $activeFy->id, $cancelDate,
+                    LoanPayment::EVENT_CREATED, $payment->reference_no, auth()->id()
+                );
 
                 $payment->update([
                     'status' => LoanPayment::STATUS_CANCELLED,
@@ -581,8 +600,8 @@ class LoanPaymentController extends Controller implements HasMiddleware
             ->lockForUpdate()
             ->findOrFail($loan->party_account_id);
 
-        $principal = (float) $payment->principal_amount;
-        $newRemaining = (float) $loan->remaining_principal + $principal;
+        $principal = Money::normalize($payment->principal_amount);
+        $newRemaining = Money::add($loan->remaining_principal, $principal);
 
         $loanData = [
             'remaining_principal' => $newRemaining,
@@ -612,54 +631,81 @@ class LoanPaymentController extends Controller implements HasMiddleware
         string $cancelDate,
         string $cancelReason
     ): void {
-        $total = (float) $payment->total_amount;
-        $savingAmount = (float) $payment->saving_amount;
+        $total = Money::normalize($payment->total_amount);
+        $savingAmount = Money::normalize($payment->saving_amount);
 
         if ($payment->account_id) {
+            $accountTransaction = $this->strictOriginalAccountTransaction($payment, $loan, $companyId);
+
             $account = Account::where('company_id', $companyId)
                 ->lockForUpdate()
                 ->findOrFail($payment->account_id);
 
-            if ($loan->loan_type === 'taken') {
+            if ($loan->loan_type === LoanAccount::TYPE_TAKEN) {
                 $account->increment('current_balance', $total);
             } else {
-                if ((float) $account->current_balance < $total) {
+                if (Money::compare($account->current_balance, $total) < 0) {
                     throw new \Exception('Insufficient account balance to reverse payment.');
                 }
 
                 $account->decrement('current_balance', $total);
             }
 
-            $accountTransaction = AccountTransaction::where('company_id', $companyId)
-                ->where('reference_type', 'LoanPayment')
-                ->where('reference_id', $payment->id)
-                ->where('status', 1)
-                ->first();
-
-            if ($accountTransaction) {
-                AccountBalanceService::reverseTransaction(
-                    $accountTransaction,
-                    'loan_payment_cancel',
-                    'Loan Payment Cancel: ' . $cancelReason,
-                    $cancelDate,
-                    (int) $payment->financial_year_id
-                );
-            }
+            AccountBalanceService::reverseTransaction(
+                $accountTransaction,
+                'loan_payment_cancel',
+                'Loan Payment Cancel: ' . $cancelReason,
+                $cancelDate,
+                (int) $payment->financial_year_id
+            );
         }
 
-        if ($savingAmount > 0) {
+        if (! Money::isZero($savingAmount)) {
+            $originalLedgerIds = $payment->savingLedgers()->active()->pluck('id');
+
             $this->createSavingLedgerReversal(
                 $payment,
                 $loan,
                 $companyId,
-                'withdraw',
+                LoanSavingLedger::TYPE_WITHDRAW,
                 $savingAmount,
                 $cancelDate,
                 'Saving deposit reversed: ' . $cancelReason
             );
+            LoanSavingLedger::whereIn('id', $originalLedgerIds)->update(['status' => LoanSavingLedger::STATUS_INACTIVE]);
         }
 
-        $payment->savingLedgers()->active()->update(['status' => LoanSavingLedger::STATUS_INACTIVE]);
+    }
+
+    private function strictOriginalAccountTransaction(
+        LoanPayment $payment,
+        LoanAccount $loan,
+        int $companyId
+    ): AccountTransaction {
+        $transactions = AccountTransaction::where('company_id', $companyId)
+            ->where('reference_type', 'LoanPayment')
+            ->where('reference_id', $payment->id)
+            ->where('status', 1)
+            ->whereNull('reversed_transaction_id')
+            ->lockForUpdate()
+            ->get();
+
+        if ($transactions->count() !== 1) {
+            throw new \RuntimeException('Loan payment cancellation integrity error: exactly one active original Cash/Bank transaction is required.');
+        }
+
+        $transaction = $transactions->first();
+        $amount = Money::normalize($payment->total_amount);
+        $expectedDebit = $loan->loan_type === LoanAccount::TYPE_GIVEN ? $amount : '0.00';
+        $expectedCredit = $loan->loan_type === LoanAccount::TYPE_TAKEN ? $amount : '0.00';
+
+        if ((int) $transaction->account_id !== (int) $payment->account_id
+            || Money::compare($transaction->debit, $expectedDebit) !== 0
+            || Money::compare($transaction->credit, $expectedCredit) !== 0) {
+            throw new \RuntimeException('Loan payment cancellation integrity error: the original Cash/Bank transaction does not match the payment source.');
+        }
+
+        return $transaction;
     }
 
     private function reverseSavingWithdrawPayment(
@@ -669,17 +715,19 @@ class LoanPaymentController extends Controller implements HasMiddleware
         string $cancelDate,
         string $cancelReason
     ): void {
+        $originalLedgerIds = $payment->savingLedgers()->active()->pluck('id');
+
         $this->createSavingLedgerReversal(
             $payment,
             $loan,
             $companyId,
-            'deposit',
-            (float) $payment->total_amount,
+            LoanSavingLedger::TYPE_DEPOSIT,
+            Money::normalize($payment->total_amount),
             $cancelDate,
             'Saving withdraw reversed: ' . $cancelReason
         );
+        LoanSavingLedger::whereIn('id', $originalLedgerIds)->update(['status' => LoanSavingLedger::STATUS_INACTIVE]);
 
-        $payment->savingLedgers()->active()->update(['status' => LoanSavingLedger::STATUS_INACTIVE]);
     }
 
     private function createSavingLedgerReversal(
@@ -687,7 +735,7 @@ class LoanPaymentController extends Controller implements HasMiddleware
         LoanAccount $loan,
         int $companyId,
         string $type,
-        float $amount,
+        string $amount,
         string $date,
         string $note
     ): void {
@@ -697,13 +745,13 @@ class LoanPaymentController extends Controller implements HasMiddleware
             ->latest('id')
             ->value('balance_after') ?? 0;
 
-        if ($type === 'withdraw' && $amount > (float) $currentSaving) {
+        if ($type === LoanSavingLedger::TYPE_WITHDRAW && Money::compare($amount, $currentSaving) > 0) {
             throw new \Exception('Insufficient saving balance to reverse payment.');
         }
 
-        $balanceAfter = $type === 'deposit'
-            ? (float) $currentSaving + $amount
-            : (float) $currentSaving - $amount;
+        $balanceAfter = $type === LoanSavingLedger::TYPE_DEPOSIT
+            ? Money::add($currentSaving, $amount)
+            : Money::subtract($currentSaving, $amount);
 
         LoanSavingLedger::create([
             'company_id' => $companyId,
@@ -711,7 +759,7 @@ class LoanPaymentController extends Controller implements HasMiddleware
             'loan_account_id' => $loan->id,
             'loan_payment_id' => $payment->id,
             'account_id' => $payment->account_id ?? $loan->account_id,
-            'type' => $type,
+            'type' => LoanSavingLedger::TYPE_REVERSAL,
             'amount' => $amount,
             'balance_after' => $balanceAfter,
             'date' => $date,
@@ -728,21 +776,21 @@ class LoanPaymentController extends Controller implements HasMiddleware
         int $companyId,
         int $financialYearId,
         string $referenceNo,
-        float $principal,
-        float $interest,
-        float $fine,
-        float $savingAmount,
-        float $newRemaining,
+        string $principal,
+        string $interest,
+        string $fine,
+        string $savingAmount,
+        string $newRemaining,
         ?string $file
     ): int {
-        $total = $principal + $interest + $fine + $savingAmount;
+        $total = Money::add($principal, $interest, $fine, $savingAmount);
 
         $account = Account::where('company_id', $companyId)
             ->lockForUpdate()
             ->findOrFail($request->account_id);
 
-        if ($loan->loan_type === 'taken') {
-            if ((float) $account->current_balance < $total) {
+        if ($loan->loan_type === LoanAccount::TYPE_TAKEN) {
+            if (Money::compare($account->current_balance, $total) < 0) {
                 throw new \Exception('Insufficient balance.');
             }
 
@@ -759,6 +807,7 @@ class LoanPaymentController extends Controller implements HasMiddleware
             'loan_account_id' => $loan->id,
             'account_id' => $account->id,
             'reference_no' => $referenceNo,
+            'request_key' => $request->request_key,
             'principal_amount' => $principal,
             'interest_amount' => $interest,
             'fine_amount' => $fine,
@@ -782,8 +831,8 @@ class LoanPaymentController extends Controller implements HasMiddleware
             'reference_type'      => 'LoanPayment',
             'reference_id'        => $payment->id,
             'description'         => 'Loan Payment',
-            'debit'               => $loan->loan_type === 'given' ? $total : 0,
-            'credit'              => $loan->loan_type === 'taken' ? $total : 0,
+            'debit'               => $loan->loan_type === LoanAccount::TYPE_GIVEN ? $total : '0.00',
+            'credit'              => $loan->loan_type === LoanAccount::TYPE_TAKEN ? $total : '0.00',
             'created_by'          => auth()->id(),
         ], false);
 
@@ -800,9 +849,9 @@ class LoanPaymentController extends Controller implements HasMiddleware
                 'loan_account_id' => $loan->id,
                 'loan_payment_id' => $payment->id,
                 'account_id' => $account->id,
-                'type' => 'deposit',
+                'type' => LoanSavingLedger::TYPE_DEPOSIT,
                 'amount' => $savingAmount,
-                'balance_after' => (float) $previousSaving + $savingAmount,
+                'balance_after' => Money::add($previousSaving, $savingAmount),
                 'date' => $request->payment_date,
                 'attachment' => $file,
                 'note' => $request->note,
@@ -823,15 +872,15 @@ class LoanPaymentController extends Controller implements HasMiddleware
         int $companyId,
         int $financialYearId,
         string $referenceNo,
-        float $principal,
-        float $interest,
-        float $fine,
-        float $newRemaining,
+        string $principal,
+        string $interest,
+        string $fine,
+        string $newRemaining,
         ?string $file
     ): int {
-        $total = $principal + $interest + $fine;
+        $total = Money::add($principal, $interest, $fine);
 
-        if ($total <= 0) {
+        if (Money::isZero($total)) {
             throw new \Exception('Payment amount must be greater than zero.');
         }
 
@@ -841,7 +890,7 @@ class LoanPaymentController extends Controller implements HasMiddleware
             ->latest('id')
             ->value('balance_after') ?? 0;
 
-        if ($total > (float) $currentSaving) {
+        if (Money::compare($total, $currentSaving) > 0) {
             throw new \Exception('Insufficient saving balance.');
         }
 
@@ -853,6 +902,7 @@ class LoanPaymentController extends Controller implements HasMiddleware
             'loan_account_id' => $loan->id,
             'account_id' => null,
             'reference_no' => $referenceNo,
+            'request_key' => $request->request_key,
             'principal_amount' => $principal,
             'interest_amount' => $interest,
             'fine_amount' => $fine,
@@ -873,9 +923,9 @@ class LoanPaymentController extends Controller implements HasMiddleware
             'loan_account_id' => $loan->id,
             'loan_payment_id' => $payment->id,
             'account_id' => $loan->account_id,
-            'type' => 'withdraw',
+            'type' => LoanSavingLedger::TYPE_LOAN_SETTLEMENT,
             'amount' => $total,
-            'balance_after' => (float) $currentSaving - $total,
+            'balance_after' => Money::subtract($currentSaving, $total),
             'date' => $request->payment_date,
             'attachment' => $file,
             'note' => $request->note,
@@ -890,7 +940,7 @@ class LoanPaymentController extends Controller implements HasMiddleware
 
     private function finalizeLoanAfterPayment(
         LoanAccount $loan,
-        float $newRemaining,
+        string $newRemaining,
         ?string $nextPaymentDate
     ): void {
         $data = [

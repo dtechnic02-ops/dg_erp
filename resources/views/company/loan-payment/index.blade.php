@@ -178,8 +178,8 @@
                                 <div class="dg-filter-field dg-filter-field-status">
                                     <label for="status" class="dg-filter-label">Status</label>
                                     <select name="status" id="status" class="form-select dg-select dg-filter-control">
-                                        <option value="">All Status</option>
-                                        <option value="active" @selected(request('status') === 'active')>Active</option>
+                                        <option value="active" @selected(request('status', 'active') === 'active')>Active</option>
+                                        <option value="all" @selected(request('status') === 'all')>All Status</option>
                                         <option value="cancelled" @selected(request('status') === 'cancelled')>Cancelled</option>
                                     </select>
                                 </div>

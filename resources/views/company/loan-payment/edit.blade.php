@@ -60,8 +60,8 @@
                                     <input type="text" id="financial_year" class="form-control dg-input" value="{{ $payment->financialYear->name ?? '-' }}" readonly>
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label" for="payment_date">Payment Date <span class="text-danger">*</span></label>
-                                    <input type="date" name="payment_date" id="payment_date" class="form-control dg-input" value="{{ old('payment_date', $payment->payment_date?->format('Y-m-d')) }}" required>
+                                    <label class="form-label" for="payment_date">Payment Date</label>
+                                    <input type="date" id="payment_date" class="form-control dg-input" value="{{ $payment->payment_date?->format('Y-m-d') }}" readonly>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label" for="status">Status</label>

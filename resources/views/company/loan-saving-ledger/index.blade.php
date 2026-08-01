@@ -160,6 +160,17 @@
                                         <option value="">All Types</option>
                                         <option value="deposit" @selected(request('type') === 'deposit')>Deposit</option>
                                         <option value="withdraw" @selected(request('type') === 'withdraw')>Withdraw</option>
+                                        <option value="loan_settlement" @selected(request('type') === 'loan_settlement')>Loan Settlement</option>
+                                        <option value="reversal" @selected(request('type') === 'reversal')>Reversal</option>
+                                    </select>
+                                </div>
+
+                                <div class="dg-filter-field dg-filter-field-status">
+                                    <label for="status" class="dg-filter-label">Status</label>
+                                    <select name="status" id="status" class="form-select dg-select dg-filter-control">
+                                        <option value="active" @selected(request('status', 'active') === 'active')>Active</option>
+                                        <option value="cancelled" @selected(request('status') === 'cancelled')>Cancelled</option>
+                                        <option value="all" @selected(request('status') === 'all')>All</option>
                                     </select>
                                 </div>
 
@@ -208,6 +219,7 @@
                             <input type="hidden" name="loan_account_id" value="{{ request('loan_account_id') }}">
                             <input type="hidden" name="party_account_id" value="{{ request('party_account_id') }}">
                             <input type="hidden" name="type" value="{{ request('type') }}">
+                            <input type="hidden" name="status" value="{{ request('status', 'active') }}">
                             <input type="hidden" name="account_id" value="{{ request('account_id') }}">
                             <input type="hidden" name="date_from" value="{{ request('date_from') }}">
                             <input type="hidden" name="date_to" value="{{ request('date_to') }}">

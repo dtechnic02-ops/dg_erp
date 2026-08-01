@@ -1533,6 +1533,7 @@ Route::prefix('loan-payments')->name('loan-payment.')->group(function(){
     Route::prefix('loan-saving-withdraws')->name('loan-saving-withdraw.')->group(function(){
           Route::get('/create/{id}',[LoanSavingWithdrawController::class,'create'])->name('create');
           Route::post('/store',[LoanSavingWithdrawController::class,'store'])->name('store');
+          Route::post('/cancel/{id}',[LoanSavingWithdrawController::class,'cancel'])->name('cancel');
     });
 });
 

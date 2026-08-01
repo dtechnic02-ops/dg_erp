@@ -24,6 +24,20 @@ It is written so that any developer or AI system can:
 
 No code, prompt, design, or implementation may contradict this document.
 
+### Business Owner Amendment — Loan Compulsory Saving (Version 1)
+
+This amendment is final and overrides every conflicting saving statement elsewhere in this document.
+
+- Saving functionality in Version 1 applies only to Loan Taken.
+- Loan Taken compulsory saving belongs to the company and is an Asset named **Loan Compulsory Saving / Loan Deposit Asset**.
+- It is not customer/member saving, not Saving Payable, and not an Expense.
+- Loan Given must not collect or manage borrower/member saving.
+- Saving interest is not active.
+- Loan Taken compulsory-saving deposit: Dr Loan Compulsory Saving Asset; Cr Cash/Bank.
+- Withdrawal into a company Cash/Bank account: Dr Cash/Bank; Cr Loan Compulsory Saving Asset.
+- Saving-funded Loan Taken settlement: Dr Loan Payable for principal; Dr Loan Interest Expense for interest; Dr Loan Fine Expense for fine; Cr Loan Compulsory Saving Asset for the total.
+- A saving-funded settlement has no Cash/Bank movement and must not create an AccountTransaction.
+
 ---
 
 ## 1. Document Hierarchy
@@ -100,7 +114,6 @@ Each company must have, or be able to map, the following accounts.
 ### 4.2 Liabilities
 
 - Loan Payable
-- Customer or Member Saving Payable
 - Loan Interest Payable, if accrual accounting is enabled
 - Loan Fine Payable, if accrual accounting is enabled
 
@@ -108,13 +121,17 @@ Each company must have, or be able to map, the following accounts.
 
 - Loan Interest Income
 - Loan Fine Income
-- Saving-related income, only where legally and operationally applicable
 
 ### 4.4 Expenses
 
 - Loan Interest Expense
 - Loan Fine or Penalty Expense
-- Saving Interest Expense, when the company pays interest on customer/member savings
+
+### 4.5 Loan Compulsory Saving Asset
+
+- Loan Compulsory Saving / Loan Deposit Asset
+
+This account is used only for Loan Taken compulsory saving in Version 1.
 
 ### 4.5 Account Mapping Rule
 
@@ -329,18 +346,14 @@ Dr. Loan Fine/Penalty Expense
 Cr. Cash/Bank
 ```
 
-### 9.4 Saving Deposit Collected Together
-
-A saving deposit must only be collected where the business relationship legally and operationally supports it.
-
-If the company receives saving from the party:
+### 9.4 Loan Taken Compulsory Saving Deposit
 
 ```text
-Dr. Cash/Bank
-Cr. Customer/Member Saving Payable
+Dr. Loan Compulsory Saving Asset
+Cr. Cash/Bank
 ```
 
-Loan principal repayment and saving deposit are separate accounting events even when entered in one UI form.
+The saving belongs to the company. Principal, interest, fine, and compulsory saving remain separate components even when entered in one UI form.
 
 ---
 
@@ -369,30 +382,21 @@ Dr. Cash/Bank
 Cr. Loan Fine Income
 ```
 
-### 10.4 Saving Deposit Received
+### 10.4 Loan Given Saving Prohibition
 
-When the borrower deposits saving with the company:
-
-```text
-Dr. Cash/Bank
-Cr. Customer/Member Saving Payable
-```
-
-Saving is not Loan Income and must not reduce principal unless explicitly used in a settlement transaction.
+Loan Given must not collect, hold, withdraw, or settle borrower/member saving in Version 1.
 
 ---
 
 ## 11. Loan Saving Ledger
 
-Loan Saving is a separate sub-ledger connected to a Loan Account.
+Loan Compulsory Saving is a separate Asset sub-ledger connected only to a Loan Taken account.
 
 It must support at least these transaction types:
 
 - deposit;
 - withdraw;
 - loan_settlement;
-- interest_credit, if saving interest is supported;
-- interest_adjustment, if approved;
 - reversal.
 
 ### 11.1 Type Constants
@@ -409,68 +413,58 @@ The formula is:
 
 `New Saving Balance = Previous Active Balance + Credit - Debit`
 
-### 11.3 Saving Liability
+### 11.3 Saving Asset
 
-Money held as a customer's or member's saving belongs to the customer/member.
+Loan Taken compulsory saving belongs to the company. It is an Asset, not a Liability, Income, or Expense.
 
-It is a company Liability, not Income.
+### 11.4 Loan Taken Compulsory Saving Deposit Accounting
 
-### 11.4 Saving Deposit Accounting
+```text
+Dr. Loan Compulsory Saving Asset
+Cr. Cash/Bank
+```
+
+### 11.5 Saving Withdrawal Into Company Cash/Bank
 
 ```text
 Dr. Cash/Bank
-Cr. Customer/Member Saving Payable
-```
-
-### 11.5 Saving Withdrawal Accounting
-
-When saving is returned in Cash/Bank:
-
-```text
-Dr. Customer/Member Saving Payable
-Cr. Cash/Bank
+Cr. Loan Compulsory Saving Asset
 ```
 
 Effects:
 
-- saving liability decreases;
-- Cash/Bank decreases;
+- saving Asset decreases;
+- Cash/Bank increases;
 - saving sub-ledger decreases.
 
-### 11.6 Saving Used for Loan Given Settlement
-
-When a borrower's saving is used to settle principal, interest, or fine owed to the company:
+### 11.6 Saving Used for Loan Taken Settlement
 
 Principal portion:
 
 ```text
-Dr. Customer/Member Saving Payable
-Cr. Loan Receivable
+Dr. Loan Payable
+Cr. Loan Compulsory Saving Asset
 ```
 
 Interest portion:
 
 ```text
-Dr. Customer/Member Saving Payable
-Cr. Loan Interest Income
+Dr. Loan Interest Expense
+Cr. Loan Compulsory Saving Asset
 ```
 
 Fine portion:
 
 ```text
-Dr. Customer/Member Saving Payable
-Cr. Loan Fine Income
+Dr. Loan Fine Expense
+Cr. Loan Compulsory Saving Asset
 ```
 
-No Cash/Bank entry is created because money is internally transferred from the saving liability.
+No Cash/Bank entry or AccountTransaction is created because this is an internal Asset settlement.
 
-### 11.7 Saving Used for Loan Taken Settlement
+### 11.7 Loan Given Saving
 
-This is not a standard default case and must not be inferred automatically.
-
-If business rules permit a valid offset between amounts the company owes and saving held for the same party, the transaction must be explicitly authorized and posted through approved liability-to-liability settlement rules.
-
-An AI or developer must not create this flow without Business Owner approval.
+Saving functionality is prohibited for Loan Given in Version 1.
 
 ### 11.8 Insufficient Saving
 
@@ -482,32 +476,7 @@ Saving balance must never become negative.
 
 ## 12. Saving Interest
 
-Saving interest is optional and is not considered implemented merely because saving deposits and withdrawals exist.
-
-If enabled:
-
-- the interest rate;
-- calculation basis;
-- calculation frequency;
-- minimum balance rule;
-- effective date;
-- rounding rule;
-- tax or withholding rule;
-- posting date;
-- cancellation rule
-
-must be explicitly configured.
-
-### 12.1 Saving Interest Credited to Customer
-
-```text
-Dr. Saving Interest Expense
-Cr. Customer/Member Saving Payable
-```
-
-The saving sub-ledger must record an `interest_credit` entry.
-
-Saving interest must not be created through a generic deposit type.
+Saving interest is not active in Version 1 and must not be implemented or advertised.
 
 ---
 
@@ -515,7 +484,7 @@ Saving interest must not be created through a generic deposit type.
 
 The Party Account is a business sub-ledger identity, not a substitute for the General Ledger.
 
-Party balances may be maintained for operational convenience, but they must reconcile with the related Loan Receivable, Loan Payable, and Saving Payable control accounts.
+Party balances may be maintained for operational convenience, but Loan sub-ledger and General Ledger control accounts remain authoritative. Loan compulsory saving reconciles to the Loan Compulsory Saving Asset, not PartyAccount.current_balance.
 
 ### 13.1 Meaning Must Be Frozen
 
@@ -537,7 +506,7 @@ For every party:
 
 - total active Loan Given remaining principal must reconcile to party loan receivable;
 - total active Loan Taken remaining principal must reconcile to party loan payable;
-- total active saving balance must reconcile to party saving payable;
+- total active Loan Taken compulsory saving must reconcile to the Loan Compulsory Saving Asset;
 - net party display may be derived, but underlying balances must remain separately auditable.
 
 ---
@@ -647,7 +616,7 @@ Cancellation must restore:
 - Cash/Bank balance;
 - Party balance/sub-ledger;
 - saving balance;
-- saving liability;
+- Loan Compulsory Saving Asset;
 - interest/fine income or expense;
 - journal and ledger balances;
 - source references.
@@ -810,7 +779,7 @@ The Loan Module must support at least:
 - Fine Income Report;
 - Fine Expense Report;
 - Loan Saving Statement;
-- Saving Liability Report;
+- Loan Compulsory Saving Asset Report;
 - Saving Withdrawal Report;
 - Cancelled Loan Transactions Report;
 - Loan-to-General-Ledger Reconciliation;
@@ -974,7 +943,7 @@ These patterns should be preserved where they agree with this Constitution.
 
 ### 27.2 Chart of Accounts Posting Not Proven
 
-The audited Loan code showed Cash/Bank Account Transaction handling, but complete Loan Receivable, Loan Payable, Interest Income/Expense, Fine Income/Expense, Saving Liability, Journal, and General Ledger posting was not proven.
+The audited Loan code showed Cash/Bank Account Transaction handling, but complete Loan Receivable, Loan Payable, Interest Income/Expense, Fine Income/Expense, Loan Compulsory Saving Asset, Journal, and General Ledger posting was not proven.
 
 Future audit must inspect the accounting services and confirm all postings required by this document.
 
@@ -987,8 +956,8 @@ That behavior is correct only if the transaction means the company is paying sav
 In that case, the accounting must be:
 
 ```text
-Dr. Customer/Member Saving Payable
-Cr. Cash/Bank
+Dr. Cash/Bank
+Cr. Loan Compulsory Saving Asset
 ```
 
 The UI label and business meaning must clearly identify this as a payout to the party.
@@ -1097,8 +1066,8 @@ An AI auditing Loan code must answer all of the following.
 
 ### Saving
 
-- Does deposit increase saving liability?
-- Does withdrawal decrease saving liability and Cash/Bank?
+- Does a Loan Taken saving deposit increase the compulsory-saving Asset and decrease Cash/Bank?
+- Does withdrawal decrease the compulsory-saving Asset and increase Cash/Bank?
 - Does saving settlement avoid unnecessary Cash/Bank entries?
 - Does `balance_after` reconcile?
 - Can balance become negative?
@@ -1129,7 +1098,7 @@ An AI auditing Loan code must answer all of the following.
 
 - Does Loan Given outstanding equal Loan Receivable control balance?
 - Does Loan Taken outstanding equal Loan Payable control balance?
-- Does total saving equal Saving Payable control balance?
+- Does total Loan Taken compulsory saving equal the Loan Compulsory Saving Asset control balance?
 - Do Account Transactions reconcile with Cash/Bank General Ledger?
 - Does the journal balance?
 
@@ -1155,7 +1124,7 @@ The final Loan Module must include tests for:
 12. create saving deposit;
 13. reject saving withdrawal above balance;
 14. process valid saving withdrawal;
-15. use saving for Loan Given settlement;
+15. use compulsory saving for Loan Taken settlement;
 16. reject principal above remaining principal;
 17. cancel Loan payment and verify complete reversal;
 18. cancel saving transaction and verify complete reversal;
@@ -1180,9 +1149,9 @@ The following rules are FINAL:
 5. Principal is never Income or Expense.
 6. Loan Given interest and fine received are Income.
 7. Loan Taken interest and fine paid are Expenses.
-8. Customer/member saving is a Liability.
-9. Saving deposit is not Income.
-10. Saving withdrawal is not Expense.
+8. Loan Taken compulsory saving belongs to the company and is an Asset.
+9. Loan Taken saving deposit debits the compulsory-saving Asset and credits Cash/Bank.
+10. Saving withdrawal into company Cash/Bank debits Cash/Bank and credits the compulsory-saving Asset.
 11. Principal, interest, fine, and saving must remain separate.
 12. Loan sub-ledger, Party sub-ledger, Cash/Bank, and General Ledger must reconcile.
 13. Every Cash/Bank effect requires Account Transaction history.
@@ -1192,7 +1161,8 @@ The following rules are FINAL:
 17. Financial records must not be hard-deleted.
 18. All operations must enforce company isolation.
 19. All financial transactions must enforce the active financial year and valid transaction date.
-20. Saving interest is not active until separately and completely implemented.
+20. Saving interest is not active in Version 1.
+20A. Saving functionality is prohibited for Loan Given in Version 1.
 21. Party balance sign convention must be formally frozen before it is treated as an independent accounting authority.
 22. Existing code must be changed wherever it conflicts with this document.
 

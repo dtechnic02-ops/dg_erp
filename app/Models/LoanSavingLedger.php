@@ -11,6 +11,12 @@ public const STATUS_INACTIVE = 0;
 
 public const STATUS_ACTIVE = 1;
 
+public const TYPE_DEPOSIT = 'deposit';
+public const TYPE_WITHDRAW = 'withdraw';
+public const TYPE_LOAN_SETTLEMENT = 'loan_settlement';
+public const TYPE_REVERSAL = 'reversal';
+public const EVENT_WITHDRAWN = 'withdrawn';
+
 protected $fillable = [
 
 'company_id',
@@ -20,6 +26,8 @@ protected $fillable = [
 'loan_account_id',
 
 'loan_payment_id',
+
+'request_key',
 
 'account_id',
 
@@ -39,6 +47,12 @@ protected $fillable = [
 
 'updated_by',
 
+'cancelled_by',
+
+'cancelled_date',
+
+'cancel_reason',
+
 'status'
 
 ];
@@ -48,6 +62,7 @@ protected $casts = [
     'amount' => 'decimal:2',
     'balance_after' => 'decimal:2',
     'status' => 'integer',
+    'cancelled_date' => 'date',
 ];
 
 /**

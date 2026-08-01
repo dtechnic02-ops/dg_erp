@@ -8,6 +8,7 @@
     $canPrint = userCan('print_loan_saving_ledger');
     $canViewAccount = userCan('view_loan_account');
     $canViewPayment = userCan('view_loan_payment');
+    $canCancelWithdraw = userCan('cancel_loan_saving_withdraw');
 @endphp
 
 <div class="dg-page dg-invoice">
@@ -25,6 +26,16 @@
                     @endif
                     @if ($canViewPayment && $ledger->loan_payment_id && $ledger->loanPayment)
                         <a href="{{ route('company.loan-payment.show', $ledger->loan_payment_id) }}" class="btn btn-outline-success dg-btn">Loan Payment</a>
+                    @endif
+                    @if ($canCancelWithdraw && $ledger->type === \App\Models\LoanSavingLedger::TYPE_WITHDRAW && (int) $ledger->status === \App\Models\LoanSavingLedger::STATUS_ACTIVE)
+                        <form method="POST" action="{{ route('company.loan-saving-withdraw.cancel', $ledger->id) }}" class="d-inline" onsubmit="return confirm('Cancel this withdrawal and reverse every financial effect?')">
+                            @csrf
+                            <label class="visually-hidden" for="withdraw_cancel_date">Cancel Date</label>
+                            <input type="date" id="withdraw_cancel_date" name="cancel_date" value="{{ date('Y-m-d') }}" required class="form-control form-control-sm d-inline-block w-auto">
+                            <label class="visually-hidden" for="withdraw_cancel_reason">Cancel Reason</label>
+                            <input type="text" id="withdraw_cancel_reason" name="cancel_reason" required maxlength="500" placeholder="Cancel reason" class="form-control form-control-sm d-inline-block w-auto">
+                            <button type="submit" class="btn btn-outline-danger dg-btn">Cancel Withdrawal</button>
+                        </form>
                     @endif
                 </nav>
             </div>

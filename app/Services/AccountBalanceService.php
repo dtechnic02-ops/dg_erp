@@ -17,10 +17,25 @@ class AccountBalanceService
     bool $checkBalance = true
 )
     {
-        $account = Account::findOrFail(
-            $data['account_id']
-           
-        );
+        $companyId = (int) ($data['company_id'] ?? 0);
+        if ($companyId < 1) {
+            throw new \InvalidArgumentException('company_id is required for an account transaction.');
+        }
+
+        $account = Account::where('company_id', $companyId)
+            ->lockForUpdate()
+            ->findOrFail($data['account_id']);
+
+        if (! empty($data['reference_type']) && ! empty($data['reference_id']) && AccountTransaction::where('company_id', $companyId)
+            ->where('reference_type', $data['reference_type'])
+            ->where('reference_id', $data['reference_id'])
+            ->where('account_id', $account->id)
+            ->when(array_key_exists('journal_item_id', $data), fn ($query) => $query->where('journal_item_id', $data['journal_item_id']))
+            ->where('status', 1)
+            ->lockForUpdate()
+            ->exists()) {
+            throw new \RuntimeException('An active account transaction already exists for this source.');
+        }
  
 if ($checkBalance)
 {
@@ -195,6 +210,22 @@ public static function reverseTransaction(
     ?int $financialYearId = null
 )
 {
+    $transaction = AccountTransaction::where('company_id', $transaction->company_id)
+        ->whereKey($transaction->id)
+        ->lockForUpdate()
+        ->firstOrFail();
+
+    if ((int) $transaction->status !== 1 || $transaction->reversed_transaction_id !== null) {
+        throw new \RuntimeException('Only an active original account transaction may be reversed.');
+    }
+
+    if (AccountTransaction::where('company_id', $transaction->company_id)
+        ->where('reversed_transaction_id', $transaction->id)
+        ->where('status', 1)
+        ->lockForUpdate()
+        ->exists()) {
+        throw new \RuntimeException('This account transaction has already been reversed.');
+    }
 
     return self::createTransaction([
 
@@ -220,6 +251,9 @@ public static function reverseTransaction(
         'reference_id' =>
             $transaction->reference_id,
 
+        'reversed_transaction_id' =>
+            $transaction->id,
+
         'description' =>
             $description,
 
@@ -238,9 +272,7 @@ public static function recalculateLedger(
     int $accountId
 )
 {  
-    $account = Account::findOrFail(
-        $accountId
-    );
+    $account = Account::lockForUpdate()->findOrFail($accountId);
 
     $transactions = AccountTransaction::where(
         'company_id',
@@ -317,5 +349,3 @@ public static function recalculateAllLedger(
 
 
 }
-
-

@@ -20,6 +20,10 @@ class LoanAccount extends Model
 
     public const STATUS_ACTIVE = 1;
 
+    public const TYPE_TAKEN = 'taken';
+    public const TYPE_GIVEN = 'given';
+    public const EVENT_CREATED = 'created';
+
 
 
     protected $fillable = [
@@ -29,6 +33,7 @@ class LoanAccount extends Model
         'financial_year_id',
 
         'loan_no',
+        'request_key',
 
         'loan_name',
 
@@ -61,6 +66,7 @@ class LoanAccount extends Model
         'cancelled_by',
 
         'cancelled_at',
+        'cancel_reason',
 
         'status',
 
@@ -198,6 +204,9 @@ class LoanAccount extends Model
 
     }
 
+    public function isTaken(): bool
+    {
+        return $this->loan_type === self::TYPE_TAKEN;
+    }
+
 }
-
-

@@ -120,6 +120,7 @@ class DefaultChartAccountSeeder extends Seeder
             $this->account('1140', 'Inventory', 'asset', 'inventory', 'debit', 'INVENTORY', 'CURRENT_ASSETS', 3, false, false),
             $this->account('1150', 'Input Tax Receivable', 'asset', 'tax_receivable', 'debit', 'INPUT_TAX_RECEIVABLE', 'CURRENT_ASSETS', 3, false, false),
             $this->account('1160', 'Loan Receivable', 'asset', 'loan_receivable', 'debit', 'LOAN_RECEIVABLE', 'CURRENT_ASSETS', 3, false, false),
+            $this->account('1165', 'Loan Compulsory Saving', 'asset', 'loan_deposit_asset', 'debit', 'LOAN_COMPULSORY_SAVING_ASSET', 'CURRENT_ASSETS', 3, false, false),
             $this->account('1170', 'Other Current Assets', 'asset', 'other_current_asset', 'debit', 'OTHER_CURRENT_ASSETS', 'CURRENT_ASSETS', 3, false, true),
             $this->account('1210', 'Property, Plant and Equipment', 'asset', 'fixed_asset', 'debit', 'PROPERTY_PLANT_EQUIPMENT', 'NON_CURRENT_ASSETS', 3, false, true),
             $this->account('1220', 'Accumulated Depreciation', 'asset', 'accumulated_depreciation', 'credit', 'ACCUMULATED_DEPRECIATION', 'NON_CURRENT_ASSETS', 3, false, true),
@@ -128,6 +129,7 @@ class DefaultChartAccountSeeder extends Seeder
             $this->account('2130', 'Salary Payable', 'liability', 'salary_payable', 'credit', 'SALARY_PAYABLE', 'CURRENT_LIABILITIES', 3, false, false),
             $this->account('2140', 'Personal Loan Payable', 'liability', 'personal_loan_payable', 'credit', 'PERSONAL_LOAN_PAYABLE', 'CURRENT_LIABILITIES', 3, false, false),
             $this->account('2150', 'Other Current Liabilities', 'liability', 'other_current_liability', 'credit', 'OTHER_CURRENT_LIABILITIES', 'CURRENT_LIABILITIES', 3, false, true),
+            $this->account('2160', 'Loan Payable', 'liability', 'loan_payable', 'credit', 'LOAN_PAYABLE', 'CURRENT_LIABILITIES', 3, false, false),
             $this->account('2210', 'Bank Loan Payable', 'liability', 'bank_loan_payable', 'credit', 'BANK_LOAN_PAYABLE', 'NON_CURRENT_LIABILITIES', 3, false, false),
             $this->account('3110', 'Owner’s Capital', 'equity', 'capital', 'credit', 'OWNERS_CAPITAL', 'OWNERS_EQUITY', 3, false, true),
             $this->account('3120', 'Owner’s Drawings', 'equity', 'drawings', 'debit', 'OWNERS_DRAWINGS', 'OWNERS_EQUITY', 3, false, true),
@@ -137,6 +139,8 @@ class DefaultChartAccountSeeder extends Seeder
             $this->account('4120', 'Service Revenue', 'income', 'service_income', 'credit', 'SERVICE_REVENUE', 'OPERATING_INCOME', 3, false, false),
             $this->account('4130', 'Sales Returns and Allowances', 'income', 'sales_return', 'debit', 'SALES_RETURNS', 'OPERATING_INCOME', 3, false, false),
             $this->account('4210', 'Other Income', 'income', 'other_income', 'credit', 'OTHER_INCOME_REVENUE', 'OTHER_INCOME', 3, false, true),
+            $this->account('4220', 'Loan Interest Income', 'income', 'loan_interest_income', 'credit', 'LOAN_INTEREST_INCOME', 'OTHER_INCOME', 3, false, false),
+            $this->account('4230', 'Loan Fine Income', 'income', 'loan_fine_income', 'credit', 'LOAN_FINE_INCOME', 'OTHER_INCOME', 3, false, false),
             $this->account('5110', 'Cost of Goods Sold', 'expense', 'cost_of_goods_sold', 'debit', 'COST_OF_GOODS_SOLD', 'COST_OF_SALES', 3, false, false),
             $this->account('5120', 'Purchase Returns', 'expense', 'purchase_return', 'credit', 'PURCHASE_RETURNS', 'COST_OF_SALES', 3, false, false),
             $this->account('5210', 'Salary Expense', 'expense', 'salary_expense', 'debit', 'SALARY_EXPENSE', 'OPERATING_EXPENSES', 3, false, false),
@@ -147,6 +151,8 @@ class DefaultChartAccountSeeder extends Seeder
             $this->account('5260', 'Depreciation Expense', 'expense', 'depreciation_expense', 'debit', 'DEPRECIATION_EXPENSE', 'OPERATING_EXPENSES', 3, false, true),
             $this->account('5270', 'Service Purchase Expense', 'expense', 'service_purchase_expense', 'debit', 'SERVICE_PURCHASE_EXPENSE', 'OPERATING_EXPENSES', 3, false, false),
             $this->account('5310', 'Interest Expense', 'expense', 'interest_expense', 'debit', 'INTEREST_EXPENSE', 'FINANCE_COSTS', 3, false, true),
+            $this->account('5320', 'Loan Interest Expense', 'expense', 'loan_interest_expense', 'debit', 'LOAN_INTEREST_EXPENSE', 'FINANCE_COSTS', 3, false, false),
+            $this->account('5330', 'Loan Fine Expense', 'expense', 'loan_fine_expense', 'debit', 'LOAN_FINE_EXPENSE', 'FINANCE_COSTS', 3, false, false),
         ];
     }
 
