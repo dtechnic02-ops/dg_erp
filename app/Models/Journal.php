@@ -20,6 +20,10 @@ class Journal extends Model
         'journal_no',
         'journal_date',
         'reference_no',
+        'source_module',
+        'source_type',
+        'source_id',
+        'source_key',
         'total_amount',
         'attachment',
         'note',
@@ -41,7 +45,7 @@ class Journal extends Model
         'cancelled_date' => 'date',
         'posted_at'      => 'datetime',
         'reversed_at'    => 'datetime',
-        'total_amount'   => 'decimal:2',
+        'total_amount'   => 'decimal:4',
         'status'         => 'integer',
     ];
 

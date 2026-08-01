@@ -28,7 +28,7 @@ public static function recalculateSupplier(
     int $supplierId
 )
 {
-    $supplier = Supplier::findOrFail(
+    $supplier = Supplier::lockForUpdate()->findOrFail(
         $supplierId
     );
 
@@ -48,6 +48,7 @@ public static function recalculateSupplier(
     'status',
     1
 )
+    ->lockForUpdate()
     ->get();
 
     foreach ($transactions as $transaction)

@@ -58,6 +58,7 @@ class CustomerOpeningBalanceAccountingDataBuilder
             'company_id' => $companyId,
             'customer_id' => $customerId,
             'transaction_date' => $transactionDate,
+            'financial_year_id' => $financialYearId,
             'reference_number' => (string) ($transaction->reference_no ?? ('OPEN-' . $customerId)),
             'amount' => $amount,
             'created_by' => $this->nullablePositiveInteger($transaction->created_by ?? $customer->created_by ?? null, 'created_by'),

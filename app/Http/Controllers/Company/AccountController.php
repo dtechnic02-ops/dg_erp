@@ -5,14 +5,10 @@ namespace App\Http\Controllers\Company;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Services\AccountBalanceService;
-use App\Models\FinancialYear;
 use App\Models\Account;
 use Illuminate\Support\Facades\DB;
 use App\Services\FileUploadService;
 use App\Services\ValidationService;
-use App\Services\InvoiceNumberService;
-use App\Models\AccountTransaction;
 
 class AccountController extends Controller
 {
@@ -209,7 +205,7 @@ try{
         $request->currency ?? 'AED',
 
     'opening_balance' =>
-        $request->opening_balance ?? 0,
+        0,
 
     'current_balance' => 0,
 
@@ -223,64 +219,6 @@ $imagePath,
         $request->status ?? 'active',
 
 ]);
-        if (
-    $account->opening_balance > 0
-)
-{
-    $activeFy = FinancialYear::where(
-        'company_id',
-        auth()->user()->company_id
-    )
-    ->where(
-        'is_active',
-        1
-    )
-    ->first();
-
-    if ($activeFy)
-    {
-       AccountBalanceService::createTransaction([
-
-    'company_id' =>
-        auth()->user()->company_id,
-
-    'financial_year_id' =>
-        $activeFy->id,
-
-    'account_id' =>
-        $account->id,
-
-    'transaction_date' =>
-        $activeFy->start_date,
-'voucher_no' =>
-    InvoiceNumberService::generate(
-        'OB',
-        auth()->user()->company_id,
-        $activeFy->id,
-        AccountTransaction::class,
-        'voucher_no'
-    ),
-
-    'reference_type' =>
-        'opening_balance',
-
-    'reference_id' =>
-        $account->id,
-
-    'description' =>
-        'Opening Balance - ' . $account->account_name,
-
-    'debit' =>
-        $account->opening_balance,
-
-    'credit' =>
-        0,
-
-]);
-    }
-}
-   
-
 DB::commit();
 
 return back()->with(
@@ -426,8 +364,7 @@ $request->currency
 ?? 'AED',
 
 'opening_balance' =>
-
-$request->opening_balance,
+$account->opening_balance,
 
 'current_balance'=>
 
@@ -499,6 +436,15 @@ public function destroy($id)
     DB::beginTransaction();
 
     try{
+
+        if (\App\Models\OpeningBalanceLine::where('operational_account_id', $account->id)->exists()
+            || $account->transactions()->exists()
+            || $account->journalItems()->exists()
+            || \App\Models\AccountingEntryLine::where('operational_account_id', $account->id)->exists()) {
+            $account->update(['status' => 'inactive']);
+            DB::commit();
+            return back()->with('success', 'Account has financial history and was safely archived.');
+        }
 
         if ($account->current_balance != 0)
         {

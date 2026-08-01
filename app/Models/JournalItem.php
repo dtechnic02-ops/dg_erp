@@ -14,6 +14,7 @@ class JournalItem extends Model
         'company_id',
         'journal_id',
         'account_id',
+        'chart_account_id',
         'sub_ledger_type',
         'sub_ledger_id',
         'type',
@@ -23,7 +24,7 @@ class JournalItem extends Model
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
+        'amount' => 'decimal:4',
         'status' => 'integer',
     ];
 
@@ -35,6 +36,11 @@ class JournalItem extends Model
     public function account()
     {
         return $this->belongsTo(Account::class);
+    }
+
+    public function chartAccount()
+    {
+        return $this->belongsTo(ChartAccount::class);
     }
 
     public function company()

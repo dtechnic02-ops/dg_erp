@@ -5,18 +5,11 @@ namespace App\Http\Controllers\Company;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Customer;
-use App\Models\FinancialYear;
-use App\Services\CustomerTransactionService;
-use App\Services\Accounting\Integrations\CustomerOpeningBalanceAccountingIntegrationService;
 use App\Services\ValidationService;
 use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
-public function __construct(
-    private readonly CustomerOpeningBalanceAccountingIntegrationService $openingBalanceAccounting
-) {
-}
 
 
 /* =====================
@@ -204,18 +197,14 @@ $request->address,
 $request->tax_no,
 
 'opening_balance'=>
-
-$request->opening_balance
-?? 0,
+0,
 
 'credit_days'=>
 
 max(0, (int) ($request->credit_days ?? 0)),
 
 'current_balance'=>
-
-$request->opening_balance
-?? 0,
+0,
 
 'bank_name'=>
 
@@ -350,71 +339,9 @@ $name;
 
 
 $customer = DB::transaction(function () use ($data) {
-    $customer = Customer::create(
+    return Customer::create(
         $data
     );
-
-    if (
-        $customer->opening_balance > 0
-    )
-    {
-        $activeFy = FinancialYear::where(
-            'company_id',
-            auth()->user()->company_id
-        )
-        ->where(
-            'is_active',
-            1
-        )
-        ->firstOrFail();
-
-        CustomerTransactionService::createTransaction([
-
-        'company_id'        =>
-            auth()->user()->company_id,
-
-        'financial_year_id' =>
-            $activeFy->id,
-
-        'customer_id'       =>
-            $customer->id,
-
-        'transaction_date'  =>
-            $activeFy->start_date,
-
-        'voucher_no'        =>
-            'OPEN-' . $customer->id,
-
-        'reference_type'    =>
-            'opening_balance',
-
-        'reference_id'      =>
-            $customer->id,
-
-        'reference_no'      =>
-            'OPEN-' . $customer->id,
-
-        'description'       =>
-            'Customer Opening Balance',
-
-        'debit'             =>
-            $customer->opening_balance,
-
-        'credit'            =>
-            0,
-
-        'created_by'        =>
-            auth()->id(),
-
-        'status'            =>
-            1,
-
-        ]);
-
-        $this->openingBalanceAccounting->postOpeningBalance($customer);
-    }
-
-    return $customer;
 });
 
 return back()
@@ -716,6 +643,10 @@ auth()->user()->company_id
 )
 
 ->firstOrFail();
+
+if ($customer->transactions()->exists() || \App\Models\OpeningBalanceLine::where('subledger_type', 'customer')->where('subledger_id', $customer->id)->whereHas('openingBalance', fn ($q) => $q->where('company_id', auth()->user()->company_id))->exists() || \App\Models\AccountingEntryLine::where('subledger_type', 'customer')->where('subledger_id', $customer->id)->exists()) {
+    return back()->with('error', 'Customer has financial history and cannot be deleted. Deactivate the customer instead.');
+}
 
 
 if(

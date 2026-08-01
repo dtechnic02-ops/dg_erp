@@ -11,6 +11,13 @@ class PermissionSeeder extends Seeder
     public function run()
     {
         $permissions = [
+            ...collect([
+                'opening-balance.view', 'opening-balance.create', 'opening-balance.edit-draft',
+                'opening-balance.submit', 'opening-balance.approve', 'opening-balance.post',
+                'opening-balance.cancel', 'opening-balance.reverse', 'opening-balance.lock',
+                'opening-balance.unlock', 'opening-balance.audit-view', 'opening-balance.print',
+                'opening-balance.export',
+            ])->map(fn (string $name) => Permission::firstOrCreate(['name' => $name]))->all(),
             Permission::firstOrCreate(['name' => 'view_users']),
             Permission::firstOrCreate(['name' => 'edit_users']),
             Permission::firstOrCreate(['name' => 'delete_users']),

@@ -29,6 +29,7 @@ class ChartAccount extends Model
         'is_control',
         'allow_manual_entry',
         'status',
+        'is_locked',
         'created_by',
         'updated_by',
     ];
@@ -41,6 +42,7 @@ class ChartAccount extends Model
             'is_system' => 'boolean',
             'is_control' => 'boolean',
             'allow_manual_entry' => 'boolean',
+            'is_locked' => 'boolean',
         ];
     }
 

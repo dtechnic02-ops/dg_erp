@@ -152,20 +152,6 @@
                         value="{{ old('credit_days', $customer->credit_days ?? 0) }}">
                 </div>
 
-                <div class="col-lg-4 col-md-6 col-12">
-                    <label for="opening_balance" class="form-label dg-label">
-                        Opening Balance
-                    </label>
-
-                    <input
-                        type="number"
-                        step="0.01"
-                        name="opening_balance"
-                        id="opening_balance"
-                        class="form-control dg-input"
-                        value="{{ $customer->opening_balance ?? 0 }}">
-                </div>
-
                 @isset($customer)
                     <div class="col-lg-4 col-md-6 col-12">
                         <label for="current_balance" class="form-label dg-label">

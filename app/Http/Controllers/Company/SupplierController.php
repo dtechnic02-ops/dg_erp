@@ -10,16 +10,9 @@ use App\Models\Supplier;
 use App\Services\FileUploadService;
 use App\Services\ValidationService;
 
-use App\Services\SupplierTransactionService;
-use App\Services\Accounting\Integrations\SupplierOpeningBalanceAccountingIntegrationService;
-use App\Models\FinancialYear;
 use Illuminate\Support\Facades\DB;
 class SupplierController extends Controller
 {
-    public function __construct(
-        private readonly SupplierOpeningBalanceAccountingIntegrationService $openingBalanceAccounting
-    ) {
-    }
 
     // 🔥 SHARED FILTERED QUERY
     // Used by index() and any other action (e.g. summary totals)
@@ -84,7 +77,6 @@ public function store(Request $request)
         'credit_days' => ValidationService::quantity(),
         'name' => 'required|max:255',
         'image_path' => ValidationService::image(),
-        'opening_balance' => ValidationService::amount(),
     ]);
 
     $imagePath = null;
@@ -143,13 +135,13 @@ public function store(Request $request)
                 $request->tax_no,
 
             'opening_balance' =>
-                $request->opening_balance ?? 0,
+                0,
 
             'credit_days' =>
                 max(0, (int) ($request->credit_days ?? 0)),
 
             'current_balance' =>
-                $request->opening_balance ?? 0,
+                0,
 
             'bank_name' =>
                 $request->bank_name,
@@ -167,64 +159,6 @@ public function store(Request $request)
                 $request->status ?? 'active',
 
         ]);
-
-        if ($supplier->opening_balance > 0)
-        {
-            $activeFy = FinancialYear::where(
-                'company_id',
-                auth()->user()->company_id
-            )
-            ->where(
-                'is_active',
-                1
-            )
-            ->firstOrFail();
-
-            SupplierTransactionService::createTransaction([
-
-                'company_id' =>
-                    auth()->user()->company_id,
-
-                'financial_year_id' =>
-                    $activeFy->id,
-
-                'supplier_id' =>
-                    $supplier->id,
-
-                'transaction_date' =>
-                    $activeFy->start_date,
-
-                'voucher_no' =>
-                    'OPEN-' . $supplier->id,
-
-                'reference_type' =>
-                    'opening_balance',
-
-                'reference_id' =>
-                    $supplier->id,
-
-                'reference_no' =>
-                    'OPEN-' . $supplier->id,
-
-                'description' =>
-                    'Supplier Opening Balance',
-
-                'debit' =>
-                    0,
-
-                'credit' =>
-                    $supplier->opening_balance,
-
-                'created_by' =>
-                    auth()->id(),
-
-                'status' =>
-                    1,
-
-            ]);
-
-            $this->openingBalanceAccounting->postOpeningBalance($supplier);
-        }
 
         DB::commit();
 
@@ -457,12 +391,16 @@ $supplier = Supplier::where(
     auth()->user()->company_id
 )
 ->firstOrFail();
-   if (
+if (
     $supplier->purchaseInvoices()->exists()
     ||
     $supplier->purchaseReturns()->exists()
     ||
     $supplier->transactions()->exists()
+    ||
+    \App\Models\OpeningBalanceLine::where('subledger_type', 'supplier')->where('subledger_id', $supplier->id)->whereHas('openingBalance', fn ($q) => $q->where('company_id', auth()->user()->company_id))->exists()
+    ||
+    \App\Models\AccountingEntryLine::where('subledger_type', 'supplier')->where('subledger_id', $supplier->id)->exists()
 )
 {
     return back()->with(

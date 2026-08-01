@@ -35,6 +35,7 @@ use App\Http\Controllers\Company\CompanyDashboardController;
 
 use App\Http\Controllers\Company\SupplierController;
 use App\Http\Controllers\Company\AccountController;
+use App\Http\Controllers\Company\OpeningBalanceController;
 use App\Http\Controllers\Company\CashAccountController;
 use App\Http\Controllers\Company\PurchaseController;
 use App\Http\Controllers\Company\VatController;
@@ -85,6 +86,7 @@ use App\Http\Controllers\Company\CustomerStatementController;
 use App\Http\Controllers\Company\UserPermissionController;
 
 
+Route::get('/', fn() => view('login'));
 Route::get('/login', fn() => view('login'))->name('login');
 
 Route::post('/login', function (Request $request) {
@@ -258,6 +260,23 @@ Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_ST
 
 
 Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::class,'subscription'])->prefix('company')->name('company.')->group(function () {
+    Route::prefix('opening-balances')->name('opening-balances.')->group(function () {
+        Route::get('/', [OpeningBalanceController::class, 'index'])->middleware('permission:opening-balance.view')->name('index');
+        Route::get('/create', [OpeningBalanceController::class, 'create'])->middleware('permission:opening-balance.create')->name('create');
+        Route::post('/', [OpeningBalanceController::class, 'store'])->middleware('permission:opening-balance.create')->name('store');
+        Route::get('/{openingBalance}', [OpeningBalanceController::class, 'show'])->middleware('permission:opening-balance.view')->name('show');
+        Route::get('/{openingBalance}/edit', [OpeningBalanceController::class, 'edit'])->middleware('permission:opening-balance.edit-draft')->name('edit');
+        Route::put('/{openingBalance}', [OpeningBalanceController::class, 'update'])->middleware('permission:opening-balance.edit-draft')->name('update');
+        Route::post('/{openingBalance}/submit', [OpeningBalanceController::class, 'submit'])->middleware('permission:opening-balance.submit')->name('submit');
+        Route::post('/{openingBalance}/approve', [OpeningBalanceController::class, 'approve'])->middleware('permission:opening-balance.approve')->name('approve');
+        Route::post('/{openingBalance}/post', [OpeningBalanceController::class, 'post'])->middleware('permission:opening-balance.post')->name('post');
+        Route::post('/{openingBalance}/cancel', [OpeningBalanceController::class, 'cancel'])->middleware('permission:opening-balance.cancel')->name('cancel');
+        Route::post('/{openingBalance}/reverse', [OpeningBalanceController::class, 'reverse'])->middleware('permission:opening-balance.reverse')->name('reverse');
+        Route::post('/{openingBalance}/lock', [OpeningBalanceController::class, 'lock'])->middleware('permission:opening-balance.lock')->name('lock');
+        Route::post('/{openingBalance}/unlock', [OpeningBalanceController::class, 'unlock'])->middleware('permission:opening-balance.unlock')->name('unlock');
+        Route::get('/{openingBalance}/audit', [OpeningBalanceController::class, 'audit'])->middleware('permission:opening-balance.audit-view')->name('audit');
+        Route::get('/{openingBalance}/print', [OpeningBalanceController::class, 'print'])->middleware('permission:opening-balance.print')->name('print');
+    });
 
     /*
     |--------------------------------------------------------------------------

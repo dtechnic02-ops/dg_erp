@@ -28,7 +28,7 @@ class CustomerTransactionService
         int $customerId
     )
     {
-        $customer = Customer::findOrFail(
+        $customer = Customer::lockForUpdate()->findOrFail(
             $customerId
         );
 
@@ -45,6 +45,7 @@ $transactions = CustomerTransaction::where(
     'status',
     1
 )
+->lockForUpdate()
 ->orderBy(
     'transaction_date'
 )

@@ -14,9 +14,16 @@ class FinancialYear extends Model
         'start_date',
         'end_date',
         'is_active',
+        'is_closed',
+        'is_locked',
         'created_by'
 
     ];
+
+    protected function casts(): array
+    {
+        return ['is_active' => 'boolean', 'is_closed' => 'boolean', 'is_locked' => 'boolean'];
+    }
 
     public function company()
     {

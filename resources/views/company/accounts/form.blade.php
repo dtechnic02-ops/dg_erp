@@ -75,11 +75,6 @@
     </div>
 
     <div class="col-lg-4 col-md-6 col-12">
-        <label for="opening_balance" class="dg-label">Opening Balance</label>
-        <input type="number" step="0.01" name="opening_balance" id="opening_balance" value="{{ optional($account)->opening_balance ?? 0 }}" class="form-control dg-input">
-    </div>
-
-    <div class="col-lg-4 col-md-6 col-12">
         <label for="current_balance" class="dg-label">Current Balance</label>
         <input type="number" step="0.01" id="current_balance" value="{{ optional($account)->current_balance ?? 0 }}" class="form-control dg-input" readonly aria-readonly="true">
     </div>

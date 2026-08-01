@@ -58,6 +58,7 @@ class SupplierOpeningBalanceAccountingDataBuilder
             'company_id' => $companyId,
             'supplier_id' => $supplierId,
             'transaction_date' => $transactionDate,
+            'financial_year_id' => $financialYearId,
             'reference_number' => (string) ($transaction->reference_no ?? ('OPEN-' . $supplierId)),
             'amount' => $amount,
             'created_by' => $this->nullablePositiveInteger($transaction->created_by ?? $supplier->created_by ?? null, 'created_by'),

@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\AccountingEntry;
 use App\Models\ChartAccount;
+use App\Models\FinancialYear;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -33,6 +34,16 @@ class AccountingPostingService
         }
 
         $normalizedLines = $this->normalizeLines($lines);
+
+        if (Schema::hasColumn('accounting_entries', 'financial_year_id') && Schema::hasTable('financial_years')) {
+            if ($financialYearId === null) {
+                throw new InvalidArgumentException('financial_year_id is required for an accounting entry.');
+            }
+            $financialYear = FinancialYear::query()->where('company_id', $companyId)->where('is_active', 1)->find($financialYearId);
+            if (! $financialYear || $entryDate < $financialYear->start_date || $entryDate > $financialYear->end_date) {
+                throw new RuntimeException('The accounting entry date must belong to the active company Financial Year.');
+            }
+        }
 
         return DB::transaction(function () use (
             $companyId,
@@ -254,6 +265,7 @@ class AccountingPostingService
         $explicitAccounts = ChartAccount::query()
             ->forCompany($companyId)
             ->where('status', 'active')
+            ->when(Schema::hasColumn('chart_accounts', 'is_locked'), fn ($query) => $query->where('is_locked', 0))
             ->whereIn('id', $explicitIds)
             ->get()
             ->keyBy('id');
@@ -265,6 +277,7 @@ class AccountingPostingService
         $accounts = ChartAccount::query()
             ->forCompany($companyId)
             ->where('status', 'active')
+            ->when(Schema::hasColumn('chart_accounts', 'is_locked'), fn ($query) => $query->where('is_locked', 0))
             ->whereIn('system_code', $systemCodes)
             ->get()
             ->groupBy('system_code');
