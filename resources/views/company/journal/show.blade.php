@@ -6,7 +6,7 @@
 
 @php
     $user = auth()->user();
-    $canEdit = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('edit_journal'));
+    $canEdit = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('journal.edit-draft') || $user->hasPermission('edit_journal'));
     $canPrint = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('print_journal'));
     $company = auth()->user()->company;
 
@@ -34,9 +34,10 @@
                             <span aria-hidden="true">🖨</span> Print
                         </a>
                     @endif
-                    @if ($canEdit && $journal->isActive())
+                    @if ($canEdit && $journal->isDraft() && !$journal->is_locked)
                         <a href="{{ route('company.journal.edit', $journal->id) }}" class="btn btn-outline-primary dg-btn">Edit</a>
                     @endif
+                    @if($user?->hasPermission('journal.audit-view'))<a href="{{ route('company.journal.audit', $journal->id) }}" class="btn btn-outline-secondary dg-btn">Audit</a>@endif
                 </nav>
             </div>
         </div>
@@ -51,19 +52,6 @@
 
             @if (session('error'))
                 <div class="alert alert-danger dg-alert d-print-none" role="alert">{{ session('error') }}</div>
-            @endif
-
-            @if ($canEdit && $journal->isPosted() && !$journal->reversal_of_journal_id)
-                <form method="POST" action="{{ route('company.journal.reverse', $journal->id) }}" class="card dg-card mb-3 d-print-none">
-                    @csrf
-                    <div class="card-body dg-card-body d-flex flex-wrap align-items-end gap-2">
-                        <div class="flex-grow-1">
-                            <label for="cancel_reason" class="form-label">Reversal Reason <span class="text-danger">*</span></label>
-                            <input type="text" name="cancel_reason" id="cancel_reason" class="form-control dg-input" maxlength="1000" required>
-                        </div>
-                        <button type="submit" class="btn btn-outline-danger dg-btn">Reverse Journal</button>
-                    </div>
-                </form>
             @endif
 
             <article class="dg-invoice-sheet dg-print">
@@ -159,18 +147,18 @@
                                 @foreach ($journal->items as $item)
                                     <tr class="dg-row">
                                         <td class="dg-col-num">{{ $loop->iteration }}</td>
-                                        <td>{{ $item->account->account_name ?? '-' }}</td>
+                                        <td>{{ $item->chartAccount ? $item->chartAccount->code . ' — ' . $item->chartAccount->name : ($item->account->account_name ?? '-') }}</td>
                                         <td>{{ $item->sub_ledger_label ?: '-' }}</td>
                                         <td class="dg-col-num">
                                             @if ($item->type === 'debit')
-                                                {{ number_format($item->amount, 2) }}
+                                                {{ number_format((float) ($item->debit ?: $item->amount), 4) }}
                                             @else
                                                 -
                                             @endif
                                         </td>
                                         <td class="dg-col-num">
                                             @if ($item->type === 'credit')
-                                                {{ number_format($item->amount, 2) }}
+                                                {{ number_format((float) ($item->credit ?: $item->amount), 4) }}
                                             @else
                                                 -
                                             @endif

@@ -18,6 +18,7 @@ use App\Models\Supplier;
 use App\Models\SupplierTransaction;
 use App\Services\Accounting\AccountingPostingService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -261,7 +262,9 @@ class OpeningBalanceService
     {
         $total = array_reduce($lines, fn ($sum, $line) => $sum + $this->scaled($line['debit']), 0);
         $journal = Journal::create(['company_id' => $opening->company_id, 'financial_year_id' => $opening->financial_year_id,
-            'journal_no' => 'OB-' . $opening->id, 'journal_date' => $opening->business_date, 'reference_no' => $opening->reference_number,
+            'journal_no' => 'OB-' . $opening->id, 'journal_date' => $opening->business_date,
+            ...Schema::hasColumn('journals', 'journal_type') ? ['journal_type' => Journal::TYPE_OPENING] : [],
+            'reference_no' => $opening->reference_number,
             'source_module' => 'opening_balance', 'source_type' => 'opening_balance', 'source_id' => $opening->id,
             'source_key' => $sourceKey, 'total_amount' => $this->decimal($total), 'note' => $opening->remarks,
             'created_by' => $userId, 'posted_by' => $userId, 'posted_at' => now(), 'status' => Journal::STATUS_POSTED]);
@@ -292,6 +295,7 @@ class OpeningBalanceService
     {
         $journal = Journal::create(['company_id' => $opening->company_id, 'financial_year_id' => $opening->financial_year_id,
             'journal_no' => 'REV-OB-' . $opening->id, 'journal_date' => $opening->business_date,
+            ...Schema::hasColumn('journals', 'journal_type') ? ['journal_type' => Journal::TYPE_REVERSAL] : [],
             'reference_no' => 'REV-' . $opening->reference_number, 'source_module' => 'opening_balance',
             'source_type' => 'opening_balance_reversal', 'source_id' => $opening->id, 'source_key' => $sourceKey,
             'total_amount' => $original->total_amount, 'note' => $reason,

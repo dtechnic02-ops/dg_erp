@@ -155,6 +155,16 @@ class OpeningBalanceModuleTest extends TestCase
         foreach($requests as [$method,$name,$parameters]){$response=$this->actingAs($staff)->{$method}(route($name,$parameters));$response->assertForbidden();}
     }
 
+    public function test_chart_account_only_opening_balance_journal_renders_in_show_and_voucher(): void
+    {
+        Schema::create('company_subscriptions', function (Blueprint $t) {$t->id();$t->unsignedBigInteger('company_id');$t->string('status');$t->json('hidden_modules')->nullable();$t->boolean('is_all_modules_enabled')->default(true);$t->timestamps();});
+        DB::table('company_subscriptions')->insert(['company_id'=>1,'status'=>'active','is_all_modules_enabled'=>1]);
+        $this->actingAs(User::findOrFail(1));
+        $opening=$this->approved($this->basicLines());$opening=$this->service()->post($opening,1,2);
+        $journal=\App\Models\Journal::with(['items.account','items.chartAccount','financialYear','createdBy','updatedByUser'])->findOrFail($opening->journal_id);
+        foreach(['company.journal.show','company.journal.voucher-print'] as $view){$html=view($view,['journal'=>$journal,'errors'=>new \Illuminate\Support\ViewErrorBag])->render();$this->assertStringContainsString('<td>1130 — AR/Cash</td>', $html);$this->assertStringContainsString('100.1234', $html);}
+    }
+
     private function approved(array $lines): OpeningBalance {$o=$this->service()->create(1,1,$this->payload($lines));$o=$this->service()->submit($o,1,1);return $this->service()->approve($o,1,2);}
     private function service(): OpeningBalanceService {return app(OpeningBalanceService::class);}
     private function payload(array $lines): array {return ['financial_year_id'=>1,'business_date'=>'2026-01-01','type'=>'initial','reference_number'=>'OB-001','remarks'=>'Opening','request_key'=>'11111111-1111-4111-8111-111111111111','lines'=>$lines];}

@@ -12,6 +12,12 @@ class PermissionSeeder extends Seeder
     {
         $permissions = [
             ...collect([
+                'journal.view', 'journal.create', 'journal.edit-draft', 'journal.submit',
+                'journal.approve', 'journal.reject', 'journal.post', 'journal.cancel',
+                'journal.reverse', 'journal.lock', 'journal.unlock', 'journal.audit-view',
+                'journal.print', 'journal.export',
+            ])->map(fn (string $name) => Permission::firstOrCreate(['name' => $name]))->all(),
+            ...collect([
                 'opening-balance.view', 'opening-balance.create', 'opening-balance.edit-draft',
                 'opening-balance.submit', 'opening-balance.approve', 'opening-balance.post',
                 'opening-balance.cancel', 'opening-balance.reverse', 'opening-balance.lock',

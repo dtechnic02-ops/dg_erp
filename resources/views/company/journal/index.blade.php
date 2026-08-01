@@ -98,8 +98,9 @@
                                     <label for="status" class="dg-filter-label">Status</label>
                                     <select name="status" id="status" class="form-select dg-select dg-filter-control">
                                         <option value="" @selected(request()->has('status') && request('status') === '')>All</option>
-                                        <option value="1" @selected(!request()->has('status') || request('status') === '1')>Posted</option>
-                                        <option value="0" @selected(request('status') === '0')>Cancelled</option>
+                        @foreach (\App\Models\Journal::STATUSES as $status)
+                            <option value="{{ $status }}" @selected(request('status', \App\Models\Journal::STATUS_DRAFT) === $status)>{{ ucfirst($status) }}</option>
+                        @endforeach
                                     </select>
                                 </div>
 
@@ -127,7 +128,7 @@
                             <input type="hidden" name="financial_year_id" value="{{ request('financial_year_id', $activeFy?->id) }}">
                             <input type="hidden" name="start_date" value="{{ request('start_date') }}">
                             <input type="hidden" name="end_date" value="{{ request('end_date') }}">
-                            <input type="hidden" name="status" value="{{ request()->has('status') ? request('status') : '1' }}">
+                    <input type="hidden" name="status" value="{{ request()->has('status') ? request('status') : \App\Models\Journal::STATUS_DRAFT }}">
 
                             <label for="per_page" class="dg-list-per-page-label">Show</label>
                             <select name="per_page" id="per_page" class="form-select dg-select dg-list-per-page-select" onchange="this.form.submit()">

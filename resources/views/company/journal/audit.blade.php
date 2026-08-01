@@ -1,0 +1,5 @@
+@extends('company.layout')
+@section('title', 'Journal Audit')
+@section('content')
+<div class="dg-page"><header class="dg-toolbar"><div class="container-fluid d-flex justify-content-between"><h1 class="h4">Journal Audit — {{ $journal->journal_no }}</h1><a class="btn btn-outline-secondary dg-btn" href="{{ route('company.journal.show', $journal->id) }}">Back</a></div></header><div class="container-fluid py-3"><div class="card dg-card"><div class="table-responsive"><table class="table dg-table mb-0"><thead><tr><th>Date/Time</th><th>Event</th><th>Previous</th><th>New</th><th>Actor</th><th>Reason</th></tr></thead><tbody>@forelse($journal->auditEvents as $event)<tr><td>{{ $event->event_at }}</td><td>{{ $event->event }}</td><td>{{ $event->previous_status ?: '—' }}</td><td>{{ $event->new_status ?: '—' }}</td><td>{{ $event->actor_id }}</td><td>{{ $event->reason ?: '—' }}</td></tr>@empty<tr><td colspan="6">No audit events recorded.</td></tr>@endforelse</tbody></table></div></div></div></div>
+@endsection

@@ -1622,8 +1622,8 @@ Route::prefix('income')
         Route::post('/store', 'store')->name('store');
         Route::get('/show/{id}', 'show')->name('show');
         Route::get('/edit/{id}', 'edit')->name('edit');
-        Route::post('/update/{id}', 'update')->name('update');
-        Route::post('/reverse/{id}', 'reverse')->name('reverse');
+        Route::put('/update/{id}', 'update')->name('update');
+        Route::get('/audit/{id}', 'audit')->name('audit');
         Route::get('/print', 'print')->name('print');
         Route::get('/print/{id}', 'printVoucher')->name('print-voucher');
     });

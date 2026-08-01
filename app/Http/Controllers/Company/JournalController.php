@@ -13,6 +13,9 @@ use App\Models\EmployeeAccount;
 use App\Models\FinancialYear;
 use App\Models\Journal;
 use App\Models\JournalItem;
+use App\Models\ChartAccount;
+use App\Http\Requests\JournalRequest;
+use App\Services\JournalService;
 use App\Models\PartyAccount;
 use App\Models\Supplier;
 use App\Models\SupplierTransaction;
@@ -30,6 +33,14 @@ class JournalController extends Controller
 {
     use AuthorizesCompanyPermission;
     use HandlesTransactionDocumentationEdit;
+
+    public function __construct(private readonly JournalService $journalService) {}
+
+    private function authorizeJournalPermission(string $permission, ?string $legacy = null): void
+    {
+        $user = auth()->user();
+        abort_unless($user && ($user->hasPermission($permission) || ($legacy && $user->hasPermission($legacy))), 403, 'You do not have permission to perform this action.');
+    }
 
     protected function buildJournalQuery(Request $request, int $companyId)
     {
@@ -53,7 +64,7 @@ class JournalController extends Controller
         if (!$request->has('status')) {
             $query->where('status', Journal::STATUS_ACTIVE);
         } elseif ($request->filled('status')) {
-            $query->where('status', (int) $request->status);
+            $query->where('status', (string) $request->status);
         }
 
         if ($request->filled('search')) {
@@ -109,9 +120,12 @@ class JournalController extends Controller
 
     protected function chartAccountsForJournal(int $companyId)
     {
-        return Account::where('company_id', $companyId)
-            ->where('status', '!=', 'inactive')
-            ->orderBy('account_name')
+        return ChartAccount::where('company_id', $companyId)
+            ->where('status', 'active')
+            ->where('level', 3)
+            ->where('allow_manual_entry', 1)
+            ->when(\Illuminate\Support\Facades\Schema::hasColumn('chart_accounts', 'is_locked'), fn ($q) => $q->where('is_locked', 0))
+            ->orderBy('code')
             ->get();
     }
 
@@ -377,7 +391,7 @@ class JournalController extends Controller
 
     public function index(Request $request)
     {
-        $this->authorizeCompanyPermission('view_journal');
+        $this->authorizeJournalPermission('journal.view', 'view_journal');
 
         $companyId = auth()->user()->company_id;
         $query = $this->buildJournalQuery($request, $companyId);
@@ -421,7 +435,7 @@ class JournalController extends Controller
 
     public function create()
     {
-        $this->authorizeCompanyPermission('create_journal');
+        $this->authorizeJournalPermission('journal.create', 'create_journal');
 
         $companyId = auth()->user()->company_id;
 
@@ -435,133 +449,30 @@ class JournalController extends Controller
 
         $chartAccounts = $this->chartAccountsForJournal($companyId);
         $subLedgerData = $this->subLedgerCollections($companyId);
-        $submissionToken = $this->createSubmissionToken();
+        $requestKey = (string) Str::uuid();
 
         return view('company.journal.create', array_merge(
             $subLedgerData,
-            compact('chartAccounts', 'activeFy', 'submissionToken')
+            compact('chartAccounts', 'activeFy', 'requestKey')
         ));
     }
 
-    public function store(Request $request)
+    public function store(JournalRequest $request)
     {
-        $this->authorizeCompanyPermission('create_journal');
-
-        $request->validate([
-            'journal_date' => ValidationService::requiredDate(),
-            'reference_no' => 'nullable|string|max:100',
-            'note'         => ValidationService::requiredText(1000),
-            'attachment'   => ValidationService::document(),
-            'submission_token' => 'required|uuid',
-            'ledger_selection'   => 'required|array|min:2',
-            'ledger_selection.*' => 'required|string|max:30',
-            'debit'          => 'required|array',
-            'credit'         => 'required|array',
-            'row_note'       => 'nullable|array',
-        ]);
-
-        $file = null;
-        $submissionToken = (string) $request->submission_token;
-        $submissionConsumed = false;
-        $submissionProcessed = false;
-        $submissionLock = Cache::lock('journal-submission:' . $submissionToken, 30);
-
-        if (!$submissionLock->get()) {
-            return back()->withInput()->with('error', 'This journal submission is already being processed.');
-        }
-
         try {
-            $this->consumeSubmissionToken($submissionToken);
-            $submissionConsumed = true;
-
-            $journal = DB::transaction(function () use ($request, &$file) {
-                $companyId = auth()->user()->company_id;
-                $activeFy = $this->assertActiveFinancialYear($companyId);
-
-                $this->assertDateWithinFinancialYear(
-                    $request->journal_date,
-                    $activeFy,
-                    'Journal date must be inside the active financial year.'
-                );
-
-                $parsed = $this->parseDetailRows($request);
-                $rows = $parsed['rows'];
-                $debitTotal = $parsed['debit_total'];
-
-                foreach ($rows as $row) {
-                    $this->validateAccount($companyId, $row['account_id']);
-
-                    if ($row['sub_ledger_type'] && $row['sub_ledger_id']) {
-                        $this->validateSubLedgerEntity(
-                            $companyId,
-                            $row['sub_ledger_type'],
-                            $row['sub_ledger_id']
-                        );
-                    }
-                }
-
-                $journalNo = $this->generateJournalNo($companyId, $activeFy);
-                $folder = 'companies/' . $companyId . '/journals';
-
-                if ($request->hasFile('attachment')) {
-                    $file = FileUploadService::uploadFile(
-                        $request->file('attachment'),
-                        $folder
-                    );
-                }
-
-                $journal = Journal::create([
-                    'company_id'        => $companyId,
-                    'financial_year_id' => $activeFy->id,
-                    'journal_no'        => $journalNo,
-                    'journal_date'      => $request->journal_date,
-                    'reference_no'    => $request->reference_no,
-                    'total_amount'      => $debitTotal,
-                    'attachment'        => $file,
-                    'note'              => $request->note,
-                    'created_by'        => auth()->id(),
-                    'posted_by'         => auth()->id(),
-                    'posted_at'         => now(),
-                    'status'            => Journal::STATUS_ACTIVE,
-                ]);
-
-                $this->createJournalTransactions(
-                    $journal,
-                    $rows,
-                    $activeFy,
-                    $companyId,
-                    trim($request->note)
-                );
-
-                return $journal;
-            });
-
-            $submissionProcessed = true;
-
-            return redirect()
-                ->route('company.journal.show', $journal->id)
-                ->with('success', 'Journal entry saved successfully.');
-        } catch (\Exception $e) {
-            FileUploadService::deleteFile($file);
-
-            if ($submissionConsumed && !$submissionProcessed) {
-                $this->restoreSubmissionToken($submissionToken);
-            }
-
-            return back()
-                ->withInput()
-                ->with('error', $e->getMessage());
-        } finally {
-            $submissionLock->release();
+            $journal = $this->journalService->createDraft($request->validated(), auth()->user()->company_id, auth()->id());
+            return redirect()->route('company.journal.show', $journal->id)->with('success', 'Draft Journal created successfully.');
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $e->getMessage());
         }
     }
 
     public function show($id)
     {
-        $this->authorizeCompanyPermission('view_journal');
+        $this->authorizeJournalPermission('journal.view', 'view_journal');
 
         $journal = Journal::with([
-                'items.account',
+                'items.account', 'items.chartAccount', 'auditEvents',
                 'financialYear',
                 'createdBy',
                 'updatedByUser',
@@ -574,7 +485,7 @@ class JournalController extends Controller
 
     public function edit($id)
     {
-        $this->authorizeCompanyPermission('edit_journal');
+        $this->authorizeJournalPermission('journal.edit-draft', 'edit_journal');
 
         $companyId = auth()->user()->company_id;
 
@@ -582,8 +493,8 @@ class JournalController extends Controller
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        if (!$journal->isActive()) {
-            return back()->with('error', 'Cancelled journal cannot be edited.');
+        if (!$journal->isDraft() || $journal->is_locked) {
+            return back()->with('error', 'Only an unlocked Draft Journal can be edited.');
         }
 
         if ($journal->financial_year_id) {
@@ -606,54 +517,28 @@ class JournalController extends Controller
         ));
     }
 
-    public function update(Request $request, $id)
+    public function update(JournalRequest $request, $id)
     {
-        $this->authorizeCompanyPermission('edit_journal');
-
-        $request->validate([
-            'journal_date' => ValidationService::requiredDate(),
-            'note' => ValidationService::requiredText(1000),
-        ]);
-
         try {
-            DB::transaction(function () use ($request, $id) {
-                $companyId = auth()->user()->company_id;
-                $journal = Journal::where('company_id', $companyId)->lockForUpdate()->findOrFail($id);
-
-                abort_unless($journal->isPosted(), 422, 'Only posted journals may be updated.');
-
-                $financialYear = FinancialYear::where('company_id', $companyId)
-                    ->whereKey($journal->financial_year_id)
-                    ->where('is_active', 1)
-                    ->firstOrFail();
-
-                $this->assertDateWithinFinancialYear($request->journal_date, $financialYear);
-
-                $journal->update($this->appendUpdatedBy([
-                    'journal_date' => $request->journal_date,
-                    'note' => $request->note,
-                ], $journal));
-
-                $description = trim($request->note);
-                foreach ([AccountTransaction::class, \App\Models\CustomerTransaction::class, \App\Models\SupplierTransaction::class] as $transactionModel) {
-                    $transactionModel::where('company_id', $companyId)
-                        ->where('reference_type', 'Journal')
-                        ->where('reference_id', $journal->id)
-                        ->where('status', 1)
-                        ->update(['transaction_date' => $request->journal_date, 'description' => $description]);
-                }
-            });
-
-            return redirect()->route('company.journal.show', $id)->with('success', 'Posted journal date and narration updated successfully.');
+            $journal = Journal::where('company_id', auth()->user()->company_id)->findOrFail($id);
+            $this->journalService->updateDraft($journal, $request->validated(), auth()->id());
+            return redirect()->route('company.journal.show', $id)->with('success', 'Draft Journal updated successfully.');
         } catch (\Throwable $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
     }
 
+    public function audit($id)
+    {
+        $this->authorizeCompanyPermission('journal.audit-view');
+        $journal = Journal::with(['auditEvents', 'financialYear'])->where('company_id', auth()->user()->company_id)->findOrFail($id);
+        return view('company.journal.audit', compact('journal'));
+    }
+
     public function reverse(Request $request, $id)
     {
-        $this->authorizeCompanyPermission('edit_journal');
+        $this->authorizeJournalPermission('journal.reverse');
 
         $request->validate([
             'cancel_reason' => ValidationService::requiredText(1000),
@@ -809,7 +694,7 @@ class JournalController extends Controller
 
     public function print()
     {
-        $this->authorizeCompanyPermission('view_journal');
+        $this->authorizeJournalPermission('journal.print', 'print_journal');
 
         $companyId = auth()->user()->company_id;
 
@@ -839,7 +724,7 @@ class JournalController extends Controller
 
     public function printVoucher($id)
     {
-        $this->authorizeCompanyPermission('print_journal');
+        $this->authorizeJournalPermission('journal.print', 'print_journal');
 
         $journal = Journal::with([
                 'items.account',

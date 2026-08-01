@@ -19,12 +19,19 @@ class JournalItem extends Model
         'sub_ledger_id',
         'type',
         'amount',
+        'debit',
+        'credit',
+        'description',
+        'reference',
+        'line_number',
         'note',
         'status',
     ];
 
     protected $casts = [
         'amount' => 'decimal:4',
+        'debit' => 'decimal:4',
+        'credit' => 'decimal:4',
         'status' => 'integer',
     ];
 

@@ -110,18 +110,18 @@
                                     @foreach ($journal->items as $item)
                                         <tr class="dg-row">
                                             <td class="dg-col-num">{{ $loop->iteration }}</td>
-                                            <td>{{ $item->account->account_name ?? '-' }}</td>
+                                    <td>{{ $item->chartAccount ? $item->chartAccount->code . ' — ' . $item->chartAccount->name : ($item->account->account_name ?? '-') }}</td>
                                             <td>{{ $item->sub_ledger_label ?: '-' }}</td>
                                             <td class="dg-col-num">
                                                 @if ($item->type === 'debit')
-                                                    {{ number_format($item->amount, 2) }}
+                                                    {{ number_format((float) ($item->debit ?: $item->amount), 4) }}
                                                 @else
                                                     -
                                                 @endif
                                             </td>
                                             <td class="dg-col-num">
                                                 @if ($item->type === 'credit')
-                                                    {{ number_format($item->amount, 2) }}
+                                                    {{ number_format((float) ($item->credit ?: $item->amount), 4) }}
                                                 @else
                                                     -
                                                 @endif
@@ -133,8 +133,8 @@
                                 <tfoot>
                                     <tr class="dg-row">
                                         <th colspan="3" class="text-end">Total</th>
-                                        <th class="dg-col-num">{{ number_format($totalDebit, 2) }}</th>
-                                        <th class="dg-col-num">{{ number_format($totalCredit, 2) }}</th>
+                                        <th class="dg-col-num">{{ number_format($totalDebit, 4) }}</th>
+                                        <th class="dg-col-num">{{ number_format($totalCredit, 4) }}</th>
                                         <th></th>
                                     </tr>
                                 </tfoot>
@@ -160,16 +160,16 @@
                             <div class="dg-invoice-totals-box">
                                 <div class="dg-summary-item">
                                     <span class="dg-summary-label">Total Debit</span>
-                                    <span class="dg-summary-value">{{ number_format($totalDebit, 2) }}</span>
+                                    <span class="dg-summary-value">{{ number_format($totalDebit, 4) }}</span>
                                 </div>
                                 <div class="dg-summary-item">
                                     <span class="dg-summary-label">Total Credit</span>
-                                    <span class="dg-summary-value">{{ number_format($totalCredit, 2) }}</span>
+                                    <span class="dg-summary-value">{{ number_format($totalCredit, 4) }}</span>
                                 </div>
                                 <div class="dg-invoice-totals-divider"></div>
                                 <div class="dg-summary-item dg-summary-total">
                                     <span class="dg-summary-label">Amount</span>
-                                    <span class="dg-summary-value">{{ number_format($journal->total_amount, 2) }}</span>
+                                    <span class="dg-summary-value">{{ number_format((float) $journal->total_amount, 4) }}</span>
                                 </div>
                             </div>
                         </section>
