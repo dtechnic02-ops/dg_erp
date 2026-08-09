@@ -10,7 +10,37 @@ class PermissionSeeder extends Seeder
 {
     public function run()
     {
+        foreach ([
+            'module_users', 'module_income', 'module_expense', 'module_journal',
+            'module_opening_balance', 'module_loan', 'module_hr', 'module_payroll',
+            'module_delivery', 'module_crm', 'module_company_profile', 'module_maintenance',
+            'module_sales', 'module_sales_payment', 'module_customer', 'module_purchase',
+            'module_supplier', 'module_stock', 'module_accounts', 'module_account_transaction',
+            'module_contra', 'module_vat', 'module_reports',
+        ] as $modulePermission) {
+            Permission::firstOrCreate(['name' => $modulePermission], ['scope' => Permission::SCOPE_COMPANY]);
+        }
+
+        Permission::firstOrCreate(['name' => 'system_maintenance'], ['scope' => Permission::SCOPE_COMPANY]);
+
         $permissions = [
+            ...collect([
+                'view_sales', 'create_sales', 'edit_sales', 'cancel_sales', 'print_sales',
+                'view_sales_payment', 'create_sales_payment', 'edit_sales_payment',
+                'cancel_sales_payment', 'print_sales_payment',
+                'view_customer', 'create_customer', 'edit_customer', 'delete_customer', 'print_customer',
+                'view_purchase', 'create_purchase', 'edit_purchase', 'cancel_purchase', 'print_purchase',
+                'view_supplier', 'create_supplier', 'edit_supplier', 'delete_supplier', 'print_supplier',
+                'view_stock', 'print_stock',
+                'view_accounts', 'create_accounts', 'edit_accounts', 'delete_accounts', 'print_accounts',
+                'view_account_transaction',
+                'view_contra', 'create_contra', 'edit_contra', 'delete_contra', 'print_contra',
+                'view_vat', 'create_vat', 'edit_vat', 'delete_vat', 'print_vat',
+                'view_reports', 'print_reports',
+            ])->map(fn (string $name) => Permission::firstOrCreate(
+                ['name' => $name],
+                ['scope' => Permission::SCOPE_COMPANY]
+            ))->all(),
             ...collect([
                 'journal.view', 'journal.create', 'journal.edit-draft', 'journal.submit',
                 'journal.approve', 'journal.reject', 'journal.post', 'journal.cancel',
@@ -142,16 +172,35 @@ class PermissionSeeder extends Seeder
         $permissionIds = collect($permissions)->pluck('id')->all();
 
         $platformPermissionNames = [
+            'platform_module_dashboard',
+            'platform_module_companies',
+            'platform_module_registrations',
+            'platform_module_subscriptions',
+            'platform_module_subscription_payments',
+            'platform_module_subscription_reports',
+            'platform_module_settings',
+            'platform_module_plans',
+            'platform_module_super_staff',
+            'platform_module_users',
+            'platform_dashboard_view',
             'platform_companies_view',
             'platform_companies_block',
             'platform_companies_unblock',
+            'platform_companies_edit',
+            'platform_companies_delete',
+            'platform_companies_reset_password',
             'platform_registrations_view',
             'platform_registrations_approve',
             'platform_registrations_reject',
             'platform_subscriptions_view',
+            'platform_subscriptions_manage',
             'platform_subscription_payments_view',
             'platform_subscription_payments_invoice_view',
             'platform_subscription_reports_view',
+            'platform_settings_manage',
+            'platform_plans_manage',
+            'platform_super_staff_manage',
+            'platform_users_manage',
         ];
 
         foreach ($platformPermissionNames as $platformPermissionName) {

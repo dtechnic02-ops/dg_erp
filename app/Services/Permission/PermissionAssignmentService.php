@@ -2,13 +2,31 @@
 
 namespace App\Services\Permission;
 
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\UserPermission;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class PermissionAssignmentService
 {
+    public function resetCompanyPermissions(User $user, int $companyId): int
+    {
+        if (
+            (int) $user->role_id !== Role::COMPANY_STAFF_ID
+            || (int) $user->company_id !== $companyId
+        ) {
+            throw new AuthorizationException('Company Staff permission reset boundary violated.');
+        }
+
+        return UserPermission::query()
+            ->where('user_id', $user->id)
+            ->whereIn('permission_id', Permission::company()->select('id'))
+            ->delete();
+    }
+
     /**
      * Allow a permission for a user.
      */

@@ -9,7 +9,7 @@ class VerifyAdminUserPasswordResetOtpRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (int) $this->user()?->role_id === Role::SUPER_ADMIN_ID;
+        return app(\App\Services\PlatformAuthorizationService::class)->can($this->user(), 'platform_users_manage');
     }
 
     public function rules(): array

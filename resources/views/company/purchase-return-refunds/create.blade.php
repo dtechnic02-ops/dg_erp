@@ -49,6 +49,7 @@
                 data-grand="{{ $return->grand_total }}"
                 data-refunded="{{ $totalRefunded }}">
                 @csrf
+                <input type="hidden" name="idempotency_key" value="{{ $idempotencyKey }}">
 
                 <input type="hidden" name="purchase_return_id" value="{{ $return->id }}">
 

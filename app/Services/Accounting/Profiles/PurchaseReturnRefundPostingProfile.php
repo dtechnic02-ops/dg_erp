@@ -1,8 +1,24 @@
 <?php
+
 namespace App\Services\Accounting\Profiles;
+
 use App\Models\PurchaseReturnRefund;
 use RuntimeException;
+
 class PurchaseReturnRefundPostingProfile
 {
- public function build(array $d):array { $n=$d['components']['net'];$t=$d['components']['tax'];$a=$d['adjust_amount'];$c=$d['cash_amount']; if(bccomp(bcadd($n,$t,4),bcadd($a,$c,4),4)!==0)throw new RuntimeException('Purchase return refund accounting is not balanced.');$l=[];if($n!=='0.0000')$l[]=['chart_account_system_code'=>'PURCHASE_RETURNS','operational_account_id'=>null,'description'=>'Purchase return - '.$d['refund_number'],'debit'=>'0.0000','credit'=>$n,'subledger_type'=>null,'subledger_id'=>null];if($t!=='0.0000')$l[]=['chart_account_system_code'=>'INPUT_TAX_RECEIVABLE','operational_account_id'=>null,'description'=>'Input tax reversal - '.$d['refund_number'],'debit'=>'0.0000','credit'=>$t,'subledger_type'=>null,'subledger_id'=>null];if($a!=='0.0000')$l[]=['chart_account_system_code'=>'ACCOUNTS_PAYABLE','operational_account_id'=>null,'description'=>'Supplier payable adjustment - '.$d['refund_number'],'debit'=>$a,'credit'=>'0.0000','subledger_type'=>'supplier','subledger_id'=>$d['supplier_id']];if($c!=='0.0000')$l[]=['chart_account_system_code'=>$d['account_type']==='Cash'?'CASH_IN_HAND':'BANK_ACCOUNTS','operational_account_id'=>$d['account_id'],'description'=>'Purchase return cash receipt - '.$d['refund_number'],'debit'=>$c,'credit'=>'0.0000','subledger_type'=>null,'subledger_id'=>null];return ['company_id'=>$d['company_id'],'entry_date'=>$d['refund_date'],'reference_number'=>$d['refund_number'],'source_module'=>'purchase_return_refund','source_type'=>'purchase_return_refund','source_type_aliases'=>[PurchaseReturnRefund::class],'source_id'=>$d['refund_id'],'source_event'=>'created','source_key'=>'purchase_return_refund:'.$d['refund_id'].':created','description'=>'Purchase return refund - '.$d['refund_number'],'posted_by'=>$d['created_by'],'lines'=>$l]; }
+    public function build(array $data): array
+    {
+        $adjust=$data['adjust_amount']; $cash=$data['cash_amount']; $settlement=$data['settlement_amount'];
+        if(bccomp(bcadd($adjust,$cash,4),$settlement,4)!==0 || bccomp($settlement,'0.0000',4)<=0) throw new RuntimeException('Purchase Return Refund accounting is not balanced.');
+        $lines=[];
+        if($adjust!=='0.0000') $lines[]=['chart_account_system_code'=>'ACCOUNTS_PAYABLE','operational_account_id'=>null,'description'=>'Supplier payable adjustment - '.$data['refund_number'],'debit'=>$adjust,'credit'=>'0.0000','subledger_type'=>'supplier','subledger_id'=>$data['supplier_id']];
+        if($cash!=='0.0000') $lines[]=['chart_account_system_code'=>$data['account_type']==='Cash'?'CASH_IN_HAND':'BANK_ACCOUNTS','operational_account_id'=>$data['account_id'],'description'=>'Purchase Return cash receipt - '.$data['refund_number'],'debit'=>$cash,'credit'=>'0.0000','subledger_type'=>null,'subledger_id'=>null];
+        $lines[]=['chart_account_system_code'=>'SUPPLIER_RETURN_RECEIVABLE','operational_account_id'=>null,'description'=>'Purchase Return settlement clearing - '.$data['refund_number'],'debit'=>'0.0000','credit'=>$settlement,'subledger_type'=>null,'subledger_id'=>null];
+
+        return ['company_id'=>$data['company_id'],'financial_year_id'=>$data['financial_year_id'],'entry_date'=>$data['refund_date'],'reference_number'=>$data['refund_number'],
+            'source_module'=>'purchase_return_refund','source_type'=>'purchase_return_refund','source_type_aliases'=>[PurchaseReturnRefund::class],
+            'source_id'=>$data['refund_id'],'source_event'=>'created','source_key'=>'purchase_return_refund:'.$data['refund_id'].':created',
+            'description'=>'Purchase Return Refund settlement - '.$data['refund_number'],'posted_by'=>$data['created_by'],'lines'=>$lines];
+    }
 }

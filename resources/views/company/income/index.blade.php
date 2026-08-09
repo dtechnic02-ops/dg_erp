@@ -6,10 +6,10 @@
 
 @php
     $user = auth()->user();
-    $canCreate = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('create_income'));
-    $canEdit = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('edit_income'));
-    $canPrint = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('print_income'));
-    $canManageCategories = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('manage_income_categories'));
+    $canCreate = $user?->hasPermission('create_income') ?? false;
+    $canEdit = $user?->hasPermission('edit_income') ?? false;
+    $canPrint = $user?->hasPermission('print_income') ?? false;
+    $canManageCategories = $user?->hasPermission('manage_income_categories') ?? false;
 @endphp
 
 <div class="dg-page">

@@ -14,7 +14,7 @@ trait AuthorizesAdminSubscription
 
     {
 
-        abort_unless(auth()->user()?->hasPermission('view_subscription_module'), 403, 'You do not have permission to view subscription data.');
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_subscriptions_view'), 403, 'You do not have permission to view subscription data.');
 
     }
 
@@ -24,9 +24,8 @@ trait AuthorizesAdminSubscription
 
     {
 
-        abort_unless(auth()->user()?->hasPermission('manage_subscription_module'), 403, 'You do not have permission to manage subscriptions.');
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_subscriptions_manage'), 403, 'You do not have permission to manage subscriptions.');
 
     }
 
 }
-

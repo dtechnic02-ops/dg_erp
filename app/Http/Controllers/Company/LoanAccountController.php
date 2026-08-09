@@ -341,11 +341,6 @@ class LoanAccountController extends Controller implements HasMiddleware
                 $principal = Money::normalize($request->principal_amount);
 
                 if ($request->loan_type === LoanAccount::TYPE_TAKEN) {
-                    $account->increment(
-                        'current_balance',
-                        $principal
-                    );
-
                     $party->increment(
                         'current_balance',
                         $principal
@@ -600,7 +595,6 @@ class LoanAccountController extends Controller implements HasMiddleware
                 throw new \Exception('Insufficient account balance to cancel this loan.');
             }
 
-            $account->decrement('current_balance', $principal);
             $party->decrement('current_balance', $principal);
         }
     }

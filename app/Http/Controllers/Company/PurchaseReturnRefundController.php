@@ -23,6 +23,7 @@ use App\Services\ValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
 class PurchaseReturnRefundController extends Controller
@@ -198,7 +199,7 @@ class PurchaseReturnRefundController extends Controller
                 'refundNo',
                 'remainingAmount',
                 'outstandingInvoices'
-            )
+            ) + ['idempotencyKey' => (string) Str::uuid()]
         );
     }
 
@@ -208,6 +209,7 @@ class PurchaseReturnRefundController extends Controller
 
         $request->validate([
             'purchase_return_id'      => 'required|exists:purchase_returns,id,company_id,' . $companyId,
+            'idempotency_key'         => 'required|uuid',
             'refund_date'             => 'required|date',
             'purchase_invoice_id'     => 'nullable|array',
             'purchase_invoice_id.*'   => 'nullable|integer',
@@ -236,6 +238,9 @@ class PurchaseReturnRefundController extends Controller
 
         try {
             $refund = DB::transaction(function () use ($request, $companyId) {
+                if (PurchaseReturnRefund::where('company_id', $companyId)->where('idempotency_key', $request->idempotency_key)->lockForUpdate()->exists()) {
+                    throw new \Exception('This Purchase Return Refund request has already been submitted.');
+                }
                 $activeFy = $this->resolveFinancialYear($companyId, $request->refund_date);
 
                 if (!$activeFy) {
@@ -324,6 +329,7 @@ class PurchaseReturnRefundController extends Controller
                     'purchase_return_id'  => $return->id,
                     'supplier_id'         => $return->supplier_id,
                     'account_id'          => $account?->id,
+                    'idempotency_key'     => $request->idempotency_key,
                     'refund_no'           => $refundNo,
                     'refund_date'         => $request->refund_date,
                     'refund_amount'       => $settlementTotal,

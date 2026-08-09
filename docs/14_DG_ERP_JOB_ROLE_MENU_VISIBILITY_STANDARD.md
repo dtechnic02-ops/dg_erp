@@ -4,6 +4,160 @@ Version: 1.0
 Status: FINAL (FROZEN)
 Authority: Business Owner
 
+BUSINESS OWNER AMENDMENT — JOB ROLE CHANGE PERMISSION RESET
+Version: 1.3 Authority Freeze
+Status: FINAL — BUSINESS OWNER APPROVED
+Effective: 2026-08-09
+
+This amendment freezes the security behavior when a Company Staff Job Role
+actually changes. It does not make Job Role an authorization mechanism. Where
+wording elsewhere conflicts with this amendment, this amendment controls.
+
+JOB ROLE, CATALOG, AND AUTHORITY
+
+- Job Role controls organizational designation, approved visibility, and the
+  assignable-permission catalog boundary.
+- Explicit `scope=company` Module and Action permissions control Company Staff
+  backend authority.
+- Job Role grants zero backend business authority and grants no permission
+  automatically.
+
+ACTUAL JOB ROLE CHANGE
+
+Changing a Company Staff member from one Job Role to another requires a clear
+warning and explicit confirmation. On confirmation, the Job Role change and
+removal of that target staff member's existing explicit company permission
+assignments must be atomic.
+
+After the confirmed reset, the new Job Role determines the new assignable
+catalog. Company Admin or an explicitly authorized Sub Admin must then assign
+the required company Module and Action permissions. The new Job Role itself
+must not create, allow, or inherit permissions.
+
+JOB ROLE UNCHANGED
+
+Saving a staff record without an actual Job Role change must not reset explicit
+permissions. Changes to name, email, phone, or other staff information do not
+constitute a permission-reset event.
+
+CANCELLED OR UNCONFIRMED CHANGE
+
+If the authorized user cancels or does not confirm an actual Job Role change,
+the stored Job Role and all existing explicit permissions must remain
+unchanged.
+
+TARGET AND SCOPE BOUNDARY
+
+This rule applies to Company Staff, including staff designated as Sub Admin.
+Only the target staff member's explicit `scope=company` assignments are reset.
+It must not affect Permission master records, another staff member, Company
+Admin implicit authority, Super Admin, or Super Staff platform permissions.
+
+END BUSINESS OWNER AMENDMENT — VERSION 1.3
+
+BUSINESS OWNER AMENDMENT — ASSIGNABLE PERMISSION CATALOG BOUNDARY
+Version: 1.2 Authority Freeze
+Status: FINAL — BUSINESS OWNER APPROVED
+Effective: 2026-08-09
+
+This amendment adds one approved Job Role responsibility without creating a
+new authorization model. Where wording elsewhere in this document limits Job
+Role exclusively to sidebar/dashboard visibility or otherwise conflicts with
+this amendment, this amendment controls.
+
+THREE DISTINCT RESPONSIBILITIES
+
+1. Job Role Visibility
+
+Job Role controls approved sidebar, dashboard, widget, and organizational
+visibility.
+
+2. Job Role Assignable-Permission Catalog Filter
+
+When managing permissions for Company Staff, Job Role may limit the
+`scope=company` Module and Action permissions available for new assignment.
+This is an administrative assignment-catalog boundary only. It does not grant,
+deny, or evaluate backend access.
+
+3. Explicit Permission-Based Backend Authorization
+
+Backend authority exists only when the staff member has the explicitly
+assigned company Module Permission and corresponding company Action
+Permission. Job Role never auto-assigns or auto-allows either permission.
+
+RECEIVER CATALOG FREEZE
+
+Receiver's assignable operational domains are:
+
+- Purchase;
+- Suppliers;
+- Inventory.
+
+Unrelated domains, including CRM, Income, HR, Payroll, and Journal, must not be
+available for new Receiver assignment unless the Business Owner changes the
+Receiver Job Role definition.
+
+LEGACY ASSIGNMENT PRESERVATION
+
+An existing explicit permission outside a new or changed Job Role filter must
+not be silently deleted, revoked, denied, or rewritten. It must remain visible
+for review and may be removed only through an explicit authorized cleanup
+decision. Applying the filter alone is never a cleanup decision.
+
+BOUNDARIES UNCHANGED
+
+- Company Admin retains full own-company authority.
+- Sub Admin and Company Staff remain permission-authorized users.
+- Job Role grants zero backend business authority.
+- Platform permissions are never assignable through a company Job Role.
+- Owner-reserved and platform-reserved permissions remain unavailable to
+  Company Staff regardless of Job Role.
+
+END BUSINESS OWNER AMENDMENT — VERSION 1.2
+
+BUSINESS OWNER AMENDMENT — COMPANY SUB ADMIN IDENTITY AND BOUNDARY
+Version: 1.1 Authority Freeze
+Status: FINAL — BUSINESS OWNER APPROVED
+Effective: 2026-08-09
+
+This amendment resolves the Sub Admin identity and authority boundary without
+changing the Job Role architecture. Where wording elsewhere in this document
+conflicts with this amendment, this amendment controls.
+
+Company Sub Admin is not a System Role. DG ERP continues to have exactly four
+System Roles: Super Admin, Company Admin, Company Staff, and Super Staff.
+
+A Company Sub Admin has:
+
+- System Role: Company Staff;
+- Job Role: Sub Admin;
+- business authority: individually assigned `scope=company` Module and Action
+  permissions.
+
+The Sub Admin Job Role grants zero backend business authority. It controls only
+sidebar visibility, dashboard visibility, widgets, and organizational
+designation. A visible menu is not authorization, and a hidden menu does not
+revoke an assigned business permission.
+
+A Sub Admin may receive broad operational authority, including approved staff
+management and Company Staff permission management, only through corresponding
+company-scope Module and Action permissions. This permission-based exception
+overrides the general ordinary-Company-Staff User Management restriction only
+for an explicitly authorized Sub Admin.
+
+The following remain unavailable to Sub Admin regardless of assigned
+permissions or menu visibility: Company Profile ownership-level administration,
+Company Reset, Database Reset, Dangerous Maintenance Tools, System Maintenance,
+Cache Clear, Queue Restart, Log Management, Maintenance Mode, System Utilities,
+Company Delete or tenant-destructive deletion, platform company approval,
+platform company blocking, platform company deletion, and every other action
+classified by the Constitution as Company Admin owner-only or Platform-only.
+
+Sub Admin authority is restricted to the user's own company. Sub Admin receives
+no platform-scope authority and no cross-company authority.
+
+END BUSINESS OWNER AMENDMENT — VERSION 1.1
+
 PURPOSE
 
 This document defines the official Job Role architecture for DG ERP.

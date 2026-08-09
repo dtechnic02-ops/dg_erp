@@ -17,9 +17,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // 🔥 ROLE MIDDLEWARE
         $middleware->alias([
 
-            'role' =>
-                \App\Http\Middleware\RoleMiddleware::class,
-
             'subscription' =>
                 \App\Http\Middleware\CheckSubscription::class,
 
@@ -28,6 +25,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
             'permission' =>
                 \App\Http\Middleware\EnsurePermission::class,
+
+            'platform.user' =>
+                \App\Http\Middleware\EnsurePlatformUser::class,
+
+            'platform.permission' =>
+                \App\Http\Middleware\EnsurePlatformPermission::class,
 
             'company.user' =>
                 \App\Http\Middleware\EnsureCompanyUser::class,
@@ -49,4 +52,3 @@ return Application::configure(basePath: dirname(__DIR__))
     })
 
     ->create();
-

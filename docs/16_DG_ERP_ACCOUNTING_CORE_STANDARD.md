@@ -353,6 +353,7 @@ Every company shall contain, at minimum, the following System Accounts:
 - Bank Account
 - Accounts Receivable
 - Inventory
+- Supplier Return Receivable (`SUPPLIER_RETURN_RECEIVABLE`) — an Asset clearing-control account for Purchase Return value returned to a Supplier but not yet settled
 
 ### Liabilities
 
@@ -391,6 +392,7 @@ SYS_BANK
 SYS_AR
 SYS_AP
 SYS_INVENTORY
+SUPPLIER_RETURN_RECEIVABLE
 SYS_CAPITAL
 SYS_RETAINED_EARNINGS
 SYS_SALES

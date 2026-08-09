@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Role;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -16,18 +15,8 @@ class CheckPermission
             return redirect('/login');
         }
 
-        // super admin bypass
-        if ((int) $user->role_id === Role::SUPER_ADMIN_ID) {
-            return $next($request);
-        }
-
-        // check permission
-        if (!$user->role || !$user->role->permissions->contains('name', $permission)) {
-            return "Access Denied";
-        }
-        if (auth()->user()->company->status === 'blocked') {
-           abort(403, 'Company blocked');
-        }
+        abort_unless($user->hasPermission($permission, $user->company_id), 403);
+        abort_if($user->company?->status === 'blocked', 403, 'Company blocked');
 
         return $next($request);
     }

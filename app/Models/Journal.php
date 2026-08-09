@@ -114,6 +114,20 @@ class Journal extends Model
         return $this->belongsTo(User::class, 'cancelled_by');
     }
 
+    public function submittedByUser() { return $this->belongsTo(User::class, 'submitted_by'); }
+    public function approvedByUser() { return $this->belongsTo(User::class, 'approved_by'); }
+    public function postedByUser() { return $this->belongsTo(User::class, 'posted_by'); }
+    public function rejectedByUser() { return $this->belongsTo(User::class, 'rejected_by'); }
+    public function lockedByUser() { return $this->belongsTo(User::class, 'locked_by'); }
+    public function unlockedByUser() { return $this->belongsTo(User::class, 'unlocked_by'); }
+    public function reversedByUser() { return $this->belongsTo(User::class, 'reversed_by'); }
+    public function reversalJournal() { return $this->hasOne(self::class, 'reversal_of_journal_id'); }
+    public function originalJournal() { return $this->belongsTo(self::class, 'reversal_of_journal_id'); }
+    public function accountingEntry()
+    {
+        return $this->hasOne(AccountingEntry::class, 'source_key', 'source_key');
+    }
+
     public function isActive(): bool
     {
         return $this->isPosted();

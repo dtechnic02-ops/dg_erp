@@ -174,6 +174,7 @@ class LoanPaymentController extends Controller implements HasMiddleware
                 'integer',
                 ValidationService::existsForCompany('accounts', $companyId),
             ],
+            'payment_date' => ValidationService::requiredDate(),
             'next_payment_date' => ValidationService::date(),
             'principal_amount' => 'required|numeric|min:0',
             'interest_amount' => ValidationService::amount(),
@@ -308,6 +309,12 @@ class LoanPaymentController extends Controller implements HasMiddleware
                 if ((int) $request->financial_year_id !== (int) $activeFy->id) {
                     throw new \Exception('Financial year must be the active financial year.');
                 }
+
+                $this->assertDateWithinFinancialYear(
+                    $request->payment_date,
+                    $activeFy,
+                    'Payment date must be inside the active financial year.'
+                );
 
                 if ($request->filled('next_payment_date')) {
                     $this->assertDateWithinFinancialYear(
@@ -641,9 +648,7 @@ class LoanPaymentController extends Controller implements HasMiddleware
                 ->lockForUpdate()
                 ->findOrFail($payment->account_id);
 
-            if ($loan->loan_type === LoanAccount::TYPE_TAKEN) {
-                $account->increment('current_balance', $total);
-            } else {
+            if ($loan->loan_type === LoanAccount::TYPE_GIVEN) {
                 if (Money::compare($account->current_balance, $total) < 0) {
                     throw new \Exception('Insufficient account balance to reverse payment.');
                 }
@@ -793,9 +798,7 @@ class LoanPaymentController extends Controller implements HasMiddleware
             if (Money::compare($account->current_balance, $total) < 0) {
                 throw new \Exception('Insufficient balance.');
             }
-
-            $account->decrement('current_balance', $total);
-        } else {
+        } elseif ($loan->loan_type === LoanAccount::TYPE_GIVEN) {
             $account->increment('current_balance', $total);
         }
 

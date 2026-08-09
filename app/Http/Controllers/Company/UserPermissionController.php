@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Company;
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\User;
+use App\Services\JobRoleVisibilityService;
 use App\Services\SubscriptionService;
 use App\Services\Permission\PermissionAssignmentService;
+use App\Services\Permission\PermissionModuleResolver;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -15,13 +17,16 @@ class UserPermissionController extends Controller
 {
     protected PermissionAssignmentService $permissionService;
     protected SubscriptionService $subscriptionService;
+    protected JobRoleVisibilityService $jobRoleVisibilityService;
 
     public function __construct(
         PermissionAssignmentService $permissionService,
-        SubscriptionService $subscriptionService
+        SubscriptionService $subscriptionService,
+        JobRoleVisibilityService $jobRoleVisibilityService
     ) {
         $this->permissionService = $permissionService;
         $this->subscriptionService = $subscriptionService;
+        $this->jobRoleVisibilityService = $jobRoleVisibilityService;
     }
 
     /**
@@ -31,7 +36,7 @@ class UserPermissionController extends Controller
 {
     $this->authorizeUser($user);
 
-    $permissions = $this->availablePermissions();
+    $permissions = $this->availablePermissions($user);
 
     $overrides = $user->permissions()
         ->pluck('user_permissions.is_allowed', 'permissions.id')
@@ -67,7 +72,7 @@ class UserPermissionController extends Controller
             ],
         ]);
 
-        $allowedPermissionIds = $this->availablePermissions()->modelKeys();
+        $allowedPermissionIds = $this->availablePermissions($user)->modelKeys();
         $submittedPermissionIds = array_keys($validated['permissions'] ?? []);
 
         if (array_diff($submittedPermissionIds, array_map('strval', $allowedPermissionIds))) {
@@ -110,7 +115,7 @@ class UserPermissionController extends Controller
         Permission $permission
     ) {
         $this->authorizeUser($user);
-        $this->authorizePermissionForSubscription($permission);
+        $this->authorizePermissionForSubscription($permission, $user);
 
         $this->permissionService
             ->assignPermissionToUser(
@@ -132,7 +137,7 @@ class UserPermissionController extends Controller
         Permission $permission
     ) {
         $this->authorizeUser($user);
-        $this->authorizePermissionForSubscription($permission);
+        $this->authorizePermissionForSubscription($permission, $user);
 
         $this->permissionService
             ->denyPermissionToUser(
@@ -154,7 +159,7 @@ class UserPermissionController extends Controller
         Permission $permission
     ) {
         $this->authorizeUser($user);
-        $this->authorizePermissionForSubscription($permission);
+        $this->authorizePermissionForSubscription($permission, $user);
 
         $this->permissionService
             ->revokePermissionFromUser(
@@ -175,28 +180,63 @@ class UserPermissionController extends Controller
         User $user
     ): void {
 
+        abort_unless(auth()->user()?->hasPermission('manage_users', auth()->user()?->company_id), 403);
+
         if (
             $user->company_id !== auth()->user()->company_id
+            || (int) $user->role_id !== \App\Models\Role::COMPANY_STAFF_ID
         ) {
             abort(403);
         }
     }
 
-    protected function availablePermissions()
+    protected function availablePermissions(User $user)
     {
         $company = auth()->user()->company;
+        $assignableModules = $this->jobRoleVisibilityService
+            ->assignablePermissionModules($user);
+        $existingPermissionIds = $user->permissions()
+            ->where('permissions.scope', Permission::SCOPE_COMPANY)
+            ->pluck('permissions.id');
 
-        return Permission::orderBy('name')
+        $assignable = Permission::company()
+            ->whereNotIn('name', [
+                'view_company_profile', 'edit_company_profile', 'company_reset', 'database_reset',
+                'dangerous_maintenance', 'system_maintenance', 'cache_clear', 'queue_restart',
+                'log_management', 'maintenance_mode', 'system_utilities', 'company_delete',
+                'approve_company', 'block_company', 'delete_company',
+            ])
+            ->orderBy('name')
             ->get()
             ->filter(fn (Permission $permission) => $this->subscriptionService
                 ->canAccessPermission($company, $permission->name))
+            ->filter(function (Permission $permission) use ($assignableModules) {
+                if (in_array('*', $assignableModules, true)) {
+                    return true;
+                }
+
+                $module = PermissionModuleResolver::companyModule($permission->name);
+                return $module !== null && in_array($module, $assignableModules, true);
+            });
+
+        $existing = Permission::company()
+            ->whereIn('id', $existingPermissionIds)
+            ->get();
+
+        return $assignable
+            ->merge($existing)
+            ->unique('id')
+            ->sortBy('name')
             ->values();
     }
 
-    protected function authorizePermissionForSubscription(Permission $permission): void
+    protected function authorizePermissionForSubscription(Permission $permission, User $user): void
     {
-        if (! $this->subscriptionService->canAccessPermission(auth()->user()->company, $permission->name)) {
-            abort(403, 'This permission is not available on the current subscription plan.');
-        }
+        abort_unless($permission->scope === Permission::SCOPE_COMPANY, 403);
+        abort_unless(
+            $this->availablePermissions($user)->contains('id', $permission->id),
+            403,
+            'This permission is not available for the staff member\'s Job Role.'
+        );
     }
 }

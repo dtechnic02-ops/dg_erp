@@ -42,6 +42,7 @@
 
             <form method="POST" action="{{ route('company.purchase-return.store') }}" enctype="multipart/form-data" id="dgPurchaseReturnForm">
                 @csrf
+                <input type="hidden" name="request_key" value="{{ $requestKey }}">
 
                 <input type="hidden" name="purchase_invoice_id" value="{{ $invoice->id }}">
                 <input type="hidden" name="supplier_id" value="{{ $invoice->supplier_id }}">

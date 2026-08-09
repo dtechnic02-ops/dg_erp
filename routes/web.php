@@ -144,15 +144,15 @@ Route::post('/logout', function (Request $request) {
 
 //SUPER ADMIN ROUTES
 
-Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_STAFF_ID])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])
-        ->middleware('role:' . Role::SUPER_ADMIN_ID)
+        ->middleware('platform.permission:platform_dashboard_view')
         ->name('admin.dashboard');
 
     Route::view('/no-access', 'admin.no_access')->name('admin.no-access');
 
-    Route::middleware('role:' . Role::SUPER_ADMIN_ID)->prefix('platform-settings')->name('admin.platform-settings.')->group(function () {
+    Route::middleware('platform.permission:platform_settings_manage')->prefix('platform-settings')->name('admin.platform-settings.')->group(function () {
         Route::get('/', [PlatformSettingController::class, 'index'])->name('index');
         Route::put('/general', [PlatformSettingController::class, 'updateGeneral'])->name('general.update');
         Route::put('/branding', [PlatformSettingController::class, 'updateBranding'])->name('branding.update');
@@ -167,15 +167,15 @@ Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_ST
 
     Route::post('/company/block/{id}', [CompanyController::class, 'block'])->name('admin.company.block');
     Route::post('/company/unblock/{id}', [CompanyController::class, 'unblock'])->name('admin.company.unblock');
-    Route::post('/company/delete/{id}', [CompanyController::class, 'delete'])->middleware('permission:delete_company')->name('admin.company.delete');
+    Route::post('/company/delete/{id}', [CompanyController::class, 'delete'])->middleware('platform.permission:platform_companies_delete')->name('admin.company.delete');
 
-    Route::post('/company/limit/{id}', [CompanyController::class, 'updateLimit'])->middleware('permission:edit_company')->name('admin.company.limit');
-    Route::post('/company/customer-limit/{id}', [CompanyController::class, 'updateCustomerLimit'])->middleware('permission:edit_company')->name('admin.company.customer.limit');
-    Route::post('/company/reset/{company}', [CompanyController::class, 'requestPasswordReset'])->middleware('permission:reset_company_password')->name('admin.company.reset');
-    Route::get('/company/{company}/reset/verify', [CompanyController::class, 'showPasswordResetVerification'])->middleware('permission:reset_company_password')->name('admin.company.reset.verify.form');
-    Route::post('/company/{company}/reset/verify', [CompanyController::class, 'verifyPasswordResetOtp'])->middleware('permission:reset_company_password')->name('admin.company.reset.verify');
-    Route::get('/company/{company}/reset/password', [CompanyController::class, 'showPasswordResetForm'])->middleware('permission:reset_company_password')->name('admin.company.reset.password.form');
-    Route::post('/company/{company}/reset/password', [CompanyController::class, 'completePasswordReset'])->middleware('permission:reset_company_password')->name('admin.company.reset.password');
+    Route::post('/company/limit/{id}', [CompanyController::class, 'updateLimit'])->middleware('platform.permission:platform_companies_edit')->name('admin.company.limit');
+    Route::post('/company/customer-limit/{id}', [CompanyController::class, 'updateCustomerLimit'])->middleware('platform.permission:platform_companies_edit')->name('admin.company.customer.limit');
+    Route::post('/company/reset/{company}', [CompanyController::class, 'requestPasswordReset'])->middleware('platform.permission:platform_companies_reset_password')->name('admin.company.reset');
+    Route::get('/company/{company}/reset/verify', [CompanyController::class, 'showPasswordResetVerification'])->middleware('platform.permission:platform_companies_reset_password')->name('admin.company.reset.verify.form');
+    Route::post('/company/{company}/reset/verify', [CompanyController::class, 'verifyPasswordResetOtp'])->middleware('platform.permission:platform_companies_reset_password')->name('admin.company.reset.verify');
+    Route::get('/company/{company}/reset/password', [CompanyController::class, 'showPasswordResetForm'])->middleware('platform.permission:platform_companies_reset_password')->name('admin.company.reset.password.form');
+    Route::post('/company/{company}/reset/password', [CompanyController::class, 'completePasswordReset'])->middleware('platform.permission:platform_companies_reset_password')->name('admin.company.reset.password');
 
 
     // Subscription Module
@@ -227,7 +227,7 @@ Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_ST
     
         //Payments legacy removed — use subscription-payments routes
 
-    Route::middleware('role:' . Role::SUPER_ADMIN_ID)
+    Route::middleware('platform.permission:platform_super_staff_manage')
         ->prefix('super-staff')
         ->name('admin.super-staff.')
         ->controller(\App\Http\Controllers\Admin\SuperStaffController::class)
@@ -383,6 +383,7 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
     
     */
     Route::prefix('maintenance')
+    ->middleware('permission:system_maintenance')
     ->name('maintenance.')
     ->group(function () {
 
@@ -1623,6 +1624,14 @@ Route::prefix('income')
         Route::get('/show/{id}', 'show')->name('show');
         Route::get('/edit/{id}', 'edit')->name('edit');
         Route::put('/update/{id}', 'update')->name('update');
+        Route::post('/{id}/submit', 'submit')->name('submit');
+        Route::post('/{id}/approve', 'approve')->name('approve');
+        Route::post('/{id}/reject', 'reject')->name('reject');
+        Route::post('/{id}/post', 'post')->name('post');
+        Route::post('/{id}/cancel', 'cancelJournal')->name('cancel');
+        Route::post('/{id}/reverse', 'reverseJournal')->name('reverse');
+        Route::post('/{id}/lock', 'lockJournal')->name('lock');
+        Route::post('/{id}/unlock', 'unlockJournal')->name('unlock');
         Route::get('/audit/{id}', 'audit')->name('audit');
         Route::get('/print', 'print')->name('print');
         Route::get('/print/{id}', 'printVoucher')->name('print-voucher');

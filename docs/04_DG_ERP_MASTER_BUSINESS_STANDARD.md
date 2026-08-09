@@ -278,6 +278,122 @@ Architecture SHALL remain identical.
 
 ---
 
+# 7A. PURCHASE RETURN ACCOUNTING RECOGNITION — FINAL FROZEN RULE
+
+**Status:** FINAL AND FROZEN
+**Authority:** Business Owner
+
+This section is the final approved clarification of the Purchase Return mirror rule. Purchase Return and Purchase Return Refund / Settlement are two separate business events.
+
+## 7A.1 Purchase Return Event
+
+Purchase Return represents the actual return of purchased goods or services to the Supplier.
+
+For a **Product Purchase Return**:
+
+- Product is returned to the Supplier.
+- Stock SHALL move **OUT immediately**.
+- The returned purchase value SHALL be recognized in the official Accounting Core at Purchase Return time.
+
+For a **Service Purchase Return**:
+
+- No stock movement occurs.
+- Required return-value accounting recognition SHALL follow the approved accounting rules where applicable.
+
+Purchase Return is **not** a money movement event. At Purchase Return creation:
+
+- Cash/Bank SHALL NOT move.
+- A Cash/Bank AccountTransaction SHALL NOT be created.
+- The return SHALL NOT be treated as cash received.
+- The Supplier Ledger SHALL NOT be automatically settled.
+- The system SHALL NOT assume that the Supplier has refunded money.
+
+Purchase Return creates the official return/refundable/supplier-adjustment balance. Goods/value recognition and money settlement are separate events.
+
+## 7A.2 Accounting Core Recognition
+
+Purchase Return SHALL recognize the returned purchase value in the official Accounting Core at the time of return through the approved centralized architecture:
+
+Purchase Return → Accounting Integration Layer → AccountingPostingService → AccountingEntry → AccountingEntryLine → General Ledger / Accounting Reports
+
+Every Purchase Return posting SHALL:
+
+- be balanced double entry;
+- preserve company isolation;
+- use the active Financial Year;
+- use the valid Business Date;
+- preserve source identity;
+- prevent duplicate posting;
+- execute atomically;
+- support exact reversal; and
+- preserve audit history.
+
+Chart Account IDs SHALL NOT be hard-coded. The following mapping is FINAL, APPROVED, and FROZEN.
+
+### SUPPLIER_RETURN_RECEIVABLE Control Account
+
+The Accounting Core SHALL provide the permanent system account:
+
+**System Code:** `SUPPLIER_RETURN_RECEIVABLE`
+**Account Class:** Asset
+**Business Type:** Supplier Return Receivable clearing-control account
+
+This account represents Purchase Return value already returned to the Supplier but not yet settled through Purchase Invoice / Accounts Payable adjustment, actual Cash/Bank refund, or mixed settlement.
+
+`SUPPLIER_RETURN_RECEIVABLE` SHALL NOT be treated as Cash/Bank, Accounts Payable, Income, Expense, or Supplier settlement itself.
+
+### Product Purchase Return Mapping
+
+At Product Purchase Return recognition:
+
+- **Debit `SUPPLIER_RETURN_RECEIVABLE`:** total approved refundable value.
+- **Credit `INVENTORY`:** returned net product purchase value derived from the approved original Purchase value/cost basis, including approved discount allocation.
+- **Credit `INPUT_TAX_RECEIVABLE`:** reversible VAT derived from the original persisted Purchase VAT applicable to the returned portion, when applicable.
+
+Current value and selling value SHALL NOT be used for returned inventory.
+
+### Service Purchase Return Mapping
+
+At Service Purchase Return recognition:
+
+- **Debit `SUPPLIER_RETURN_RECEIVABLE`:** total approved refundable value.
+- **Credit the original persisted service value account:** normally `SERVICE_PURCHASE_EXPENSE`.
+- **Credit `INPUT_TAX_RECEIVABLE`:** reversible VAT derived from the original persisted Purchase VAT applicable to the returned portion, when applicable.
+
+`SERVICE_PURCHASE_EXPENSE` SHALL NOT be assumed when the original service was posted to another approved account.
+
+No Purchase Return recognition entry creates Cash/Bank movement, Cash/Bank AccountTransaction, or automatic Accounts Payable settlement.
+
+## 7A.3 Purchase Return Refund / Settlement Event
+
+Purchase Return Refund is the separate settlement event. Settlement may use one or more of the following methods:
+
+1. **Purchase Invoice / Supplier Adjustment:** Debit `ACCOUNTS_PAYABLE` and Credit `SUPPLIER_RETURN_RECEIVABLE` for the actual approved adjustment amount. Supplier/Purchase Invoice settlement records SHALL reflect the adjustment. Cash/Bank movement is zero, and no Cash/Bank AccountTransaction is created for this portion.
+2. **Cash/Bank Refund:** when the Supplier actually returns money, Debit `CASH_IN_HAND` or `BANK_ACCOUNTS` and Credit `SUPPLIER_RETURN_RECEIVABLE` for the amount actually received. Only that amount creates the corresponding Cash/Bank AccountTransaction.
+3. **Mixed Settlement:** Debit `ACCOUNTS_PAYABLE` for the invoice-adjustment portion, Debit `CASH_IN_HAND` or `BANK_ACCOUNTS` for the actual Cash/Bank refund portion, and Credit `SUPPLIER_RETURN_RECEIVABLE` for the combined settlement total. Only the actual Cash/Bank portion creates an AccountTransaction.
+
+Purchase Return Refund / Settlement SHALL NOT recognize the returned goods/value a second time. Purchase Return already recognized that value in the Accounting Core. Settlement records only the financial settlement effect appropriate to the invoice/supplier adjustment, actual Cash/Bank refund, or mixed settlement.
+
+Partial settlement and mixed settlement are permitted. Total settlement SHALL never exceed the remaining Purchase Return refundable balance.
+
+## 7A.4 Cancellation and Reversal
+
+Each source event reverses only its own effects:
+
+- Cancelling Purchase Return SHALL reverse the accounting and stock effects created by Purchase Return, subject to approved dependency rules.
+- Cancelling Purchase Return Refund / Settlement SHALL reverse only the settlement effects created by that settlement.
+- Original posted accounting records SHALL NOT be edited or deleted.
+- Reversal SHALL use exact reversal through the approved Accounting Core architecture.
+
+This frozen clarification preserves the Sales/Purchase mirror architecture where applicable while explicitly establishing:
+
+**PURCHASE RETURN = GOODS/VALUE RETURN EVENT**
+**PURCHASE RETURN REFUND = SETTLEMENT EVENT**
+
+Money movement occurs only when money actually moves. Invoice adjustment is not Cash/Bank movement.
+
+---
+
 # 8. CONSTITUTION STANDARD
 
 Every module shall maintain its own Constitution document.

@@ -8,16 +8,19 @@ use App\Models\User;
 use App\Services\StaffUserService;
 use App\Services\SubscriptionService;
 use App\Services\JobRoleVisibilityService;
+use App\Services\Permission\PermissionAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
     public function __construct(
         private SubscriptionService $subscriptionService,
-        private StaffUserService $staffUserService
+        private StaffUserService $staffUserService,
+        private PermissionAssignmentService $permissionAssignmentService
     ) {
     }
 
@@ -81,12 +84,52 @@ class UserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'job_role' => ['required', Rule::in(array_keys(JobRoleVisibilityService::jobRoles()))],
+            'confirm_job_role_change' => ['nullable', 'boolean'],
         ]);
 
-        $user->update([
-            'name' => $request->name,
-            'job_role' => $request->job_role,
-        ]);
+        $requestedJobRole = (string) $request->job_role;
+        $jobRoleChanged = $user->job_role !== $requestedJobRole;
+
+        if ($jobRoleChanged && ! $request->boolean('confirm_job_role_change')) {
+            throw ValidationException::withMessages([
+                'job_role' => 'Confirm the Job Role change. Existing company permissions will be reset.',
+            ]);
+        }
+
+        $jobRoleChanged = DB::transaction(function () use ($request, $id, $requestedJobRole): bool {
+            $lockedUser = $this->staffUserService
+                ->staffQuery((int) auth()->user()->company_id)
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            $changed = $lockedUser->job_role !== $requestedJobRole;
+
+            if ($changed && ! $request->boolean('confirm_job_role_change')) {
+                throw ValidationException::withMessages([
+                    'job_role' => 'Confirm the Job Role change. Existing company permissions will be reset.',
+                ]);
+            }
+
+            $lockedUser->update([
+                'name' => $request->name,
+                'job_role' => $requestedJobRole,
+            ]);
+
+            if ($changed) {
+                $this->permissionAssignmentService->resetCompanyPermissions(
+                    $lockedUser,
+                    (int) auth()->user()->company_id
+                );
+            }
+
+            return $changed;
+        });
+
+        if ($jobRoleChanged) {
+            return redirect()
+                ->route('company.staff-permissions.edit', $user->id)
+                ->with('success', 'Job Role changed and existing company permissions reset. Assign permissions for the new Job Role.');
+        }
 
         return redirect()
             ->route('company.users.index')

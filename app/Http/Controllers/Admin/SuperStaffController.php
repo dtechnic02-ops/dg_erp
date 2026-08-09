@@ -200,7 +200,7 @@ class SuperStaffController extends Controller
     private function authorizeSuperAdmin(): void
     {
         abort_unless(
-            (int) auth()->user()?->role_id === Role::SUPER_ADMIN_ID,
+            app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_super_staff_manage'),
             403
         );
     }
