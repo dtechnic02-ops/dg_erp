@@ -1360,3 +1360,15 @@ Status: FINAL
 Authority: Business Owner
 
 END OF DOCUMENT
+
+---
+
+# BUSINESS OWNER AMENDMENT — OFFICIAL REPORT CLASSIFICATION
+
+Status: FINAL AND FROZEN
+
+1. An approved Opening Balance Accounting Entry shall be identified by its approved Accounting Core source identity or source type.
+2. Opening Balance classification shall not depend only on `entry_date`.
+3. If an approved Opening Balance posting has the same Business Date as the report `from_date` or the first date of the Financial Year, it remains Opening/Brought-Forward balance and shall not be treated as ordinary period movement.
+4. The original Opening Balance remains historically effective from its Business Date. An approved equal-and-opposite reversal becomes effective from its own Business Date; on and after that date both records participate and net correctly.
+5. Both original and reversal records remain available in audit drill-down.

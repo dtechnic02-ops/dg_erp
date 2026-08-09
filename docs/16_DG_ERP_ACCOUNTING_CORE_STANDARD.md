@@ -1688,3 +1688,19 @@ The Accounting Engine shall always preserve financial integrity above implementa
 
 **Authority:** Business Owner
 
+---
+
+## BUSINESS OWNER AMENDMENT — REPORT EFFECT OF OFFICIAL ENTRIES
+
+**Status:** FINAL AND FROZEN  
+**Scope:** Official Accounting Reports
+
+1. An Accounting Entry that was officially posted remains historically effective from its original Business Date even if its current status is later changed to `reversed`.
+2. Its approved reversal is a separate equal-and-opposite Accounting Entry effective from the reversal Business Date.
+3. Before that reversal date, official reports include the original. On and after that date, official reports include both entries.
+4. “Posted only” shall not be interpreted as erasing an original official entry whose current status is `reversed`.
+5. Opening/Brought-Forward postings shall be identified by approved Accounting Core source identity/type, not by date alone.
+6. Inactive Chart Accounts remain part of historical official reports whenever relevant official lines exist.
+7. Phase 1 official report amounts are the persisted single-currency debit and credit amounts on Accounting Entry Lines; no conversion is performed.
+8. Approved year-end closing source identity shall control whether current profit/loss has already been transferred to Retained Earnings, and the Accounting Core shall prevent double counting.
+

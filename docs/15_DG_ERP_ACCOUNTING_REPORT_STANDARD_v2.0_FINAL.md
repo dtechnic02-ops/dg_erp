@@ -1436,3 +1436,70 @@ This document is the official Accounting Constitution of DG ERP and shall govern
 # END OF DOCUMENT
 # DG ERP ACCOUNTING REPORT STANDARD
 # VERSION 2.0 FINAL
+
+---
+
+# BUSINESS OWNER AMENDMENT — OFFICIAL ACCOUNTING REPORT RULES
+
+## Amendment Status
+
+Version: 2.1 FINAL  
+Status: BUSINESS OWNER APPROVED AND FROZEN  
+Applies To: General Ledger, Trial Balance, Profit & Loss, Balance Sheet
+
+This amendment is controlling wherever older wording in this document could produce a different result.
+
+## 1. Official Report Source
+
+The four official reports shall use only `accounting_entries`, `accounting_entry_lines`, and `chart_accounts`, with `financial_years` used for company-owned Financial Year scope. Persisted `accounting_entry_lines` debit and credit amounts are the authoritative report amounts. Operational transaction tables shall never supply official report amounts.
+
+## 2. Reversal Reporting by Business Date
+
+An original posted Accounting Entry remains financially effective from its original `entry_date`. Changing its current status to `reversed` shall not erase its historical financial effect.
+
+The equal-and-opposite reversal Accounting Entry becomes effective from its own `entry_date`.
+
+- Before the reversal Business Date, reports include the original entry.
+- On and after the reversal Business Date, reports include both the original and reversal entries, producing the correct net effect.
+- Audit drill-down shall retain and display both records and their reversal relationship.
+- Reports shall not exclude an original entry merely because its current status is `reversed`.
+
+For this purpose, “Posted Entries Only” means entries that became official through approved posting, including an original official entry later marked `reversed`, together with its officially posted reversal. Draft, failed, deleted, or never-posted entries remain excluded.
+
+## 3. Opening and Brought-Forward Balances
+
+Approved Opening Balance postings shall be identified by their approved Accounting Core source identity or source type, not merely by `entry_date`.
+
+An approved Opening Balance posting belongs to Opening/Brought-Forward balances even when its Business Date equals the report `from_date` or the first date of the Financial Year. It shall not be classified as ordinary period movement.
+
+Opening Balance reversals shall follow the Business Date reversal rule in this amendment.
+
+## 4. Inactive and Zero-Balance Chart Accounts
+
+Inactive Chart Accounts with relevant historical Accounting Entry Lines shall remain visible in historical official reports. Deactivation shall never remove or reclassify historical financial activity.
+
+By default, a report may omit an account only when all applicable opening, movement, and closing values are zero. The UI may provide an optional “Show Zero Balance” filter. This is presentation-only and shall never change report totals, balancing controls, hierarchy, or source calculations.
+
+## 5. Balance Sheet Current Profit or Loss
+
+The Balance Sheet shall include current-period or current-Financial-Year Net Profit or Net Loss as a derived Equity component while that result has not already been transferred through an approved year-end closing Accounting Entry.
+
+The Accounting Core shall use the approved closing source identity to determine whether the result has been transferred to Retained Earnings. Once transferred, the same result shall not also be added as derived current profit or loss. Double counting is prohibited.
+
+Income and Expense accounts remain excluded as Balance Sheet account lines; only the derived, non-duplicated result appears within Equity.
+
+## 6. Financial Year Isolation
+
+General Ledger, Trial Balance, Profit & Loss, and Balance Sheet shall operate on exactly one selected Financial Year belonging to the selected company. The generic “All Financial Years” option does not apply to these four official reports. Cross-Financial-Year mixing is prohibited.
+
+All date filters use `accounting_entries.entry_date` as Business Date and must remain within the selected Financial Year.
+
+## 7. Phase 1 Currency
+
+Official Accounting Reports are single-currency in Phase 1. No currency conversion or exchange-rate calculation shall be performed.
+
+Persisted Accounting Entry Line amounts are authoritative. If an approved company/base-currency source exists, its code may be displayed as the report currency label. If no approved source exists, reports shall display monetary amounts without inventing a currency code, exchange rate, or conversion. Absence of a currency label does not block Phase 1 implementation.
+
+## 8. Final Implementation Readiness
+
+These rules complete the Business Owner decisions required to implement the General Ledger, Trial Balance, Profit & Loss, and Balance Sheet through one centralized official Accounting Report calculation layer.

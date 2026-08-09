@@ -79,6 +79,7 @@ use App\Http\Controllers\Company\EmployeePaymentController;
 use App\Http\Controllers\Company\EmployeeLedgerController;
 use App\Http\Controllers\Company\PayrollRegisterController;
 use App\Http\Controllers\Company\AccountTransactionController;
+use App\Http\Controllers\Company\AccountingReportController;
 use App\Http\Controllers\Company\SupplierLedgerController;
 use App\Http\Controllers\Company\MaintenanceController;
 use App\Http\Controllers\Company\SupplierStatementController;
@@ -260,6 +261,13 @@ Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function ()
 
 
 Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::class,'subscription'])->prefix('company')->name('company.')->group(function () {
+    Route::prefix('accounting-reports')->name('accounting-reports.')->middleware('permission:view_reports')->group(function () {
+        Route::get('/general-ledger', [AccountingReportController::class, 'generalLedger'])->name('general-ledger');
+        Route::get('/trial-balance', [AccountingReportController::class, 'trialBalance'])->name('trial-balance');
+        Route::get('/profit-loss', [AccountingReportController::class, 'profitLoss'])->name('profit-loss');
+        Route::get('/balance-sheet', [AccountingReportController::class, 'balanceSheet'])->name('balance-sheet');
+    });
+
     Route::prefix('opening-balances')->name('opening-balances.')->group(function () {
         Route::get('/', [OpeningBalanceController::class, 'index'])->middleware('permission:opening-balance.view')->name('index');
         Route::get('/create', [OpeningBalanceController::class, 'create'])->middleware('permission:opening-balance.create')->name('create');

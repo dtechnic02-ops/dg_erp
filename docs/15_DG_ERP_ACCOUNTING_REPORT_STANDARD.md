@@ -1,4 +1,7 @@
 # DG ERP ACCOUNTING REPORT STANDARD
+
+> **SUPERSEDED:** This Version 1.0 document is retained for historical reference only. It is superseded by `15_DG_ERP_ACCOUNTING_REPORT_STANDARD_v2.0_FINAL.md` and its Business Owner amendments. Its legacy `accounts` / `account_transactions` report-source rules are not authoritative and shall not be implemented. Official reports use Accounting Core `accounting_entries`, `accounting_entry_lines`, and `chart_accounts`.
+
 ## Document Version
 Version: 1.0 FINAL
 

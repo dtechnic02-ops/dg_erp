@@ -1182,3 +1182,20 @@ Default Status = Active.
 Filtering shall always use the module's Business Date.
 
 END OF DOCUMENT
+
+---
+
+# BUSINESS OWNER AMENDMENT — OFFICIAL ACCOUNTING REPORT FINANCIAL YEAR SCOPE
+
+Status: FINAL AND FROZEN
+
+The generic “All Financial Years” reporting option does not apply to:
+
+- General Ledger
+- Trial Balance
+- Profit & Loss
+- Balance Sheet
+
+Each of these four official Accounting Core reports shall operate on exactly one selected Financial Year belonging to the selected company. Cross-Financial-Year mixing is prohibited.
+
+Date From and Date To use Accounting Entry Business Date and shall remain within that selected Financial Year. This amendment controls wherever the generic Default Financial Filters wording could otherwise permit “All Financial Years” for these four reports.
