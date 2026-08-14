@@ -14,7 +14,7 @@ The centralized Accounting Core exists, is schema-backed, and is integrated with
 | Document | Version / status | Area controlled | Authority / priority | Duplicate / superseded status |
 |---|---|---|---|---|
 | `01_DG_ERP_MASTER_DEVELOPMENT_STANDARD.md` | v1, FINAL/FREEZE | Global engineering, authorization, business date, cancellation | Global development constitution | Current global engineering authority |
-| `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md` | v1, FINAL/FROZEN | Financial Year and Business Date | Highest subject authority for date/FY | Current |
+| `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md` | v1.1, FINAL/FROZEN | Financial Year and Business Date | Highest subject authority for date/FY | Current |
 | `04_DG_ERP_MASTER_BUSINESS_STANDARD.md` | v1, FROZEN | Global business rules | Above module standards | Current |
 | `02_DG_ERP_SALES_MODULE_STANDARD.md` | Approved module standard | Sales, payments, returns/refunds | Sales subject authority beneath global standards | Current |
 | `05_DG_ERP_INCOME_MODULE_STANDARD.md` | Approved module standard | Income | Module authority | Current |

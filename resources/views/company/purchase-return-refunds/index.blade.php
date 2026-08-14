@@ -211,7 +211,7 @@
                                         <tr class="dg-row">
                                             <td class="dg-col-num">{{ $refunds->firstItem() + $loop->index }}</td>
                                             <td>{{ $refund->refund_no }}</td>
-                                            <td class="dg-col-date">{{ $refund->refund_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td class="dg-col-date">{{ $refund->refund_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $refund->refund_date])</td>
                                             <td>{{ $refund->purchaseReturn->return_no ?? '-' }}</td>
                                             <td>{{ $refund->supplier->name ?? '-' }}</td>
                                             <td>
@@ -469,7 +469,7 @@
                                         <tr class="dg-row">
                                             <td>{{ $refunds->firstItem() + $loop->index }}</td>
                                             <td>{{ $refund->refund_no }}</td>
-                                            <td class="dg-col-date">{{ $refund->refund_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td class="dg-col-date">{{ $refund->refund_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $refund->refund_date])</td>
                                             <td>{{ $refund->purchaseReturn->return_no ?? '-' }}</td>
                                             <td>{{ $refund->supplier->name ?? '-' }}</td>
                                             <td>

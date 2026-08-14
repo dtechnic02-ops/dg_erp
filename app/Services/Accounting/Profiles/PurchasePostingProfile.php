@@ -20,6 +20,7 @@ class PurchasePostingProfile
 
         $companyId = $this->positiveInteger($this->required($data, 'company_id'), 'company_id');
         $purchaseId = $this->positiveInteger($this->required($data, 'purchase_id'), 'purchase_id');
+        $financialYearId = $this->positiveInteger($this->required($data, 'financial_year_id'), 'financial_year_id');
         $purchaseDate = $this->requiredString($this->required($data, 'purchase_date'), 'purchase_date');
         $purchaseNumber = $this->requiredString($this->required($data, 'purchase_number'), 'purchase_number');
         $supplierId = $this->nullablePositiveInteger($data['supplier_id'] ?? null, 'supplier_id');
@@ -99,6 +100,7 @@ class PurchasePostingProfile
 
         return [
             'company_id' => $companyId,
+            'financial_year_id' => $financialYearId,
             'entry_date' => $purchaseDate,
             'reference_number' => $purchaseNumber,
             'source_module' => 'purchase',

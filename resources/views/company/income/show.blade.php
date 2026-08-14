@@ -204,7 +204,7 @@
                                 <div class="dg-invoice-field-row">
                                     <span class="dg-invoice-field-label">Income Date</span>
                                     <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                    <span class="dg-invoice-field-value">{{ $income->income_date->format('d-m-Y') }}</span>
+                                    <span class="dg-invoice-field-value">{{ $income->income_date->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $income->income_date])</span>
                                 </div>
                             @endif
 

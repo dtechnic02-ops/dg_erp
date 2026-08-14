@@ -159,7 +159,7 @@ class IncomeController extends Controller
             $perPage = 10;
         }
 
-        $incomes = $query->latest()->paginate($perPage)->withQueryString();
+        $incomes = $query->orderByDesc('income_date')->orderByDesc('id')->paginate($perPage)->withQueryString();
 
         $financialYears = FinancialYear::where('company_id', $companyId)
             ->latest('id')
@@ -543,7 +543,7 @@ class IncomeController extends Controller
         $companyId = auth()->user()->company_id;
         $query = $this->buildIncomeQuery($request, $companyId);
 
-        $incomes = $query->latest()->get();
+        $incomes = $query->orderByDesc('income_date')->orderByDesc('id')->get();
 
         $totalAmount = $incomes
             ->where('status', Income::STATUS_ACTIVE)

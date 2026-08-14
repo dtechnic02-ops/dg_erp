@@ -217,7 +217,7 @@
                                         <tr class="dg-row">
                                             <td>{{ $payments->firstItem() + $loop->index }}</td>
                                             <td>{{ $payment->payment_no }}</td>
-                                            <td class="dg-col-date">{{ $payment->payment_date?->format('d-m-Y') }}</td>
+                                            <td class="dg-col-date">{{ $payment->payment_date?->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $payment->payment_date])</td>
                                             <td>{{ $payment->salesInvoice->invoice_no ?? '-' }}</td>
                                             <td>{{ $payment->customer->name ?? '-' }}</td>
                                             <td>{{ $payment->account->account_name ?? '-' }}</td>

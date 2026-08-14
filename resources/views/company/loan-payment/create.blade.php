@@ -153,6 +153,7 @@
                                     <label for="payment_date" class="form-label dg-label">Payment Date</label>
                                     <input required type="date" name="payment_date" id="payment_date" value="{{ old('payment_date', date('Y-m-d')) }}" class="form-control dg-input">
                                 </div>
+                                @include('company.components.nepali-date-field', ['adInputId' => 'payment_date', 'adDate' => old('payment_date', date('Y-m-d'))])
 
                                 <div class="col-md-3">
                                     <label for="next_payment_date" class="form-label dg-label">Next Payment Date</label>

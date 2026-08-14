@@ -195,7 +195,7 @@
                             <div class="dg-invoice-field-row">
                                 <span class="dg-invoice-field-label">Refund Date</span>
                                 <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                <span class="dg-invoice-field-value">{{ $refund->refund_date->format('d-m-Y') }}</span>
+                                <span class="dg-invoice-field-value">{{ $refund->refund_date->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $refund->refund_date])</span>
                             </div>
                         @endif
 

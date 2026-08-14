@@ -48,6 +48,7 @@
                     $canPlatform = fn (string $permission): bool => $platformAuthorization->can($adminUser, $permission);
                     $canViewCompanies = $canPlatform('platform_companies_view');
                     $canViewRegistrations = $canPlatform('platform_registrations_view');
+                    $canManageSettings = $canPlatform('platform_settings_manage');
                     $canViewSubscriptions = $canPlatform('platform_subscriptions_view');
                     $canViewSubscriptionPayments = $canPlatform('platform_subscription_payments_view');
                     $canViewSubscriptionReports = $canPlatform('platform_subscription_reports_view');
@@ -100,6 +101,14 @@
                                 <a href="{{ route('admin.platform-settings.index') }}" class="dg-sidebar-link @if(request()->routeIs('admin.platform-settings.*')) dg-sidebar-active @endif">
                                     <span class="dg-sidebar-icon"><i class="bi bi-gear"></i></span>
                                     <span class="dg-sidebar-label">Platform Settings</span>
+                                </a>
+                            </div>
+                        @endif
+                        @if($canManageSettings)
+                            <div class="dg-sidebar-item">
+                                <a href="{{ route('admin.countries.index') }}" class="dg-sidebar-link @if(request()->routeIs('admin.countries.*')) dg-sidebar-active @endif">
+                                    <span class="dg-sidebar-icon"><i class="bi bi-globe"></i></span>
+                                    <span class="dg-sidebar-label">Countries</span>
                                 </a>
                             </div>
                         @endif

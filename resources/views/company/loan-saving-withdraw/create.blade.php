@@ -128,10 +128,13 @@ Withdraw Date
 required
 type="date"
 name="date"
+id="date"
 value="{{ date('Y-m-d') }}"
 class="form-control">
 
 </div>
+
+@include('company.components.nepali-date-field', ['adInputId' => 'date', 'adDate' => old('date', date('Y-m-d')), 'columnClass' => 'col-md-4 mb-3'])
 
 
 <div class="col-md-4 mb-3">

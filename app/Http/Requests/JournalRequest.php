@@ -60,14 +60,39 @@ class JournalRequest extends FormRequest
                     if ($chartAccount->system_code !== 'ACCOUNTS_PAYABLE' || ! Supplier::where('company_id', $companyId)->where('status', 'active')->whereKey($subledgerId)->exists()) $validator->errors()->add("lines.{$index}.subledger_id", 'Supplier subledger requires the company Accounts Payable control Chart Account.');
                 }
 
-                if (! empty($line['account_id'])) {
+                $requiredCode = in_array($chartAccount->system_code, ['CASH_IN_HAND', 'BANK_ACCOUNTS'], true)
+                    ? $chartAccount->system_code
+                    : null;
+
+                if ($requiredCode) {
+                    if (empty($line['account_id'])) {
+                        $validator->errors()->add("lines.{$index}.account_id", 'Select an operational account for this Cash or Bank Chart Account.');
+                        continue;
+                    }
+
                     $account = Account::where('company_id', $companyId)->whereKey($line['account_id'])->whereIn('status', [1, 'active'])->first();
-                    $requiredCode = match ($account?->account_type) {
+                    $expectedCode = match ($account?->account_type) {
                         'Cash' => 'CASH_IN_HAND',
                         'Bank', 'ATM', 'Wallet' => 'BANK_ACCOUNTS',
                         default => null,
                     };
-                    if (! $requiredCode || $chartAccount->system_code !== $requiredCode) $validator->errors()->add("lines.{$index}.account_id", 'Operational Account must match its required Cash or Bank Chart Account.');
+                    if (! $expectedCode || $chartAccount->system_code !== $expectedCode) {
+                        $validator->errors()->add("lines.{$index}.account_id", 'Operational Account must match its required Cash or Bank Chart Account.');
+                    }
+
+                    continue;
+                }
+
+                if (! empty($line['account_id'])) {
+                    $account = Account::where('company_id', $companyId)->whereKey($line['account_id'])->whereIn('status', [1, 'active'])->first();
+                    $expectedCode = match ($account?->account_type) {
+                        'Cash' => 'CASH_IN_HAND',
+                        'Bank', 'ATM', 'Wallet' => 'BANK_ACCOUNTS',
+                        default => null,
+                    };
+                    if (! $expectedCode || $chartAccount->system_code !== $expectedCode) {
+                        $validator->errors()->add("lines.{$index}.account_id", 'Operational Account must match its required Cash or Bank Chart Account.');
+                    }
                 }
             }
         });

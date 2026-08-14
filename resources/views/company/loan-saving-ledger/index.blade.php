@@ -257,7 +257,7 @@
                                     @forelse ($ledgers as $ledger)
                                         <tr class="dg-row">
                                             <td>{{ $ledgers->firstItem() + $loop->index }}</td>
-                                            <td>{{ optional($ledger->date)->format('d-m-Y') ?: '-' }}</td>
+                                            <td>{{ optional($ledger->date)->format('d-m-Y') ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $ledger->date])</td>
                                             <td>{{ $ledger->loanAccount->loan_no ?? '-' }}</td>
                                             <td>{{ $ledger->loanAccount->partyAccount->name ?? '-' }}</td>
                                             <td>{{ $ledger->loanAccount->loan_name ?? '-' }}</td>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use App\Models\FinancialYear;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseReturn;
@@ -14,8 +15,12 @@ use Illuminate\Support\Facades\Auth;
 
 class VatReportController extends Controller
 {
+    use AuthorizesCompanyPermission;
+
     public function index(Request $request)
     {
+        $this->authorizeCompanyPermission('view_vat');
+
         $report = $this->buildReport($request);
 
         if ($report instanceof \Illuminate\Http\RedirectResponse) {
@@ -30,6 +35,8 @@ class VatReportController extends Controller
 
     public function print(Request $request)
     {
+        $this->authorizeCompanyPermission('print_vat');
+
         return redirect()->route(
             'company.vat-report.index',
             array_merge(

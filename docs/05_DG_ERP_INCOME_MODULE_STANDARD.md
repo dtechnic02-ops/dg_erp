@@ -15,7 +15,7 @@ This document is subordinate to the following frozen DG ERP standards. Where any
 
 | Priority | Document | Role |
 |----------|----------|------|
-| 1 | `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md` | Financial Year, Business Date, Cancelled Record Rule |
+| 1 | `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md` | Financial Year, Business Date, Cancelled Record Rule |
 | 2 | `04_DG_ERP_MASTER_BUSINESS_STANDARD.md` | Master principles, cancel philosophy, reuse architecture |
 | 3 | `01_DG_ERP_MASTER_UI_FRAMEWORK_STANDARD.md` | UI framework, print framework, DG components |
 | 4 | `02_DG_ERP_SALES_MODULE_STANDARD.md` | Reference architecture for validation, audit, cancel, ledger integrity |
@@ -115,7 +115,7 @@ The Account Ledger tracks cash and bank balances. Income Entry **increases** acc
 
 #### Financial Year
 
-Every income transaction must belong to a valid Financial Year and comply with the Active Financial Year rule. Financial Year behaviour is defined exclusively in `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md`.
+Every income transaction must belong to a valid Financial Year and comply with the Active Financial Year rule. Financial Year behaviour is defined exclusively in `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md`.
 
 #### Voucher Number
 
@@ -350,7 +350,7 @@ Save Attachment (optional)
 
 `income_date` must fall within the date range of the **currently Active Financial Year**.
 
-**Why:** Financial truth is determined by Business Date and Active Financial Year. See `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md`.
+**Why:** Financial truth is determined by Business Date and Active Financial Year. See `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md`.
 
 #### Validate Category
 
@@ -650,13 +650,13 @@ Assigned when a new income entry is created. Links to account debit and income r
 
 ## 10. Financial Year Rules
 
-All Income transactions must comply with `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md`.
+All Income transactions must comply with `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md`.
 
 This module does **not** redefine Financial Year behaviour.
 
 The official authority for Financial Year, Business Date, Active Financial Year, Back-Date Entry, Company Isolation, Business Date Filtering, and Cancelled Record behaviour is:
 
-**`03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md`**
+**`03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md`**
 
 ### 10.1 Income-Specific FY Application
 
@@ -1022,7 +1022,7 @@ Only the Business Owner may approve:
 - New income types that blur Sales/Income boundary  
 - Permanent deviation from Expense accounting parity  
 
-Any change to Financial Year behaviour requires updating `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md` first — not this document.
+Any change to Financial Year behaviour requires updating `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md` first — not this document.
 
 ---
 

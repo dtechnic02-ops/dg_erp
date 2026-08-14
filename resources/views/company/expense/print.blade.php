@@ -154,7 +154,7 @@
                                         <td>{{ $expense->reference_no ?? '-' }}</td>
                                         <td>{{ $expense->category->name ?? '-' }}</td>
                                         <td>{{ $expense->account->account_name ?? '-' }}</td>
-                                        <td>{{ $expense->expense_date?->format('d-m-Y') ?? '-' }}</td>
+                                        <td>{{ $expense->expense_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $expense->expense_date])</td>
                                         <td>{{ $expense->financialYear->name ?? '-' }}</td>
                                         <td>{{ $expense->isActive() ? 'Active' : 'Cancelled' }}</td>
                                         <td class="text-end">{{ number_format($expense->amount, 2) }}</td>

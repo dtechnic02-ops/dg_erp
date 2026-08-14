@@ -2,487 +2,150 @@
 
 @section('content')
 
+<div class="dg-page">
+    <main class="dg-container">
+        <div class="container-fluid">
+            <section class="dg-section d-print-none">
+                <article class="card dg-card">
+                    <header class="card-header dg-card-header">
+                        <h2 class="h6 mb-0">Filter</h2>
+                    </header>
 
+                    <div class="card-body dg-card-body">
+                        <form method="GET">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-4 col-lg-2">
+                                    <label for="product_id" class="form-label">Product</label>
+                                    <select name="product_id" id="product_id" class="form-select dg-select">
+                                        <option value="">All Products</option>
+                                        @foreach ($products as $product)
+                                            <option value="{{ $product->id }}" @selected(request('product_id') == $product->id)>{{ $product->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
 
+                                <div class="col-md-4 col-lg-2">
+                                    <label for="financial_year_id" class="form-label">Financial Year</label>
+                                    <select name="financial_year_id" id="financial_year_id" class="form-select dg-select">
+                                        <option value="all" @selected($financialYearId == 'all')>All Financial Years</option>
+                                        @foreach ($financialYears as $fy)
+                                            <option value="{{ $fy->id }}" @selected($financialYearId == $fy->id)>{{ $fy->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
 
-<div>
+                                <div class="col-md-4 col-lg-2">
+                                    <label for="type" class="form-label">Type</label>
+                                    <select name="type" id="type" class="form-select dg-select">
+                                        <option value="">All Types</option>
+                                        <option value="opening" @selected(request('type') == 'opening')>Opening</option>
+                                        <option value="purchase" @selected(request('type') == 'purchase')>Purchase</option>
+                                        <option value="sale" @selected(request('type') == 'sale')>Sale</option>
+                                        <option value="return" @selected(request('type') == 'return')>All Returns</option>
+                                        <option value="sale_return" @selected(request('type') == 'sale_return')>Sales Return</option>
+                                        <option value="purchase_return" @selected(request('type') == 'purchase_return')>Purchase Return</option>
+                                        <option value="adjustment_in" @selected(request('type') == 'adjustment_in')>Adjustment In</option>
+                                        <option value="adjustment_out" @selected(request('type') == 'adjustment_out')>Adjustment Out</option>
+                                        <option value="in" @selected(request('type') == 'in')>Stock In</option>
+                                        <option value="out" @selected(request('type') == 'out')>Stock Out</option>
+                                    </select>
+                                </div>
 
-<h5 class="mb-0">
-    
+                                <div class="col-md-4 col-lg-2">
+                                    <label for="start_date" class="form-label">Date From</label>
+                                    <input type="date" name="start_date" id="start_date" value="{{ request('start_date') }}" class="form-control dg-input">
+                                </div>
 
-<div class="container-fluid">
+                                <div class="col-md-4 col-lg-2">
+                                    <label for="end_date" class="form-label">Date To</label>
+                                    <input type="date" name="end_date" id="end_date" value="{{ request('end_date') }}" class="form-control dg-input">
+                                </div>
 
-    <div class="card">
+                                <div class="col-md-4 col-lg-2">
+                                    <button type="submit" class="btn btn-primary dg-btn">Filter</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </article>
+            </section>
 
-        <div class="d-flex justify-content-between align-items-center mb-2">
+            <section class="dg-section">
+                <article class="card dg-card dg-print">
+                    <header class="card-header dg-card-header dg-list-card-header">
+                        <h2 class="dg-list-card-title">Stock Ledger</h2>
 
-            <h4 class="mb-0">
+                        <div class="ms-auto d-flex align-items-center justify-content-end gap-3 flex-wrap">
+                            <span class="small">Total Records: <strong>{{ $summary['total_movements'] }}</strong></span>
+                            <span class="small">Total In: <strong>{{ $summary['total_in'] }}</strong></span>
+                            <span class="small">Total Out: <strong>{{ $summary['total_out'] }}</strong></span>
 
-                📦 Stock Ledger
+                            <nav class="btn-group d-print-none" aria-label="Stock Ledger actions">
+                                <button type="button" onclick="window.print()" class="btn btn-sm btn-outline-secondary dg-btn">Print</button>
+                                <a href="{{ route('company.stock-ledger.pdf', request()->query()) }}" class="btn btn-sm btn-danger dg-btn">PDF</a>
+                            </nav>
+                        </div>
+                    </header>
 
-            </h4>
+                    <div class="card-body dg-card-body dg-list-card-body">
+                        <div class="dg-table-scroll">
+                            <table class="table dg-table dg-table-compact">
+                                <thead class="dg-head">
+                                    <tr>
+                                        <th scope="col" class="dg-col-date">Date</th>
+                                        <th scope="col">Product</th>
+                                        <th scope="col">Type</th>
+                                        <th scope="col">Reference</th>
+                                        <th scope="col" class="dg-col-num">Qty</th>
+                                        <th scope="col" class="dg-col-num">Before</th>
+                                        <th scope="col" class="dg-col-num">After</th>
+                                    </tr>
+                                </thead>
 
-            <!-- STOCK SYNC -->
+                                <tbody class="dg-body">
+                                    @forelse ($movements as $move)
+                                        <tr class="dg-row">
+                                            <td class="dg-col-date">{{ $move->transaction_date }} @include('company.components.nepali-date-display', ['adDate' => $move->transaction_date])</td>
+                                            <td>{{ optional($move->product)->name }}</td>
+                                            <td>
+                                                <span class="badge @if (in_array($move->type, ['purchase', 'sale_return', 'purchase_return', 'opening', 'adjustment_in'])) bg-success @else bg-danger @endif">
+                                                    {{ str_replace('_', ' ', ucfirst($move->type)) }}
+                                                </span>
+                                            </td>
+                                            <td>{{ $move->reference_no }}</td>
+                                            <td class="dg-col-num">
+                                                @if ($move->quantity > 0)
+                                                    <span class="text-success fw-bold">+{{ $move->quantity }}</span>
+                                                @else
+                                                    <span class="text-danger fw-bold">{{ $move->quantity }}</span>
+                                                @endif
+                                            </td>
+                                            <td class="dg-col-num">{{ $move->before_stock }}</td>
+                                            <td class="dg-col-num">{{ $move->after_stock }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr class="dg-row">
+                                            <td colspan="7" class="text-center">No Stock Movement Found</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
 
-            <form action="{{ route('company.stock-ledger.sync') }}"
-                  method="POST">
+                        <div class="dg-list-footer d-print-none">
+                            <p class="dg-list-meta">
+                                Showing {{ $movements->firstItem() ?? 0 }} to {{ $movements->lastItem() ?? 0 }} of {{ $movements->total() }} records
+                            </p>
 
-                @csrf
-
-                <button type="submit"
-                        class="btn btn-warning btn-sm">
-
-                    🔄 Sync Stock
-
-                </button>
-
-            </form>
-
+                            <div class="dg-pagination">
+                                {{ $movements->links() }}
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </section>
         </div>
-
-        <div class="card-body">
-
-            <!-- FILTER FORM -->
-
-            <form method="GET">
-
-                <div class="row g-2">
-
-                    <!-- PRODUCT -->
-
-                    <div class="col-md-2">
-
-                        <select name="product_id"
-                                class="form-control">
-
-                            <option value="">
-                                All Products
-                            </option>
-
-                            @foreach($products as $product)
-
-                                <option value="{{ $product->id }}"
-                                    {{ request('product_id') == $product->id ? 'selected' : '' }}>
-
-                                    {{ $product->name }}
-
-                                </option>
-
-                            @endforeach
-
-                        </select>
-
-                    </div>
-<div class="col-md-2">
-
-    <select
-        name="financial_year_id"
-        class="form-control">
-
-        <option value="all"
-            {{ $financialYearId == 'all' ? 'selected' : '' }}>
-            All Financial Years
-        </option>
-
-        @foreach($financialYears as $fy)
-
-            <option
-                value="{{ $fy->id }}"
-                {{ $financialYearId == $fy->id ? 'selected' : '' }}>
-
-                {{ $fy->name }}
-
-            </option>
-
-        @endforeach
-
-    </select>
-
-</div>
-                    <!-- TYPE -->
-
-                    <div class="col">
-
-                        <select name="type"
-                                class="form-control">
-
-                            <option value="">
-All Types
-</option>
-
-<option value="opening">
-{{ request('type')=='opening' ? 'selected':'' }}>
-Opening
-</option>
-
-<option value="purchase"
-{{ request('type')=='purchase' ? 'selected':'' }}>
-Purchase
-</option>
-
-<option value="sale"
-{{ request('type')=='sale' ? 'selected':'' }}>
-Sale
-</option>
-
-<option value="return"
-{{ request('type')=='return' ? 'selected':'' }}>
-All Returns
-</option>
-
-<option value="sale_return"
-{{ request('type')=='sale_return' ? 'selected':'' }}>
-Sales Return
-</option>
-
-<option value="purchase_return"
-{{ request('type')=='purchase_return' ? 'selected':'' }}>
-Purchase Return
-</option>
-
-<option value="adjustment_in"
-{{ request('type')=='adjustment_in' ? 'selected':'' }}>
-Adjustment In
-</option>
-
-<option value="adjustment_out"
-{{ request('type')=='adjustment_out' ? 'selected':'' }}>
-Adjustment Out
-</option>
-
-<option value="in"
-{{ request('type')=='in' ? 'selected':'' }}>
-Stock In
-</option>
-
-<option value="out"
-{{ request('type')=='out' ? 'selected':'' }}>
-Stock Out
-</option>
-                        </select>
-
-                    </div>
-
-                    <!-- START DATE -->
-
-                    <div class="col-md-2">
-
-                        <input type="date"
-                               name="start_date"
-                               value="{{ request('start_date') }}"
-                               class="form-control">
-
-                    </div>
-
-                    <!-- END DATE -->
-
-                    <div class="col-md-2">
-
-                        <input type="date"
-                               name="end_date"
-                               value="{{ request('end_date') }}"
-                               class="form-control">
-
-                    </div>
-
-                    <!-- FILTER -->
-
-                    <div class="col-md-1">
-
-                        <button class="btn btn-primary w-100">
-
-                            Filter
-
-                        </button>
-
-                    </div>
-
-                    <!-- PRINT -->
-
-                    <div class="col-md-1">
-
-                        <button type="button"
-                                onclick="window.print()"
-                                class="btn btn-dark w-100">
-
-                            Print
-
-                        </button>
-
-                    </div>
-
-                    <!-- PDF -->
-
-                    <div class="col-md-1">
-
-                        <a href="{{ route(
-                            'company.stock-ledger.pdf',
-                            request()->query()
-                        ) }}"
-                           class="btn btn-danger w-100">
-
-                            PDF
-
-                        </a>
-
-                    </div>
-
-                </div>
-
-            </form>
-
-            <!-- PRINT HEADER -->
-
-            <div class="print-header">
-
-                <!-- LOGO -->
-
-                @if(auth()->user()->company->logo_path)
-
-                    <div class="logo-box">
-
-                        <img src="{{ asset(
-                            auth()->user()->company->logo_path
-                        ) }}"
-                             class="company-logo">
-
-                    </div>
-
-                @endif
-
-                <!-- COMPANY -->
-
-                <h1 class="company-name">
-
-                    {{ auth()->user()->company->name ?? 'Company' }}
-
-                </h1>
-
-                <!-- REPORT -->
-
-                <h2 class="report-title">
-
-                    Stock Ledger Report
-
-                </h2>
-
-                <!-- DATE -->
-
-                <p class="print-date">
-
-                    Print Date:
-                    {{ now()->format('Y-m-d h:i A') }}
-
-                </p>
-
-            </div>
-
-            <!-- SUMMARY -->
-
-            <div class="ledger-summary">
-
-                <div>
-
-                    Total Records:
-                    {{ $summary['total_movements'] }}
-
-                </div>
-
-                <div>
-
-                    Total In:
-                   {{ $summary['total_in'] }}
-
-                </div>
-
-                <div>
-
-                    Total Out:
-                   {{ $summary['total_out'] }}
-
-                </div>
-
-            </div>
-</div>
-
-            <!-- TABLE -->
-
-            <div class="table-responsive">
-
-                <table class="table table-hover align-middle mb-0">
-
-                    <thead class="table-dark">
-
-                        <tr>
-
-                            <th>Date</th>
-                            <th>Product</th>
-                            <th>Type</th>
-                            <th>Reference</th>
-                            <th>Qty</th>
-                            <th>Before</th>
-                            <th>After</th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                        @forelse($movements as $move)
-
-                            <tr>
-
-                                <td>
-{{ $move->transaction_date }}
-                                </td>
-
-                                <td>
-
-                                    {{ optional($move->product)->name }}
-
-                                </td>
-
-                                <td>
-
-                                   <span class="badge
-
-@if(
-in_array(
-$move->type,
-
-[
-'purchase',
-'sale_return',
-'purchase_return',
-'opening',
-'adjustment_in'
-]
-)
-
-)
-
-bg-success
-
-@else
-
-bg-danger
-
-@endif
-
-">
-
-                                        {{ str_replace('_',' ',ucfirst($move->type)) }}
-
-                                    </span>
-
-                                </td>
-
-                                <td>
-
-                                    {{ $move->reference_no }}
-
-                                </td>
-
-                                <td>
-
-                                    @if($move->quantity > 0)
-
-                                        <span class="text-success fw-bold">
-
-                                            +{{ $move->quantity }}
-
-                                        </span>
-
-                                    @else
-
-                                        <span class="text-danger fw-bold">
-
-                                            {{ $move->quantity }}
-
-                                        </span>
-
-                                    @endif
-
-                                </td>
-
-                                <td>
-
-                                    {{ $move->before_stock }}
-
-                                </td>
-
-                                <td>
-
-                                    {{ $move->after_stock }}
-
-                                </td>
-
-                            </tr>
-
-                        @empty
-
-                            <tr>
-
-                                <td colspan="7"
-                                    class="text-center py-4">
-
-                                    No Stock Movement Found
-
-                                </td>
-
-                            </tr>
-
-                        @endforelse
-
-                    </tbody>
-
-                </table>
-
-            </div>
-
-            <!-- PAGINATION -->
-
-            <div class="mt-3">
-
-                {{ $movements->links() }}
-
-            </div>
-
-            <!-- SIGNATURE -->
-
-            <div class="signature-section">
-
-                <div>
-
-                    @if(auth()->user()->company->signature_path)
-
-                        <img src="{{ asset(
-                            auth()->user()->company->signature_path
-                        ) }}"
-                             style="
-                                height:60px;
-                                margin-bottom:5px;
-                             ">
-
-                    @endif
-
-                    <br>
-
-                    _______________________
-
-                    <br>
-
-                    Authorized Signature
-
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
+    </main>
 </div>
 
 @endsection

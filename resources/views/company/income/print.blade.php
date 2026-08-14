@@ -134,7 +134,7 @@
                                         <td>{{ $income->title }}</td>
                                         <td>{{ $income->category->name ?? '-' }}</td>
                                         <td>{{ $income->account->account_name ?? '-' }}</td>
-                                        <td>{{ $income->income_date?->format('d-m-Y') ?? '-' }}</td>
+                                        <td>{{ $income->income_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $income->income_date])</td>
                                         <td>{{ $income->financialYear->name ?? '-' }}</td>
                                         <td>{{ $income->isActive() ? 'Active' : 'Cancelled' }}</td>
                                         <td class="text-end">{{ number_format($income->amount, 2) }}</td>

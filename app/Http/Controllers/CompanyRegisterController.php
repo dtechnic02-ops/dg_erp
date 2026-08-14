@@ -4,13 +4,15 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\CompanyRegistration;
+use App\Models\Country;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class CompanyRegisterController extends Controller
 {
     public function showForm()
     {
-        return view('company.register');
+        return view('company.register', ['countries' => Country::query()->where('is_active', true)->orderBy('name')->get()]);
     }
 
     public function register(Request $request)
@@ -24,6 +26,7 @@ class CompanyRegisterController extends Controller
 
             'username' => 'required|unique:company_registrations,username',
             'password' => 'required|min:6',
+            'country_id' => ['required', Rule::exists('countries', 'id')->where(fn ($query) => $query->where('is_active', true))],
 
         ], [
 
@@ -47,6 +50,7 @@ class CompanyRegisterController extends Controller
             'mobile_no' => $request->mobile_no,
             'username' => $request->username,
             'password' => Hash::make($request->password),
+            'country_id' => $request->integer('country_id'),
             'status' => 'pending'
         ]);
 

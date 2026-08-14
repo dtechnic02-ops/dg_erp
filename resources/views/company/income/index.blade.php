@@ -207,7 +207,7 @@
                                             <td>{{ $income->category->name ?? '-' }}</td>
                                             <td>{{ $income->account->account_name ?? '-' }}</td>
                                             <td>{{ number_format($income->amount, 2) }}</td>
-                                            <td>{{ $income->income_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $income->income_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $income->income_date])</td>
                                             <td>
                                                 @if ($income->isActive())
                                                     <span class="badge bg-success">Active</span>

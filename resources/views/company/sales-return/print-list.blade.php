@@ -209,7 +209,7 @@
                                     <tr class="dg-row">
                                         <td class="dg-col-num">{{ $loop->iteration }}</td>
                                         <td>{{ $return->return_no }}</td>
-                                        <td class="dg-col-date">{{ $return->return_date?->format('d-m-Y') }}</td>
+                                        <td class="dg-col-date">{{ $return->return_date?->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $return->return_date])</td>
                                         <td>{{ $return->invoice->invoice_no ?? '-' }}</td>
                                         <td>{{ $return->customer->name ?? '-' }}</td>
                                         <td class="dg-col-num">{{ number_format($return->subtotal, 2) }}</td>

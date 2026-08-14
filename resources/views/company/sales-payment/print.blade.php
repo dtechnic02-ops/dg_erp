@@ -189,7 +189,7 @@
                                         <div class="dg-summary-bar-item">
                                             <span class="dg-summary-bar-label text-muted">Payment Date</span>
                                             <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
-                                            <span class="dg-summary-bar-value">{{ $payment->payment_date?->format('d-m-Y') ?? '-' }}</span>
+                                            <span class="dg-summary-bar-value">{{ $payment->payment_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $payment->payment_date])</span>
                                         </div>
                                         <div class="dg-summary-bar-item">
                                             <span class="dg-summary-bar-label text-muted">Payment Account</span>

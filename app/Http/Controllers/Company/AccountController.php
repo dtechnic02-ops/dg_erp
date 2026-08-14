@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Models\Account;
@@ -12,6 +13,7 @@ use App\Services\ValidationService;
 
 class AccountController extends Controller
 {
+    use AuthorizesCompanyPermission;
 
     // 🔥 SHARED FILTERED QUERY
     // Used by index(), print(), and any other action
@@ -51,9 +53,29 @@ class AccountController extends Controller
         return $query;
     }
 
+    private function normalizedBankFields(Request $request, string $accountType): array
+    {
+        $bankFields = ['bank_name', 'branch', 'account_no', 'iban', 'swift_code'];
+
+        if ($accountType === 'Cash') {
+            return collect($bankFields)
+                ->mapWithKeys(fn (string $field) => [$field => trim((string) $request->input($field, ''))])
+                ->all();
+        }
+
+        return [
+            'bank_name' => trim((string) $request->input('bank_name', '')),
+            'branch' => $request->filled('branch') ? trim((string) $request->branch) : null,
+            'account_no' => $request->filled('account_no') ? trim((string) $request->account_no) : null,
+            'iban' => $request->filled('iban') ? trim((string) $request->iban) : null,
+            'swift_code' => $request->filled('swift_code') ? trim((string) $request->swift_code) : null,
+        ];
+    }
+
 
 public function index(Request $request)
 {
+    $this->authorizeCompanyPermission('view_accounts');
 
     $accountGroups = Account::accountGroupLabels();
 
@@ -97,6 +119,8 @@ public function index(Request $request)
 
     public function store(Request $request)
     {
+        $this->authorizeCompanyPermission('create_accounts');
+
 $request->validate([
 
     'account_group' => [
@@ -169,6 +193,8 @@ if (
 
 DB::beginTransaction();
 try{
+       $bankFields = $this->normalizedBankFields($request, $request->account_type);
+
        $account = Account::create([
 
     'company_id' =>
@@ -184,22 +210,22 @@ try{
         $request->sub_ledger_type ?: null,
 
     'bank_name' =>
-        $request->bank_name,
+        $bankFields['bank_name'],
 
     'account_name' =>
         $request->account_name,
 
     'branch' =>
-        $request->branch,
+        $bankFields['branch'],
 
     'account_no' =>
-        $request->account_no,
+        $bankFields['account_no'],
 
     'iban' =>
-        $request->iban,
+        $bankFields['iban'],
 
     'swift_code' =>
-        $request->swift_code,
+        $bankFields['swift_code'],
 
     'currency' =>
         $request->currency ?? 'AED',
@@ -256,6 +282,7 @@ catch(\Exception $e){
         $id
     )
     {
+        $this->authorizeCompanyPermission('edit_accounts');
 
         $account = Account::where(
 
@@ -320,6 +347,8 @@ catch(\Exception $e){
         
 
 
+        $bankFields = $this->normalizedBankFields($request, $request->account_type);
+
         $data = [
 
             'account_group' =>
@@ -336,7 +365,7 @@ catch(\Exception $e){
 
             'bank_name' =>
 
-                $request->bank_name,
+                $bankFields['bank_name'],
 
             'account_name' =>
 
@@ -344,19 +373,19 @@ catch(\Exception $e){
 
             'branch' =>
 
-                $request->branch,
+                $bankFields['branch'],
 
             'account_no' =>
 
-                $request->account_no,
+                $bankFields['account_no'],
 
             'iban' =>
 
-                $request->iban,
+                $bankFields['iban'],
 
             'swift_code' =>
 
-                $request->swift_code,
+                $bankFields['swift_code'],
 
             'currency' =>
 
@@ -428,6 +457,8 @@ $data['image_path'] =
 
 public function destroy($id)
 {
+    $this->authorizeCompanyPermission('delete_accounts');
+
     $account = Account::where(
         'company_id',
         auth()->user()->company_id
@@ -495,6 +526,8 @@ public function destroy($id)
 
 public function show($id)
 {
+    $this->authorizeCompanyPermission('view_accounts');
+
     $account = Account::where(
         'company_id',
         auth()->user()->company_id
@@ -526,6 +559,8 @@ currently filtered accounts.
 
 public function print(Request $request)
 {
+    $this->authorizeCompanyPermission('print_accounts');
+
     $accounts = $this->filteredAccountQuery($request)
         ->latest()
         ->get();
@@ -560,6 +595,8 @@ Supplier modules.
 
 public function printProfile($id)
 {
+    $this->authorizeCompanyPermission('print_accounts');
+
     $companyId = auth()->user()->company_id;
 
     $account = Account::where('company_id', $companyId)

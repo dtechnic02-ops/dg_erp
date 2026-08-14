@@ -38,7 +38,8 @@ $crmOpen = request()->routeIs(
     'company.crm-opportunities.*',
     'company.crm-follow-ups.*',
     'company.crm-meetings.*',
-    'company.crm-tasks.*'
+    'company.crm-tasks.*',
+    'company.quotations.*'
 );
 
 $salesOpen = request()->routeIs(
@@ -46,6 +47,7 @@ $salesOpen = request()->routeIs(
     'company.sales-payment.*',
     'company.sales-return.*',
     'company.sales-return-refund.*',
+    'company.quotations.*',
     'company.customers.*'
 );
 
@@ -102,6 +104,8 @@ $reportsOpen = request()->routeIs(
     'company.customer-statement.*',
     'company.payroll-register.*'
 );
+
+$accountingReportsOpen = request()->routeIs('company.accounting-reports.*');
 
 $settingsOpen = request()->routeIs(
     'company.profile',
@@ -164,8 +168,8 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                             <span class="dg-sidebar-label">Staff Management</span>
                             <span class="dg-sidebar-chevron" aria-hidden="true"></span>
                         </label>
-                        <div class="dg-sidebar-submenu">
-                            <div class="dg-sidebar-child">
+                          <div class="dg-sidebar-submenu">
+                              <div class="dg-sidebar-child">
                                 <a href="{{ route('company.users.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.users.*') }}">Staff List</a>
                             </div>
                         </div>
@@ -185,6 +189,11 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                             <span class="dg-sidebar-chevron" aria-hidden="true"></span>
                         </label>
                         <div class="dg-sidebar-submenu">
+                            @if ($user?->hasPermission('view_quotation'))
+                            <div class="dg-sidebar-child">
+                                <a href="{{ route('company.quotations.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.quotations.*') }}">Quotations</a>
+                            </div>
+                            @endif
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.sales.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.sales.*') }}">Sales</a>
                             </div>
@@ -217,6 +226,11 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                             <span class="dg-sidebar-chevron" aria-hidden="true"></span>
                         </label>
                         <div class="dg-sidebar-submenu">
+                            @if ($user?->hasPermission('view_quotation'))
+                                <div class="dg-sidebar-child">
+                                    <a href="{{ route('company.quotations.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.quotations.*') }}">Quotations</a>
+                                </div>
+                            @endif
                             @if ($canViewCrmDashboard)
                                 <div class="dg-sidebar-child">
                                     <a href="{{ route('company.crm.dashboard.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.crm.dashboard.*') }}">Dashboard</a>
@@ -478,6 +492,36 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                             </div>
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.customer-statement.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.customer-statement.*') }}">Customer Statement</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @endif
+
+                <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
+
+                @if($canSeeMenu('reports'))
+                <div class="dg-sidebar-section">
+                    <div class="dg-sidebar-group {{ $groupOpen($accountingReportsOpen) }}">
+                        <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-accounting-reports" @if ($accountingReportsOpen) checked @endif>
+                        <label for="dg-nav-accounting-reports" class="dg-sidebar-parent">
+                            <span class="dg-sidebar-icon" aria-hidden="true"><i class="bi bi-journal-text"></i></span>
+                            <span class="dg-sidebar-label">Accounting Reports</span>
+                            <span class="dg-sidebar-chevron" aria-hidden="true"></span>
+                        </label>
+                        <div class="dg-sidebar-submenu">
+                            <div class="dg-sidebar-child">
+                                <a href="{{ route('company.accounting-reports.general-ledger') }}" class="dg-sidebar-child-link {{ $linkActive('company.accounting-reports.general-ledger') }}">General Ledger</a>
+                            </div>
+                            <div class="dg-sidebar-child">
+                                <a href="{{ route('company.accounting-reports.trial-balance') }}" class="dg-sidebar-child-link {{ $linkActive('company.accounting-reports.trial-balance') }}">Trial Balance</a>
+                            </div>
+                            <div class="dg-sidebar-child">
+                                <a href="{{ route('company.accounting-reports.profit-loss') }}" class="dg-sidebar-child-link {{ $linkActive('company.accounting-reports.profit-loss') }}">Profit &amp; Loss</a>
+                            </div>
+                            <div class="dg-sidebar-child">
+                                <a href="{{ route('company.accounting-reports.balance-sheet') }}" class="dg-sidebar-child-link {{ $linkActive('company.accounting-reports.balance-sheet') }}">Balance Sheet</a>
                             </div>
                         </div>
                     </div>

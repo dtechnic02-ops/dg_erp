@@ -95,6 +95,7 @@ class ExpenseAccountingDataBuilder
 
         return [
             'company_id' => $companyId,
+            'financial_year_id' => $financialYearId,
             'expense_id' => $expenseId,
             'expense_date' => $expenseDate,
             'expense_number' => $this->requiredString($expense->expense_no, 'expense_no'),

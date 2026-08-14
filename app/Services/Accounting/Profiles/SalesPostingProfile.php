@@ -89,6 +89,7 @@ class SalesPostingProfile
 
         return [
             'company_id' => $companyId,
+            'financial_year_id' => $this->positiveInteger($sale->financial_year_id, 'financial_year_id'),
             'entry_date' => $saleDate,
             'reference_number' => $invoiceNumber,
             'source_module' => 'sales',

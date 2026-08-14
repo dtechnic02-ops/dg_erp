@@ -152,7 +152,10 @@ class JournalPhaseTwoTest extends OpeningBalanceModuleTest
         $this->assertSame('posted',$this->service()->post($this->approved([['chart_account_id'=>8,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]),3)->status);
         foreach ([['Cash',9],['ATM',8],['Wallet',8]] as [$type,$chart]) {DB::table('accounts')->where('id',1)->update(['account_type'=>$type]);$this->assertSame('posted',$this->service()->post($this->approved([['chart_account_id'=>$chart,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]),3)->status);}
         DB::table('accounts')->where('id',1)->update(['account_type'=>'Bank']);
-        try{$this->service()->post($this->approved([['chart_account_id'=>1,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]),3);$this->fail('Mismatched operational Account accepted.');}catch(RuntimeException){$this->assertTrue(true);}
+        try{$this->service()->post($this->approved([['chart_account_id'=>8,'debit'=>'10','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]),3);$this->fail('Bank Chart Account without operational account accepted.');}catch(ValidationException){$this->assertTrue(true);}
+        DB::table('accounts')->where('id',1)->update(['account_type'=>'Cash']);
+        try{$this->service()->post($this->approved([['chart_account_id'=>8,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]),3);$this->fail('Mismatched operational Account accepted.');}catch(ValidationException){$this->assertTrue(true);}
+        DB::table('accounts')->where('id',1)->update(['account_type'=>'Bank']);
     }
 
     public function test_journal_service_uses_the_journal_accounting_integration_layer(): void

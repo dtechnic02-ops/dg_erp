@@ -97,7 +97,7 @@
                                         <div class="dg-summary-bar-item">
                                             <span class="dg-summary-bar-label text-muted">Expense Date</span>
                                             <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
-                                            <span class="dg-summary-bar-value">{{ $expense->expense_date?->format('d-m-Y') ?? '-' }}</span>
+                                            <span class="dg-summary-bar-value">{{ $expense->expense_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $expense->expense_date])</span>
                                         </div>
                                         <div class="dg-summary-bar-item">
                                             <span class="dg-summary-bar-label text-muted">Status</span>

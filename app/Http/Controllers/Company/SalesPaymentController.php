@@ -121,7 +121,7 @@ class SalesPaymentController extends Controller
         $totalCount   = (clone $query)->count();
 
         $payments = $query
-            ->latest()
+            ->orderByDesc('payment_date')->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 
@@ -677,7 +677,7 @@ class SalesPaymentController extends Controller
         $cancelledCount = (clone $query)->where('status', 0)->count();
 
         $payments = $query
-            ->latest()
+            ->orderByDesc('payment_date')->orderByDesc('id')
             ->get();
 
         $customers = Customer::where('company_id', $companyId)

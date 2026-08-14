@@ -7,8 +7,11 @@ use App\Models\ChartAccount;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\CustomerTransaction;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 use Tests\Concerns\CreatesCompanyRouteTestFoundation;
 use Tests\TestCase;
@@ -60,6 +63,7 @@ class CustomerOpeningBalanceAccountingRouteTest extends TestCase
     private function createAuthenticatedCompanyFiveContext(bool $includeReceivable): array
     {
         $this->createCompanyRouteTestSchema();
+        $this->seedCustomerPermissions();
 
         $role = $this->createCompanyDashboardRole();
         $company = new Company([
@@ -112,5 +116,18 @@ class CustomerOpeningBalanceAccountingRouteTest extends TestCase
             'credit_days' => 0,
             'status' => 'active',
         ];
+    }
+
+    private function seedCustomerPermissions(): void
+    {
+        if (! Schema::hasTable('permissions')) {
+            Schema::create('permissions', fn (Blueprint $t) => [$t->id(), $t->string('name'), $t->string('scope')->default('company'), $t->timestamps()]);
+        }
+
+        foreach ([
+            'module_customer', 'view_customer', 'create_customer', 'edit_customer', 'delete_customer', 'print_customer',
+        ] as $permission) {
+            Permission::create(['name' => $permission, 'scope' => Permission::SCOPE_COMPANY]);
+        }
     }
 }

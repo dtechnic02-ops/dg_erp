@@ -12,6 +12,7 @@ final class PermissionModuleResolver
         'loan_saving_ledger' => 'module_loan', 'loan_saving_withdraw' => 'module_loan',
         'employee' => 'module_hr', 'salary' => 'module_payroll',
         'delivery' => 'module_delivery', 'crm' => 'module_crm',
+        'generate_quotation_invoice' => 'module_quotation',
         'company_profile' => 'module_company_profile',
         'system_maintenance' => 'module_maintenance',
         'opening-balance' => 'module_opening_balance', 'journal' => 'module_journal',

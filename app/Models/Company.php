@@ -17,6 +17,7 @@ class Company extends Model
         'address',
         'address_line_2',
         'country',
+        'country_id',
         'language',
         'pan_number',
         'vat_number',
@@ -26,6 +27,10 @@ class Company extends Model
         'expiry_date',
         'selected_customer_limit'
     ];
+    public function countryMaster()
+    {
+        return $this->belongsTo(Country::class, 'country_id');
+    }
     public function financialYears()
 {
 

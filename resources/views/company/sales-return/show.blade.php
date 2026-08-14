@@ -450,7 +450,7 @@
 
                                             <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
 
-                                            <span class="dg-summary-bar-value">{{ $return->return_date?->format('d-m-Y') ?? '-' }}</span>
+                                            <span class="dg-summary-bar-value">{{ $return->return_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $return->return_date])</span>
 
                                         </div>
 
@@ -749,4 +749,3 @@
 
 
 @endsection
-

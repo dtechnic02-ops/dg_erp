@@ -71,6 +71,7 @@
                                             <label for="refund_date" class="form-label">Refund Date</label>
                                             <input type="date" name="refund_date" id="refund_date" class="form-control dg-input" value="{{ old('refund_date', date('Y-m-d')) }}" required>
                                         </div>
+                                        @include('company.components.nepali-date-field', ['adInputId' => 'refund_date', 'adDate' => old('refund_date', date('Y-m-d'))])
                                         <div class="col-12 col-md-4">
                                             <label for="supplier_display" class="form-label">Supplier</label>
                                             <input type="text" id="supplier_display" class="form-control dg-input" value="{{ $return->supplier->name ?? '-' }}" readonly>

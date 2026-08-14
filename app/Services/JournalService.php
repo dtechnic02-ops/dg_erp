@@ -9,6 +9,8 @@ use App\Models\Company;
 use App\Models\FinancialYear;
 use App\Models\Journal;
 use App\Models\JournalAuditEvent;
+use App\Models\Role;
+use App\Models\User;
 use App\Models\AccountTransaction;
 use App\Models\Customer;
 use App\Models\CustomerTransaction;
@@ -94,11 +96,17 @@ class JournalService
 
     public function approve(Journal $journal, int $actorId): Journal
     {
+        $metadata = null;
+        if ($this->actorMayBypassMakerCheckerSeparation($actorId, (int) $journal->company_id)
+            && ((int) $journal->created_by === $actorId || (int) $journal->submitted_by === $actorId)) {
+            $metadata = ['admin_override' => true, 'override_type' => 'self_approval'];
+        }
+
         return $this->transition($journal, $actorId, Journal::STATUS_SUBMITTED, Journal::STATUS_APPROVED, 'approved', function (Journal $locked) use ($actorId) {
-            if ((int)$locked->created_by === $actorId || (int)$locked->submitted_by === $actorId) throw new RuntimeException('Maker/checker separation prevents self-approval.');
+            $this->assertMakerCheckerSeparationForApprove($locked, $actorId);
             $this->validateExisting($locked);
             return ['approved_by'=>$actorId,'approved_at'=>now()];
-        });
+        }, null, $metadata);
     }
 
     public function reject(Journal $journal, int $actorId, string $reason): Journal
@@ -131,13 +139,19 @@ class JournalService
             $j=Journal::with('items')->where('company_id',$journal->company_id)->lockForUpdate()->findOrFail($journal->id);
             $this->assertManualJournal($j);
             if($j->status!==Journal::STATUS_APPROVED||$j->is_locked)throw new RuntimeException('Only an unlocked Approved Journal may be posted.');
-            if(in_array($actorId,[(int)$j->created_by,(int)$j->approved_by],true))throw new RuntimeException('Maker/checker/poster segregation prevents this posting.');
+            $this->assertMakerCheckerSeparationForPost($j, $actorId);
             $this->validateExisting($j);
             $sourceKey='manual-journal:'.$j->id.':posted';
             $entry=$this->accountingIntegration->postJournal($j, (int) $j->company_id, $actorId);
             $this->createAuxiliary($j,$actorId);
             $j->update(['source_module'=>'journal','source_type'=>'manual_journal','source_id'=>$j->id,'source_key'=>$sourceKey,'status'=>Journal::STATUS_POSTED,'posted_by'=>$actorId,'posted_at'=>now()]);
-            $this->audit($j,'posted',Journal::STATUS_APPROVED,Journal::STATUS_POSTED,$actorId,null,['accounting_entry_id'=>$entry->id]);return $j->fresh();
+            $postMetadata = ['accounting_entry_id' => $entry->id];
+            if ($this->actorMayBypassMakerCheckerSeparation($actorId, (int) $j->company_id)
+                && in_array($actorId, [(int) $j->created_by, (int) $j->approved_by], true)) {
+                $postMetadata['admin_override'] = true;
+                $postMetadata['override_type'] = 'self_post';
+            }
+            $this->audit($j,'posted',Journal::STATUS_APPROVED,Journal::STATUS_POSTED,$actorId,null,$postMetadata);return $j->fresh();
         });
     }
 
@@ -158,7 +172,38 @@ class JournalService
         });
     }
 
-    private function transition(Journal $journal,int $actorId,string $from,string $to,string $event,callable $extra,?string $reason=null):Journal{return DB::transaction(function()use($journal,$actorId,$from,$to,$event,$extra,$reason){$j=Journal::where('company_id',$journal->company_id)->lockForUpdate()->findOrFail($journal->id);$this->assertManualJournal($j);if($j->status!==$from)throw new RuntimeException("Only {$from} Journals may be {$event}.");if($j->is_locked)throw new RuntimeException('Locked Journal cannot be changed.');$this->assertTransition($from,$to==Journal::STATUS_DRAFT&&$event==='rejected'?Journal::STATUS_REJECTED:$to);$j->update(array_merge(['status'=>$to],$extra($j)));$this->audit($j,$event,$from,$to,$actorId,$reason);return $j->fresh();});}
+    private function transition(Journal $journal,int $actorId,string $from,string $to,string $event,callable $extra,?string $reason=null,?array $metadata=null):Journal{return DB::transaction(function()use($journal,$actorId,$from,$to,$event,$extra,$reason,$metadata){$j=Journal::where('company_id',$journal->company_id)->lockForUpdate()->findOrFail($journal->id);$this->assertManualJournal($j);if($j->status!==$from)throw new RuntimeException("Only {$from} Journals may be {$event}.");if($j->is_locked)throw new RuntimeException('Locked Journal cannot be changed.');$this->assertTransition($from,$to==Journal::STATUS_DRAFT&&$event==='rejected'?Journal::STATUS_REJECTED:$to);$j->update(array_merge(['status'=>$to],$extra($j)));$this->audit($j,$event,$from,$to,$actorId,$reason,$metadata);return $j->fresh();});}
+
+    private function actorMayBypassMakerCheckerSeparation(int $actorId, int $companyId): bool
+    {
+        return User::query()
+            ->whereKey($actorId)
+            ->where('company_id', $companyId)
+            ->where('role_id', Role::COMPANY_ADMIN_ID)
+            ->exists();
+    }
+
+    private function assertMakerCheckerSeparationForApprove(Journal $journal, int $actorId): void
+    {
+        if ($this->actorMayBypassMakerCheckerSeparation($actorId, (int) $journal->company_id)) {
+            return;
+        }
+
+        if ((int) $journal->created_by === $actorId || (int) $journal->submitted_by === $actorId) {
+            throw new RuntimeException('Maker/checker separation prevents self-approval.');
+        }
+    }
+
+    private function assertMakerCheckerSeparationForPost(Journal $journal, int $actorId): void
+    {
+        if ($this->actorMayBypassMakerCheckerSeparation($actorId, (int) $journal->company_id)) {
+            return;
+        }
+
+        if (in_array($actorId, [(int) $journal->created_by, (int) $journal->approved_by], true)) {
+            throw new RuntimeException('Maker/checker/poster segregation prevents this posting.');
+        }
+    }
 
     private function validateExisting(Journal $j):void{$this->validateFinancialContext($j->company_id,$j->financial_year_id,$j->journal_date->format('Y-m-d'));$lines=$j->items()->orderBy('line_number')->get()->map(fn($i)=>['chart_account_id'=>$i->chart_account_id,'account_id'=>$i->account_id,'debit'=>$i->debit,'credit'=>$i->credit,'description'=>$i->description,'reference'=>$i->reference,'subledger_type'=>$i->sub_ledger_type,'subledger_id'=>$i->sub_ledger_id])->all();$this->validateLines($lines,$j->company_id);}
     private function accountingLines(Journal $j):array{return $j->items->map(fn($i)=>['chart_account_id'=>$i->chart_account_id,'operational_account_id'=>$i->account_id,'debit'=>$i->debit,'credit'=>$i->credit,'description'=>$i->description,'subledger_type'=>$i->sub_ledger_type,'subledger_id'=>$i->sub_ledger_id])->all();}
@@ -196,7 +241,7 @@ class JournalService
         foreach ($lines as $index => &$line) {
             $account = ChartAccount::where('company_id', $companyId)->whereKey($line['chart_account_id'])->where('level', 3)->where('allow_manual_entry', 1)->where('status', 'active')->when(Schema::hasColumn('chart_accounts', 'is_locked'), fn ($q) => $q->where('is_locked', 0))->first();
             if (!$account) throw ValidationException::withMessages(["lines.{$index}.chart_account_id" => 'Select an active, unlocked Level 3 posting Chart Account from this company.']);
-            if (!empty($line['account_id']) && !Account::where('company_id', $companyId)->whereKey($line['account_id'])->whereIn('status', [1, 'active'])->exists()) throw ValidationException::withMessages(["lines.{$index}.account_id" => 'The operational Account is invalid for this company.']);
+            $this->validateOperationalAccountLine($account, isset($line['account_id']) ? (int) $line['account_id'] : null, $companyId, $index);
             $d = $this->scaled($line['debit']); $c = $this->scaled($line['credit']);
             if (($d > 0 && $c > 0) || ($d === 0 && $c === 0)) throw ValidationException::withMessages(["lines.{$index}" => 'Each line requires either Debit or Credit, never both.']);
             $debit += $d; $credit += $c; $line['_debit'] = $d; $line['_credit'] = $c;
@@ -204,6 +249,40 @@ class JournalService
         unset($line);
         if ($debit !== $credit) throw ValidationException::withMessages(['lines' => 'Total Debit must equal Total Credit to four decimal places.']);
         return $lines;
+    }
+
+    private function validateOperationalAccountLine(ChartAccount $chartAccount, ?int $accountId, int $companyId, int $index): void
+    {
+        $requiredCode = in_array($chartAccount->system_code, ['CASH_IN_HAND', 'BANK_ACCOUNTS'], true)
+            ? $chartAccount->system_code
+            : null;
+
+        if (!$requiredCode) {
+            if ($accountId) {
+                throw ValidationException::withMessages(["lines.{$index}.account_id" => 'Operational Account is only allowed for Cash or Bank Chart Accounts.']);
+            }
+
+            return;
+        }
+
+        if (!$accountId) {
+            throw ValidationException::withMessages(["lines.{$index}.account_id" => 'Select an operational account for this Cash or Bank Chart Account.']);
+        }
+
+        $operational = Account::where('company_id', $companyId)->whereKey($accountId)->whereIn('status', [1, 'active'])->first();
+        if (!$operational) {
+            throw ValidationException::withMessages(["lines.{$index}.account_id" => 'The operational Account is invalid for this company.']);
+        }
+
+        $expectedCode = match ($operational->account_type) {
+            'Cash' => 'CASH_IN_HAND',
+            'Bank', 'ATM', 'Wallet' => 'BANK_ACCOUNTS',
+            default => null,
+        };
+
+        if ($expectedCode !== $requiredCode) {
+            throw ValidationException::withMessages(["lines.{$index}.account_id" => 'Operational Account must match its required Cash or Bank Chart Account.']);
+        }
     }
 
     private function replaceLines(Journal $journal, array $lines): void

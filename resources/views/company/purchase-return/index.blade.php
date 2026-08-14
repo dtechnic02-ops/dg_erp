@@ -418,7 +418,7 @@
 
                                             <td>{{ $return->return_no }}</td>
 
-                                            <td class="dg-col-date">{{ $return->return_date?->format('d-m-Y') }}</td>
+                                            <td class="dg-col-date">{{ $return->return_date?->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $return->return_date])</td>
 
                                             <td>{{ $return->invoice->invoice_no ?? '-' }}</td>
 
@@ -964,7 +964,7 @@
 
                                             <td>{{ $return->return_no }}</td>
 
-                                            <td class="dg-col-date">{{ $return->return_date?->format('d-m-Y') }}</td>
+                                            <td class="dg-col-date">{{ $return->return_date?->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $return->return_date])</td>
 
                                             <td>{{ $return->invoice->invoice_no ?? '-' }}</td>
 

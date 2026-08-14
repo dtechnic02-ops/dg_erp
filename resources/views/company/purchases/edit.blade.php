@@ -81,6 +81,7 @@
                                     <label for="purchase_date" class="form-label">Purchase Date</label>
                                     <input type="date" name="purchase_date" id="purchase_date" class="form-control dg-input" value="{{ old('purchase_date', \Illuminate\Support\Carbon::parse($invoice->purchase_date)->format('Y-m-d')) }}" required>
                                 </div>
+                                @include('company.components.nepali-date-field', ['adInputId' => 'purchase_date', 'adDate' => old('purchase_date', $invoice->purchase_date)])
 
                                 <div class="col-md-3">
                                     <label for="supplier_name" class="form-label">Supplier</label>

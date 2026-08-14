@@ -114,7 +114,7 @@
                                 <div class="col-md-6">
                                     <div class="dg-row">
                                         <span class="dg-label d-inline mb-0">Payment Date :</span>
-                                        {{ optional($payment->payment_date)->format('d-m-Y') ?: '-' }}
+                                        {{ optional($payment->payment_date)->format('d-m-Y') ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $payment->payment_date])
                                     </div>
                                 </div>
                                 <div class="col-md-6">

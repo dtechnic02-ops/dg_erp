@@ -29,6 +29,7 @@ class PurchasePaymentPostingProfile
 
         return [
             'company_id' => $this->positiveInteger($data['company_id'] ?? null, 'company_id'),
+            'financial_year_id' => $this->positiveInteger($data['financial_year_id'] ?? null, 'financial_year_id'),
             'entry_date' => $this->requiredString($data, 'payment_date'),
             'reference_number' => $paymentNumber,
             'source_module' => 'purchase_payment',

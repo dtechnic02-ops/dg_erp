@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use Illuminate\Http\Request;
 
 use App\Models\Product;
@@ -12,8 +13,11 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class StockLedgerController extends Controller
 {
+    use AuthorizesCompanyPermission;
+
     public function index(Request $request)
 {
+    $this->authorizeCompanyPermission('view_stock');
     $companyId = auth()->user()->company_id;
 
     /*
@@ -290,6 +294,8 @@ else
 
     public function sync()
     {
+        $this->authorizeCompanyPermission('view_stock');
+
         $companyId = auth()->user()->company_id;
 
         $products = Product::where(
@@ -330,6 +336,8 @@ else
 
    public function pdf(Request $request)
 {
+    $this->authorizeCompanyPermission('print_stock');
+
     $companyId = auth()->user()->company_id;
 
     /*

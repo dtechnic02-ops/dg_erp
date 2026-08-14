@@ -40,6 +40,8 @@ use App\Http\Controllers\Company\CashAccountController;
 use App\Http\Controllers\Company\PurchaseController;
 use App\Http\Controllers\Company\VatController;
 use App\Http\Controllers\Company\SalesController;
+use App\Http\Controllers\Company\QuotationController;
+use App\Http\Controllers\Company\NepaliDateController;
 use App\Http\Controllers\Company\DeliveryNoteController;
 use App\Http\Controllers\Company\CrmDashboardController;
 use App\Http\Controllers\Company\CrmLeadController;
@@ -146,6 +148,12 @@ Route::post('/logout', function (Request $request) {
 //SUPER ADMIN ROUTES
 
 Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function () {
+
+    Route::middleware('platform.permission:platform_settings_manage')->prefix('countries')->name('admin.countries.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\CountryController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Admin\CountryController::class, 'store'])->name('store');
+        Route::put('/{country}', [\App\Http\Controllers\Admin\CountryController::class, 'update'])->name('update');
+    });
 
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->middleware('platform.permission:platform_dashboard_view')
@@ -261,6 +269,22 @@ Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function ()
 
 
 Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::class,'subscription'])->prefix('company')->name('company.')->group(function () {
+
+    Route::get('/calendar/ad-to-bs', NepaliDateController::class)->name('calendar.ad-to-bs');
+
+    Route::prefix('quotations')->name('quotations.')->group(function () {
+        Route::get('/', [QuotationController::class, 'index'])->middleware('permission:view_quotation')->name('index');
+        Route::get('/create', [QuotationController::class, 'create'])->middleware('permission:create_quotation')->name('create');
+        Route::post('/', [QuotationController::class, 'store'])->middleware('permission:create_quotation')->name('store');
+        Route::get('/{quotation}', [QuotationController::class, 'show'])->middleware('permission:view_quotation')->name('show');
+        Route::get('/{quotation}/edit', [QuotationController::class, 'edit'])->middleware('permission:edit_quotation')->name('edit');
+        Route::put('/{quotation}', [QuotationController::class, 'update'])->middleware('permission:edit_quotation')->name('update');
+        Route::delete('/{quotation}', [QuotationController::class, 'destroy'])->middleware('permission:delete_quotation')->name('destroy');
+        Route::post('/{quotation}/approve', [QuotationController::class, 'approve'])->middleware('permission:approve_quotation')->name('approve');
+        Route::post('/{quotation}/convert', [QuotationController::class, 'convert'])->middleware('permission:generate_quotation_invoice')->name('convert');
+        Route::get('/{quotation}/print', [QuotationController::class, 'print'])->middleware('permission:print_quotation')->name('print');
+    });
+
     Route::prefix('accounting-reports')->name('accounting-reports.')->middleware('permission:view_reports')->group(function () {
         Route::get('/general-ledger', [AccountingReportController::class, 'generalLedger'])->name('general-ledger');
         Route::get('/trial-balance', [AccountingReportController::class, 'trialBalance'])->name('trial-balance');

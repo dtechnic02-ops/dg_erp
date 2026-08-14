@@ -7,7 +7,7 @@
 @php
     $user = auth()->user();
     $canCreate = $user?->hasPermission('create_journal') ?? false;
-    $canEdit = $user?->hasPermission('edit_journal') ?? false;
+    $canEditDraft = $user && ($user->hasPermission('journal.edit-draft') || $user->hasPermission('edit_journal'));
 @endphp
 
 <div class="dg-page">
@@ -97,9 +97,9 @@
                                 <div class="dg-filter-field dg-filter-field-status">
                                     <label for="status" class="dg-filter-label">Status</label>
                                     <select name="status" id="status" class="form-select dg-select dg-filter-control">
-                                        <option value="" @selected(request()->has('status') && request('status') === '')>All</option>
+                                        <option value="" @selected($statusFilter === '')>All</option>
                         @foreach (\App\Models\Journal::STATUSES as $status)
-                            <option value="{{ $status }}" @selected(request('status', \App\Models\Journal::STATUS_DRAFT) === $status)>{{ ucfirst($status) }}</option>
+                            <option value="{{ $status }}" @selected($statusFilter === $status)>{{ ucfirst($status) }}</option>
                         @endforeach
                                     </select>
                                 </div>
@@ -128,7 +128,7 @@
                             <input type="hidden" name="financial_year_id" value="{{ request('financial_year_id', $activeFy?->id) }}">
                             <input type="hidden" name="start_date" value="{{ request('start_date') }}">
                             <input type="hidden" name="end_date" value="{{ request('end_date') }}">
-                    <input type="hidden" name="status" value="{{ request()->has('status') ? request('status') : \App\Models\Journal::STATUS_DRAFT }}">
+                    <input type="hidden" name="status" value="{{ $statusFilter }}">
 
                             <label for="per_page" class="dg-list-per-page-label">Show</label>
                             <select name="per_page" id="per_page" class="form-select dg-select dg-list-per-page-select" onchange="this.form.submit()">
@@ -161,7 +161,7 @@
                                             <td>{{ $journals->firstItem() + $loop->index }}</td>
                                             <td>{{ $journal->journal_no }}</td>
                                             <td>{{ $journal->reference_no ?: '-' }}</td>
-                                            <td>{{ $journal->journal_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $journal->journal_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $journal->journal_date])</td>
                                             <td>{{ number_format($journal->total_amount, 2) }}</td>
                                             <td>
                                                 @if ($journal->isPosted())
@@ -175,7 +175,7 @@
                                             <td>
                                                 <div class="btn-group" role="group" aria-label="Journal actions for {{ $journal->journal_no }}">
                                                     <a href="{{ route('company.journal.show', $journal->id) }}" class="btn btn-sm btn-outline-info dg-btn">View</a>
-                                                    @if ($canEdit && $journal->isActive())
+                                                    @if ($canEditDraft && $journal->isDraft() && !$journal->is_locked)
                                                         <a href="{{ route('company.journal.edit', $journal->id) }}" class="btn btn-sm btn-outline-success dg-btn">Edit</a>
                                                     @endif
                                                 </div>

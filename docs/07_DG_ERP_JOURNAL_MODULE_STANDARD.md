@@ -21,7 +21,7 @@ This document is subordinate to the following frozen DG ERP standards. Where any
 
 | Priority | Document | Role |
 |----------|----------|------|
-| 1 | `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md` | Financial Year, Business Date, Cancelled Record Rule |
+| 1 | `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md` | Financial Year, Business Date, Cancelled Record Rule |
 | 2 | `04_DG_ERP_MASTER_BUSINESS_STANDARD.md` | Master principles, cancel philosophy, reuse architecture |
 | 3 | `01_DG_ERP_MASTER_UI_FRAMEWORK_STANDARD.md` | UI framework, print framework, DG components |
 | 4 | `02_DG_ERP_SALES_MODULE_STANDARD.md` | Reference architecture for validation, audit, cancel, ledger integrity |
@@ -128,7 +128,7 @@ The Account Ledger tracks all account movements. Journal Create posts debits and
 
 #### Financial Year
 
-Every journal transaction must belong to a valid Financial Year and comply with the Active Financial Year rule. Financial Year behaviour is defined exclusively in `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md`.
+Every journal transaction must belong to a valid Financial Year and comply with the Active Financial Year rule. Financial Year behaviour is defined exclusively in `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md`.
 
 #### Voucher Number
 
@@ -960,7 +960,7 @@ Every Journal and related transaction must belong to the authenticated company, 
 
 ## 13. Financial Year Rules
 
-All Journal transactions must comply with `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md`.
+All Journal transactions must comply with `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md`.
 
 This module does **not** redefine Financial Year behaviour.
 
@@ -1437,7 +1437,7 @@ Only the Business Owner may approve:
 - New journal use cases that blur module boundaries  
 - Permanent deviation from AccountBalanceService architecture  
 
-Any change to Financial Year behaviour requires updating `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md` first — not this document.
+Any change to Financial Year behaviour requires updating `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md` first — not this document.
 
 ---
 

@@ -92,6 +92,7 @@ class IncomeAccountingDataBuilder
 
         return [
             'company_id' => $companyId,
+            'financial_year_id' => $financialYearId,
             'income_id' => $incomeId,
             'income_date' => $incomeDate,
             'income_number' => $this->requiredString($income->income_no, 'income_no'),

@@ -4,6 +4,7 @@ namespace App\Services\Accounting\Profiles;
 
 use App\Models\SalesInvoice;
 use App\Services\Accounting\Builders\SalesCogsAccountingDataBuilder;
+use InvalidArgumentException;
 
 class SalesCogsPostingProfile
 {
@@ -14,7 +15,16 @@ class SalesCogsPostingProfile
 
     public function build(SalesInvoice $sale): array
     {
-        return $this->builder->build($sale);
+        $data = $this->builder->build($sale);
+        $financialYearId = $data['financial_year_id'] ?? null;
+
+        if (filter_var($financialYearId, FILTER_VALIDATE_INT) === false || (int) $financialYearId < 1) {
+            throw new InvalidArgumentException('The financial_year_id value must be a positive integer.');
+        }
+
+        $data['financial_year_id'] = (int) $financialYearId;
+
+        return $data;
     }
 
     public function hasSnapshots(SalesInvoice $sale): bool

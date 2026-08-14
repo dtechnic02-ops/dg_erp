@@ -271,7 +271,7 @@
                                     @forelse ($payments as $payment)
                                         <tr class="dg-row">
                                             <td>{{ $payments->firstItem() + $loop->index }}</td>
-                                            <td>{{ optional($payment->payment_date)->format('d-m-Y') ?: '-' }}</td>
+                                            <td>{{ optional($payment->payment_date)->format('d-m-Y') ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $payment->payment_date])</td>
                                             <td>{{ $payment->loanAccount->loan_no ?? '-' }}</td>
                                             <td>{{ $payment->loanAccount->partyAccount->name ?? '-' }}</td>
                                             <td>{{ $payment->loanAccount->loan_name ?? '-' }}</td>

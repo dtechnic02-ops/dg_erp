@@ -102,6 +102,7 @@ class ProductOpeningStockAccountingTest extends TestCase
         Schema::create('accounting_entries', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('financial_year_id');
             $table->string('entry_number');
             $table->date('entry_date');
             $table->string('reference_number')->nullable();
@@ -167,6 +168,8 @@ class ProductOpeningStockAccountingTest extends TestCase
         $entry = $this->entry($product);
         $this->assertSame('12.5000', $this->decimal($movement->unit_price));
         $this->assertSame('product', $entry->source_module);
+        $this->assertSame(1, (int) $entry->financial_year_id);
+        $this->assertSame('2026-01-01', $entry->entry_date->format('Y-m-d'));
         $this->assertSame('product_opening_stock', $entry->source_type);
         $this->assertSame('created', $entry->source_event);
         $this->assertSame('product-opening-stock:' . $product->id, $entry->source_key);
@@ -213,6 +216,38 @@ class ProductOpeningStockAccountingTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('An accounting entry has already been posted for this source key.');
         $this->integration()->postOpeningStock($product);
+    }
+
+    public function test_inactive_or_cross_company_financial_year_is_rejected_without_accounting(): void
+    {
+        $this->seedCharts(1);
+
+        $inactiveProduct = $this->product('10.00');
+        $this->openingMovement($inactiveProduct, 2, '10.00');
+        DB::table('financial_years')->where('id', 1)->update(['is_active' => 0]);
+
+        try {
+            $this->integration()->postOpeningStock($inactiveProduct);
+            $this->fail('An inactive financial year must be rejected.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('active company financial year', $exception->getMessage());
+        }
+
+        $this->assertSame(0, AccountingEntry::count());
+
+        DB::table('financial_years')->where('id', 1)->update(['is_active' => 1]);
+        $crossCompanyProduct = $this->product('10.00');
+        $this->openingMovement($crossCompanyProduct, 2, '10.00');
+        StockMovement::where('product_id', $crossCompanyProduct->id)->update(['financial_year_id' => 2]);
+
+        try {
+            $this->integration()->postOpeningStock($crossCompanyProduct);
+            $this->fail('A cross-company financial year must be rejected.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('active company financial year', $exception->getMessage());
+        }
+
+        $this->assertSame(0, AccountingEntry::count());
     }
 
     public function test_accounting_failure_rolls_back_product_and_opening_stock_movement_in_the_outer_transaction(): void

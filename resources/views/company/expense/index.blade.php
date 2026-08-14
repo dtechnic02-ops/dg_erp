@@ -207,7 +207,7 @@
                                             <td>{{ $expense->category->name ?? '-' }}</td>
                                             <td>{{ $expense->account->account_name ?? '-' }}</td>
                                             <td>{{ number_format($expense->amount, 2) }}</td>
-                                            <td>{{ $expense->expense_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $expense->expense_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $expense->expense_date])</td>
                                             <td>
                                                 @if ($expense->isActive())
                                                     <span class="badge bg-success">Active</span>

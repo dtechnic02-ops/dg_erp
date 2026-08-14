@@ -62,6 +62,7 @@
                                             <label for="payment_date" class="form-label">Payment Date</label>
                                             <input type="date" name="payment_date" id="payment_date" class="form-control dg-input" value="{{ old('payment_date', date('Y-m-d')) }}" required>
                                         </div>
+                                        @include('company.components.nepali-date-field', ['adInputId' => 'payment_date', 'adDate' => old('payment_date', date('Y-m-d'))])
                                         <div class="col-md-6">
                                             <label for="customer_display" class="form-label">Customer</label>
                                             <input type="text" id="customer_display" class="form-control dg-input" value="{{ $invoice->customer->name ?? '-' }}" readonly>

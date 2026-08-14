@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Company;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +31,7 @@ use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 class PurchaseController extends Controller
 {
     use HandlesTransactionDocumentationEdit;
+    use AuthorizesCompanyPermission;
 
     public function __construct(
         private readonly PurchaseAccountingIntegrationService $purchaseAccountingIntegrationService
@@ -38,6 +40,8 @@ class PurchaseController extends Controller
 
 public function index(Request $request)
 {
+    $this->authorizeCompanyPermission('view_purchase');
+
     $companyId = auth()->user()->company_id;
 
 
@@ -235,7 +239,7 @@ public function index(Request $request)
     }
 
     $invoices = $query
-        ->latest()
+        ->orderByDesc('purchase_date')->orderByDesc('id')
         ->paginate($perPage)
         ->withQueryString();
 
@@ -283,6 +287,8 @@ public function index(Request $request)
 
 public function printList(Request $request)
 {
+    $this->authorizeCompanyPermission('print_purchase');
+
     $companyId = auth()->user()->company_id;
 
     $suppliers = Supplier::where(
@@ -441,7 +447,7 @@ public function printList(Request $request)
     $cancelledCount = (clone $query)->where('status', 0)->count();
 
     $invoices = $query
-        ->latest()
+        ->orderByDesc('purchase_date')->orderByDesc('id')
         ->get();
 
     return view(
@@ -466,6 +472,8 @@ public function printList(Request $request)
 
 public function create()
 {
+    $this->authorizeCompanyPermission('create_purchase');
+
     $companyId =
         auth()->user()->company_id;
 
@@ -571,6 +579,8 @@ public function create()
 
 public function store(Request $request)
 {
+    $this->authorizeCompanyPermission('create_purchase');
+
 $companyId =
 auth()->user()->company_id;
 
@@ -1255,6 +1265,8 @@ protected function normalizeStoreLineItemIds(
 
 public function cancel(Request $request, $id)
 {
+    $this->authorizeCompanyPermission('cancel_purchase');
+
     $companyId = auth()->user()->company_id;
 
     $request->validate([
@@ -1491,6 +1503,8 @@ public function cancel(Request $request, $id)
 
 public function print($id)
 {
+    $this->authorizeCompanyPermission('print_purchase');
+
     $invoice = PurchaseInvoice::with([
             'supplier',
             'items.product.unit',
@@ -1516,6 +1530,8 @@ public function print($id)
      */
  public function show($id)
 {
+    $this->authorizeCompanyPermission('view_purchase');
+
     $companyId = auth()->user()->company_id;
 
     $invoice = PurchaseInvoice::with([
@@ -1545,6 +1561,8 @@ public function print($id)
 
 public function edit($id)
 {
+    $this->authorizeCompanyPermission('edit_purchase');
+
     $companyId = auth()->user()->company_id;
 
     $invoice = PurchaseInvoice::with([
@@ -1588,6 +1606,8 @@ public function edit($id)
 
 public function update(Request $request, $id)
 {
+    $this->authorizeCompanyPermission('edit_purchase');
+
     $companyId = auth()->user()->company_id;
 
     $request->validate([

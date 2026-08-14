@@ -47,7 +47,20 @@ public function salesPayments()
     return $this->hasMany(
         SalesPayment::class
     );
-} 
+}
+
+public function transactions()
+{
+    return $this->hasMany(
+        CustomerTransaction::class
+    )
+    ->orderBy(
+        'transaction_date'
+    )
+    ->orderBy(
+        'id'
+    );
+}
 
 
 public function creator()

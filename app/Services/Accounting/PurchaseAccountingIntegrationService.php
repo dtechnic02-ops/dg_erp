@@ -37,6 +37,7 @@ class PurchaseAccountingIntegrationService
 
         $this->postingService->reverseBySource([
             'company_id' => $purchase->company_id,
+            'financial_year_id' => $purchase->financial_year_id,
             'entry_date' => $date,
             'original_source_key' => 'purchase:' . $purchase->id . ':created',
             'original_source_event' => 'created',

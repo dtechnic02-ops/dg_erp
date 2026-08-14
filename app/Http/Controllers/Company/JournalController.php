@@ -61,10 +61,9 @@ class JournalController extends Controller
             $query->where('financial_year_id', $activeFy->id);
         }
 
-        if (!$request->has('status')) {
-            $query->where('status', Journal::STATUS_ACTIVE);
-        } elseif ($request->filled('status')) {
-            $query->where('status', (string) $request->status);
+        $statusFilter = $this->resolveListStatusFilter($request);
+        if ($statusFilter !== '') {
+            $query->where('status', $statusFilter);
         }
 
         if ($request->filled('search')) {
@@ -86,6 +85,19 @@ class JournalController extends Controller
         }
 
         return $query;
+    }
+
+    protected function resolveListStatusFilter(Request $request): string
+    {
+        if (!$request->has('status')) {
+            return Journal::STATUS_DRAFT;
+        }
+
+        if ($request->filled('status')) {
+            return (string) $request->status;
+        }
+
+        return '';
     }
 
     protected function generateJournalNo(int $companyId, FinancialYear $activeFy): string
@@ -127,6 +139,16 @@ class JournalController extends Controller
             ->when(\Illuminate\Support\Facades\Schema::hasColumn('chart_accounts', 'is_locked'), fn ($q) => $q->where('is_locked', 0))
             ->orderBy('code')
             ->get();
+    }
+
+    protected function operationalAccountsForJournal(int $companyId)
+    {
+        return Account::where('company_id', $companyId)
+            ->whereIn('status', [1, 'active'])
+            ->whereIn('account_type', ['Cash', 'Bank', 'ATM', 'Wallet'])
+            ->orderBy('account_type')
+            ->orderBy('account_name')
+            ->get(['id', 'account_name', 'account_type', 'current_balance']);
     }
 
     protected function subLedgerCollections(int $companyId): array
@@ -394,6 +416,7 @@ class JournalController extends Controller
         $this->authorizeJournalPermission('journal.view', 'view_journal');
 
         $companyId = auth()->user()->company_id;
+        $statusFilter = $this->resolveListStatusFilter($request);
         $query = $this->buildJournalQuery($request, $companyId);
 
         $summaryQuery = clone $query;
@@ -412,7 +435,7 @@ class JournalController extends Controller
             $perPage = 10;
         }
 
-        $journals = $query->latest()->paginate($perPage)->withQueryString();
+        $journals = $query->orderByDesc('journal_date')->orderByDesc('id')->paginate($perPage)->withQueryString();
 
         $financialYears = FinancialYear::where('company_id', $companyId)
             ->latest('id')
@@ -429,7 +452,8 @@ class JournalController extends Controller
             'totalAmount',
             'activeCount',
             'totalCount',
-            'perPage'
+            'perPage',
+            'statusFilter'
         ));
     }
 
@@ -448,12 +472,13 @@ class JournalController extends Controller
         }
 
         $chartAccounts = $this->chartAccountsForJournal($companyId);
+        $operationalAccounts = $this->operationalAccountsForJournal($companyId);
         $subLedgerData = $this->subLedgerCollections($companyId);
         $requestKey = (string) Str::uuid();
 
         return view('company.journal.create', array_merge(
             $subLedgerData,
-            compact('chartAccounts', 'activeFy', 'requestKey')
+            compact('chartAccounts', 'operationalAccounts', 'activeFy', 'requestKey')
         ));
     }
 
@@ -520,11 +545,12 @@ class JournalController extends Controller
         }
 
         $chartAccounts = $this->chartAccountsForJournal($companyId);
+        $operationalAccounts = $this->operationalAccountsForJournal($companyId);
         $subLedgerData = $this->subLedgerCollections($companyId);
 
         return view('company.journal.edit', array_merge(
             $subLedgerData,
-            compact('journal', 'chartAccounts')
+            compact('journal', 'chartAccounts', 'operationalAccounts')
         ));
     }
 
@@ -633,7 +659,7 @@ class JournalController extends Controller
             $query->where('financial_year_id', request('financial_year'));
         }
 
-        $journals = $query->latest()->get();
+        $journals = $query->orderByDesc('journal_date')->orderByDesc('id')->get();
 
         return view('company.journal.print', compact('journals'));
     }

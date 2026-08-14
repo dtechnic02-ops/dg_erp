@@ -13,6 +13,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CompanyRegistration;
 
 use App\Models\Company;
+use App\Models\Country;
 
 use App\Models\SubscriptionPlan;
 
@@ -103,6 +104,10 @@ class CompanyApprovalController extends Controller
 
         }
 
+        if (! Country::query()->whereKey($reg->country_id)->where('is_active', true)->exists()) {
+            return back()->with('error', 'The registration country is missing or inactive.');
+        }
+
 
 
         try {
@@ -120,6 +125,7 @@ class CompanyApprovalController extends Controller
                         'mobile' => $reg->mobile_no,
 
                         'status' => 'active',
+                        'country_id' => $reg->country_id,
 
                     ]
 
@@ -235,4 +241,3 @@ class CompanyApprovalController extends Controller
     }
 
 }
-

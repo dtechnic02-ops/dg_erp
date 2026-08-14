@@ -82,6 +82,8 @@
                                     <input type="date" name="sale_date" id="sale_date" class="form-control dg-input" value="{{ old('sale_date', \Illuminate\Support\Carbon::parse($invoice->sale_date)->format('Y-m-d')) }}" required>
                                 </div>
 
+                                @include('company.components.nepali-date-field')
+
                                 <div class="col-md-3">
                                     <label for="customer_name" class="form-label">Customer</label>
                                     <input type="text" id="customer_name" class="form-control dg-input" value="{{ $invoice->customer->name ?? '-' }}" readonly>

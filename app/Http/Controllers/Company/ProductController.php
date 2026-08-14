@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use Illuminate\Http\Request;
 
 use App\Models\Product;
@@ -23,6 +24,8 @@ use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
+    use AuthorizesCompanyPermission;
+
     public function __construct(
         private readonly ProductOpeningStockAccountingIntegrationService $openingStockAccounting
     ) {
@@ -164,6 +167,7 @@ private function productImageFolder()
 
 public function index(Request $request)
 {
+    $this->authorizeCompanyPermission('view_stock');
 
     $totalProducts = $this->filteredProductQuery($request)->count();
 
@@ -209,6 +213,8 @@ public function index(Request $request)
 
     public function create()
     {
+        $this->authorizeCompanyPermission('view_stock');
+
         $units = Unit::where(
             'company_id',
             auth()->user()->company_id
@@ -235,6 +241,7 @@ public function index(Request $request)
     // 🔥 STORE PRODUCT
 public function store(Request $request)
 {
+    $this->authorizeCompanyPermission('view_stock');
 
 $companyId = auth()->user()->company_id;
 
@@ -479,6 +486,7 @@ throw $e;
 
 public function edit($id)
 {
+    $this->authorizeCompanyPermission('view_stock');
 
 $product=
 
@@ -556,6 +564,7 @@ compact(
 Request $request,
 $id
 ){
+    $this->authorizeCompanyPermission('view_stock');
 
 $companyId = auth()->user()->company_id;
 
@@ -753,6 +762,8 @@ return redirect()
 
 public function show($id)
 {
+    $this->authorizeCompanyPermission('view_stock');
+
     $product = Product::where(
         'company_id',
         auth()->user()->company_id
@@ -774,6 +785,8 @@ PRODUCT PROFILE PRINT
 
 public function printProfile($id)
 {
+    $this->authorizeCompanyPermission('print_stock');
+
     $product = Product::where(
         'company_id',
         auth()->user()->company_id
@@ -797,6 +810,7 @@ PRODUCT LIST PRINT
 
 public function print(Request $request)
 {
+    $this->authorizeCompanyPermission('print_stock');
 
     $products = $this->filteredProductQuery($request)
         ->with(['brand'])
@@ -825,6 +839,7 @@ public function print(Request $request)
 
 public function destroy($id)
 {
+    $this->authorizeCompanyPermission('view_stock');
 
 $product = Product::
 
@@ -931,6 +946,8 @@ throw $e;
 
    public function exportExcel(Request $request)
 {
+    $this->authorizeCompanyPermission('print_stock');
+
     return Excel::download(
 
         new ProductsExport(
@@ -953,6 +970,8 @@ throw $e;
 
     public function exportPdf(Request $request)
 {
+    $this->authorizeCompanyPermission('print_stock');
+
     $products = $this->filteredProductQuery($request)
         ->with(['brand'])
         ->latest()

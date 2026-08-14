@@ -38,7 +38,7 @@ class CustomerOpeningBalanceAccountingDataBuilder
         }
 
         $transaction = $transactions->first();
-        $transactionDate = $this->date($transaction->getRawOriginal('transaction_date') ?? $transaction->transaction_date, 'transaction_date');
+        $transactionDate = $this->date($transaction->transaction_date, 'transaction_date');
         $financialYearId = $this->positiveInteger($transaction->financial_year_id, 'financial_year_id');
 
         $financialYear = FinancialYear::query()

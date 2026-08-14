@@ -24,7 +24,7 @@ class SalesPaymentAccountingDataBuilder
         $paymentId = $this->positiveInteger($payment->id, 'payment_id');
         $financialYearId = $this->positiveInteger($payment->financial_year_id, 'financial_year_id');
         $customerId = $this->positiveInteger($payment->customer_id, 'customer_id');
-        $paymentDate = $this->date($payment->getRawOriginal('payment_date') ?? $payment->payment_date, 'payment_date');
+        $paymentDate = $this->date($payment->payment_date, 'payment_date');
         $amount = $this->amount($payment->paid_amount, 'paid_amount');
 
         if ($this->isZero($amount)) {
@@ -93,6 +93,7 @@ class SalesPaymentAccountingDataBuilder
 
         return [
             'company_id' => $companyId,
+            'financial_year_id' => $financialYearId,
             'payment_id' => $paymentId,
             'payment_date' => $paymentDate,
             'payment_number' => $this->requiredString($payment->payment_no, 'payment_no'),

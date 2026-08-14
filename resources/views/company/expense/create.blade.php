@@ -89,6 +89,7 @@
                                     <label class="form-label" for="expense_date">Expense Date <span class="text-danger">*</span></label>
                                     <input type="date" name="expense_date" id="expense_date" class="form-control dg-input" value="{{ old('expense_date', date('Y-m-d')) }}" required>
                                 </div>
+                                @include('company.components.nepali-date-field', ['adInputId' => 'expense_date', 'adDate' => old('expense_date', date('Y-m-d'))])
 
                                 <div class="col-md-6">
                                     <label class="form-label" for="attachment">Attachment</label>

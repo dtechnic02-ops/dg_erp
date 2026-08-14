@@ -173,7 +173,7 @@ class ExpenseController extends Controller
             $perPage = 10;
         }
 
-        $expenses = $query->latest()->paginate($perPage)->withQueryString();
+        $expenses = $query->orderByDesc('expense_date')->orderByDesc('id')->paginate($perPage)->withQueryString();
 
         $financialYears = FinancialYear::where('company_id', $companyId)
             ->latest('id')
@@ -557,7 +557,7 @@ class ExpenseController extends Controller
         $companyId = auth()->user()->company_id;
         $query = $this->buildExpenseQuery($request, $companyId);
 
-        $expenses = $query->latest()->get();
+        $expenses = $query->orderByDesc('expense_date')->orderByDesc('id')->get();
 
         $totalAmount = $expenses
             ->where('status', Expense::STATUS_ACTIVE)

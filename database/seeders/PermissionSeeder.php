@@ -16,7 +16,7 @@ class PermissionSeeder extends Seeder
             'module_delivery', 'module_crm', 'module_company_profile', 'module_maintenance',
             'module_sales', 'module_sales_payment', 'module_customer', 'module_purchase',
             'module_supplier', 'module_stock', 'module_accounts', 'module_account_transaction',
-            'module_contra', 'module_vat', 'module_reports',
+            'module_contra', 'module_vat', 'module_reports', 'module_quotation',
         ] as $modulePermission) {
             Permission::firstOrCreate(['name' => $modulePermission], ['scope' => Permission::SCOPE_COMPANY]);
         }
@@ -26,6 +26,8 @@ class PermissionSeeder extends Seeder
         $permissions = [
             ...collect([
                 'view_sales', 'create_sales', 'edit_sales', 'cancel_sales', 'print_sales',
+                'view_quotation', 'create_quotation', 'edit_quotation', 'delete_quotation',
+                'approve_quotation', 'generate_quotation_invoice', 'print_quotation',
                 'view_sales_payment', 'create_sales_payment', 'edit_sales_payment',
                 'cancel_sales_payment', 'print_sales_payment',
                 'view_customer', 'create_customer', 'edit_customer', 'delete_customer', 'print_customer',

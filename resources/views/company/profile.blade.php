@@ -232,10 +232,12 @@
 <div class="row">
     <span class="label">Country</span>
 
-    <input class="input"
-           type="text"
-           name="country"
-           value="{{ $company->country }}">
+    <select class="input" name="country_id" required>
+        <option value="">Select Country</option>
+        @foreach ($countries as $country)
+            <option value="{{ $country->id }}" @selected((string) old('country_id', $company->country_id) === (string) $country->id)>{{ $country->name }} ({{ $country->iso_code }})</option>
+        @endforeach
+    </select>
 </div>
 
 <!-- LANGUAGE -->

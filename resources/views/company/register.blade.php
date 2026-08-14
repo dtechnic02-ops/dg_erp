@@ -120,7 +120,12 @@
 
                 <input type="text" name="mobile_no" placeholder="Mobile Number" value="{{ old('mobile_no') }}" required>
 
-                <input type="text" name="country" placeholder="Country" value="{{ old('country') }}" required>
+                <select name="country_id" required>
+                    <option value="">Select Country</option>
+                    @foreach ($countries as $country)
+                        <option value="{{ $country->id }}" @selected((string) old('country_id') === (string) $country->id)>{{ $country->name }} ({{ $country->iso_code }})</option>
+                    @endforeach
+                </select>
 
                 <button type="submit">Register</button>
             </form>

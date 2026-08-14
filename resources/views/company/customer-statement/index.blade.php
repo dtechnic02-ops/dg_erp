@@ -643,6 +643,8 @@ href="#"
                                     $transaction->transaction_date
                                 )->format('d-M-Y') }}
 
+                                @include('company.components.nepali-date-display', ['adDate' => $transaction->transaction_date])
+
                             </td>
 
                             <td>
@@ -851,4 +853,3 @@ href="#"
 </div>
 
 @endsection
-    

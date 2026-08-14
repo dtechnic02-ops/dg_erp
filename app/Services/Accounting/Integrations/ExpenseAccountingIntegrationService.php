@@ -41,6 +41,7 @@ class ExpenseAccountingIntegrationService
 
         $this->postingService->reverseBySource([
             'company_id' => $expense->company_id,
+            'financial_year_id' => $expense->financial_year_id,
             'entry_date' => $date,
             'original_source_key' => $current->source_key,
             'original_source_event' => $current->source_event,
@@ -79,6 +80,7 @@ class ExpenseAccountingIntegrationService
 
             $this->postingService->reverseBySource([
                 'company_id' => $expense->company_id,
+                'financial_year_id' => $expense->financial_year_id,
                 'entry_date' => $posting['entry_date'],
                 'original_source_key' => $current->source_key,
                 'original_source_event' => $current->source_event,

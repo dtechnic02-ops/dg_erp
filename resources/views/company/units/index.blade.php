@@ -153,7 +153,7 @@
                 </div>
 
                 <div class="modal-body">
-                    @include('company.units.form')
+                    @include('company.units.form', ['unit' => null])
                 </div>
 
                 <div class="modal-footer">

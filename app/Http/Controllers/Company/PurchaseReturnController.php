@@ -109,7 +109,7 @@ class PurchaseReturnController extends Controller
         $grandTotal = (clone $totalsQuery)->sum('grand_total');
 
         $returns = $query
-            ->latest()
+            ->orderByDesc('return_date')->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 

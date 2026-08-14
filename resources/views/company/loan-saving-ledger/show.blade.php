@@ -75,7 +75,7 @@
                                 <div class="col-md-6">
                                     <div class="dg-row">
                                         <span class="dg-label d-inline mb-0">Business Date :</span>
-                                        {{ optional($ledger->date)->format('d-m-Y') ?: '-' }}
+                                        {{ optional($ledger->date)->format('d-m-Y') ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $ledger->date])
                                     </div>
                                 </div>
 
