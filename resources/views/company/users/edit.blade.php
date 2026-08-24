@@ -36,8 +36,9 @@
                         <h2 class="h6 mb-0">Staff Details</h2>
                     </header>
                     <div class="card-body dg-card-body">
-                        <form method="POST" action="{{ route('company.users.update', $user->id) }}" class="row g-3">
+                        <form method="POST" action="{{ route('company.users.update', $user->id) }}" class="row g-3" id="dgStaffEditForm">
                             @csrf
+                            <input type="hidden" name="confirm_job_role_change" id="confirm_job_role_change" value="0">
 
                             <div class="col-md-6">
                                 <label for="name" class="form-label">Name</label>
@@ -51,11 +52,18 @@
 
                             <div class="col-md-6">
                                 <label for="job_role" class="form-label">Job Role</label>
-                                <select name="job_role" id="job_role" class="form-select dg-select" required>
+                                <select name="job_role" id="job_role" class="form-select dg-select" data-original-role="{{ $user->job_role }}" required>
                                     @foreach(\App\Services\JobRoleVisibilityService::jobRoles() as $value => $label)
                                         <option value="{{ $value }}" @selected(old('job_role', $user->job_role) === $value)>{{ $label }}</option>
                                     @endforeach
                                 </select>
+                            </div>
+
+                            <div class="col-12 d-none" id="dgJobRoleChangeWarning" role="alert">
+                                <div class="alert alert-warning dg-alert mb-0">
+                                    Changing Job Role will reset this staff member's existing permissions.
+                                    You will need to assign permissions for the new Job Role again.
+                                </div>
                             </div>
 
                             <div class="col-12">
@@ -70,5 +78,46 @@
         </div>
     </main>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('dgStaffEditForm');
+    const jobRole = document.getElementById('job_role');
+    const confirmation = document.getElementById('confirm_job_role_change');
+    const warning = document.getElementById('dgJobRoleChangeWarning');
+
+    if (!form || !jobRole || !confirmation || !warning) return;
+
+    const roleChanged = () => jobRole.value !== jobRole.dataset.originalRole;
+    const updateWarning = () => warning.classList.toggle('d-none', !roleChanged());
+
+    jobRole.addEventListener('change', function () {
+        confirmation.value = '0';
+        updateWarning();
+    });
+
+    form.addEventListener('submit', function (event) {
+        if (!roleChanged()) {
+            confirmation.value = '0';
+            return;
+        }
+
+        const confirmed = window.confirm(
+            "Changing Job Role will reset this staff member's existing permissions.\n\n" +
+            'You will need to assign permissions for the new Job Role again. Continue?'
+        );
+
+        if (!confirmed) {
+            event.preventDefault();
+            confirmation.value = '0';
+            return;
+        }
+
+        confirmation.value = '1';
+    });
+
+    updateWarning();
+});
+</script>
 
 @endsection

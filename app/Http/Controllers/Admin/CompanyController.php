@@ -441,8 +441,7 @@ class CompanyController extends Controller
 
     private function authorizeCompanyPasswordReset(): void
     {
-        abort_unless(auth()->check() && (int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
-        $this->authorizeResetCompanyPassword();
+        abort_unless($this->platformAuthorization->can(auth()->user(), 'platform_companies_reset_password'), 403);
     }
 
     private function resolveCompanyAdmin(Company $company): array
@@ -502,4 +501,3 @@ class CompanyController extends Controller
     }
 
 }
-

@@ -189,6 +189,61 @@ class LoanEndToEndIntegrityTest extends TestCase
         $this->assertSame(1, AccountingEntry::where('source_type', 'loan_account')->count());
     }
 
+    public function test_payment_date_is_required_and_must_be_inside_the_active_financial_year_before_mutation(): void
+    {
+        $context = $this->context();
+        $loan = $this->createLoan($context);
+        $before = $this->snapshot($loan, $context);
+
+        $payload = $this->paymentPayload($context, $loan);
+        unset($payload['payment_date']);
+        $this->post(route('company.loan-payment.store'), $payload)->assertSessionHasErrors('payment_date');
+        $this->assertSnapshot($before, $loan, $context);
+
+        $this->post(route('company.loan-payment.store'), $this->paymentPayload($context, $loan, [
+            'payment_date' => '2027-01-01',
+        ]))->assertSessionHas('error', 'Payment date must be inside the active financial year.');
+        $this->assertSnapshot($before, $loan, $context);
+
+        $this->post(route('company.loan-payment.store'), $this->paymentPayload($context, $loan, [
+            'payment_source' => 'saving',
+            'account_id' => null,
+            'payment_date' => '2027-01-01',
+        ]))->assertSessionHas('error', 'Payment date must be inside the active financial year.');
+        $this->assertSnapshot($before, $loan, $context);
+    }
+
+    public function test_account_transactions_are_the_single_cash_balance_source_and_saving_settlement_creates_none(): void
+    {
+        $context = $this->context();
+        $loan = $this->createLoan($context);
+
+        $this->assertMoney('100.00', $context['account']->fresh()->current_balance);
+        $this->assertSame(1, AccountTransaction::where('account_id', $context['account']->id)->count());
+
+        $deposit = $this->createPayment($context, $loan, [
+            'principal_amount' => '0.00',
+            'saving_amount' => '20.00',
+        ]);
+        $this->assertMoney('80.00', $context['account']->fresh()->current_balance);
+        $this->assertSame(2, AccountTransaction::where('account_id', $context['account']->id)->count());
+
+        $transactionsBeforeSettlement = AccountTransaction::count();
+        $settlement = $this->createPayment($context, $loan, [
+            'payment_source' => 'saving',
+            'account_id' => null,
+            'principal_amount' => '10.00',
+            'saving_amount' => '0.00',
+        ]);
+
+        $this->assertSame($transactionsBeforeSettlement, AccountTransaction::count());
+        $this->assertMoney('80.00', $context['account']->fresh()->current_balance);
+        $this->assertMoney('90.00', $loan->fresh()->remaining_principal);
+        $this->assertMoney('10.00', $this->savingBalance($loan));
+        $this->assertSame(1, AccountingEntry::where('source_type', 'loan_payment')->where('source_id', $deposit->id)->count());
+        $this->assertSame(1, AccountingEntry::where('source_type', 'loan_payment')->where('source_id', $settlement->id)->count());
+    }
+
     private function createLoanSchema(): void
     {
         Schema::create('party_accounts', function (Blueprint $t): void {$t->id();$t->unsignedBigInteger('company_id');$t->string('account_no');$t->string('name');$t->string('phone')->nullable();$t->text('address')->nullable();$t->decimal('opening_balance',18,2)->default(0);$t->decimal('current_balance',18,2)->default(0);$t->string('type');$t->string('photo')->nullable();$t->string('id_card')->nullable();$t->string('document')->nullable();$t->text('note')->nullable();$t->date('due_date')->nullable();$t->unsignedBigInteger('created_by');$t->unsignedBigInteger('updated_by')->nullable();$t->unsignedBigInteger('deleted_by')->nullable();$t->integer('status')->default(1);$t->timestamps();$t->softDeletes();});

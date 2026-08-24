@@ -13,6 +13,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CompanyRegistration;
 
 use App\Models\Company;
+use App\Models\Country;
 
 use App\Models\SubscriptionPlan;
 
@@ -26,8 +27,6 @@ use App\Services\PlatformAuthorizationService;
 use Illuminate\Support\Facades\DB;
 
 use Illuminate\Support\Facades\File;
-
-use Illuminate\Support\Facades\Hash;
 
 use RuntimeException;
 
@@ -103,6 +102,14 @@ class CompanyApprovalController extends Controller
 
         }
 
+        if (! Country::query()->whereKey($reg->country_id)->where('is_active', true)->exists()) {
+            return back()->with('error', 'The registration country is missing or inactive.');
+        }
+
+        if (! is_string($reg->password) || trim($reg->password) === '') {
+            return back()->with('error', 'The registration password is missing. Company approval cannot continue.');
+        }
+
 
 
         try {
@@ -120,6 +127,7 @@ class CompanyApprovalController extends Controller
                         'mobile' => $reg->mobile_no,
 
                         'status' => 'active',
+                        'country_id' => $reg->country_id,
 
                     ]
 
@@ -149,10 +157,6 @@ class CompanyApprovalController extends Controller
 
 
 
-                $passwordHash = $reg->password ?: Hash::make('123456');
-
-
-
                 $user = User::firstOrNew(['email' => $reg->email]);
 
                 $user->fill([
@@ -163,7 +167,7 @@ class CompanyApprovalController extends Controller
 
                     'role_id' => Role::COMPANY_ADMIN_ID,
 
-                    'password' => $passwordHash,
+                    'password' => $reg->password,
 
                 ]);
 
@@ -235,4 +239,3 @@ class CompanyApprovalController extends Controller
     }
 
 }
-

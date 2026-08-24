@@ -198,6 +198,14 @@
                             </div>
                         @endif
 
+                        @if ($saleDateBs !== null)
+                            <div class="dg-invoice-field-row">
+                                <span class="dg-invoice-field-label">मिति (BS)</span>
+                                <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
+                                <span class="dg-invoice-field-value">{{ $saleDateBs }}</span>
+                            </div>
+                        @endif
+
                         <div class="dg-invoice-field-row">
                             <span class="dg-invoice-field-label">Status</span>
                             <span class="dg-invoice-field-sep" aria-hidden="true">:</span>

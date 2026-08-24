@@ -61,6 +61,7 @@
                                     <label class="form-label" for="refund_date">Refund Date</label>
                                     <input type="date" name="refund_date" id="refund_date" class="form-control dg-input" value="{{ old('refund_date', $refund->refund_date?->format('Y-m-d')) }}" required>
                                 </div>
+                                @include('company.components.nepali-date-field', ['adInputId' => 'refund_date', 'adDate' => old('refund_date', $refund->refund_date)])
                                 <div class="col-md-3">
                                     <label class="form-label" for="status">Status</label>
                                     <input type="text" id="status" class="form-control dg-input" value="{{ $refund->isActive() ? 'Active' : 'Cancelled' }}" readonly>

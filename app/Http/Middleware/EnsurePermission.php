@@ -15,7 +15,7 @@ class EnsurePermission
         abort_unless($user, 403);
 
         abort_unless(
-            $user->hasPermission($permission),
+            $user->hasPermission($permission, $user->company_id),
             403,
             'You do not have permission to perform this action.'
         );

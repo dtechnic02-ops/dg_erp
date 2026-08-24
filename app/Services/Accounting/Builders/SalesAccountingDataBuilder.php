@@ -22,7 +22,7 @@ class SalesAccountingDataBuilder
 
         $companyId = $this->positiveInteger($sale->company_id, 'company_id');
         $saleId = $this->positiveInteger($sale->id, 'sale_id');
-        $saleDate = $this->date($sale->getRawOriginal('sale_date') ?? $sale->sale_date, 'sale_date');
+        $saleDate = $this->date($sale->sale_date, 'sale_date');
         $invoiceNumber = $this->requiredString($sale->invoice_no, 'invoice_no');
         $customerId = $this->nullablePositiveInteger($sale->customer_id, 'customer_id');
         $createdBy = $this->nullablePositiveInteger($sale->created_by, 'created_by');

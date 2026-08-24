@@ -141,6 +141,7 @@
                                         @if($activeFy) min="{{ \Illuminate\Support\Carbon::parse($activeFy->start_date)->format('Y-m-d') }}" max="{{ \Illuminate\Support\Carbon::parse($activeFy->end_date)->format('Y-m-d') }}" @endif
                                         required>
                                 </div>
+                                @include('company.components.nepali-date-field', ['adInputId' => 'start_date', 'adDate' => old('start_date', date('Y-m-d'))])
 
                                 <div class="col-lg-4 col-md-6 col-12">
                                     <label for="end_date" class="form-label dg-label">Due Date</label>

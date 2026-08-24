@@ -6,7 +6,7 @@
 
 @php
     $user = auth()->user();
-    $canManage = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('manage_income_categories'));
+    $canManage = $user?->hasPermission('manage_income_categories') ?? false;
 @endphp
 
 <div class="dg-page">

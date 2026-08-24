@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use Illuminate\Http\Request;
 use App\Models\Customer;
 use App\Services\ValidationService;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
-
+    use AuthorizesCompanyPermission;
 
 /* =====================
 
@@ -87,6 +88,7 @@ return $query;
 public function index(
 Request $request
 ){
+    $this->authorizeCompanyPermission('view_customer');
 
 $totalCurrentBalance=
 
@@ -148,6 +150,7 @@ STORE
 public function store(
 Request $request
 ){
+    $this->authorizeCompanyPermission('create_customer');
 
 $request->validate([
     'credit_days' => ValidationService::quantity(),
@@ -368,6 +371,7 @@ public function update(
 Request $request,
 $id
 ){
+    $this->authorizeCompanyPermission('edit_customer');
 
 $customer=
 
@@ -623,6 +627,7 @@ DELETE
 public function destroy(
 $id
 ){
+    $this->authorizeCompanyPermission('delete_customer');
 
 $customer=
 
@@ -697,6 +702,8 @@ return back()
 
 public function show($id)
 {
+    $this->authorizeCompanyPermission('view_customer');
+
     $companyId =
         auth()->user()->company_id;
 
@@ -727,6 +734,8 @@ CUSTOMER PROFILE PRINT
 
 public function printProfile($id)
 {
+    $this->authorizeCompanyPermission('print_customer');
+
     $companyId =
         auth()->user()->company_id;
 
@@ -762,6 +771,7 @@ PRINT
 public function print(
 Request $request
 ){
+    $this->authorizeCompanyPermission('print_customer');
 
 $customers=
 

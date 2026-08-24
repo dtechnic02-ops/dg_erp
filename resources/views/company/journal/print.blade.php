@@ -77,7 +77,7 @@ Amount
 
 <td>
 
-{{ $journal->journal_date }}
+{{ $journal->journal_date }} @include('company.components.nepali-date-display', ['adDate' => $journal->journal_date])
 
 </td>
 

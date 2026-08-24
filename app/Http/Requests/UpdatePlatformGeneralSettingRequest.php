@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdatePlatformGeneralSettingRequest extends FormRequest
 {
-    public function authorize(): bool { return (int) $this->user()?->role_id === Role::SUPER_ADMIN_ID; }
+    public function authorize(): bool { return app(\App\Services\PlatformAuthorizationService::class)->can($this->user(), 'platform_settings_manage'); }
     public function rules(): array
     {
         return [

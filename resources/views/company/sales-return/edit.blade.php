@@ -61,6 +61,7 @@
                                     <label class="form-label" for="return_date">Return Date</label>
                                     <input type="date" name="return_date" id="return_date" class="form-control dg-input" value="{{ old('return_date', $return->return_date?->format('Y-m-d')) }}" required>
                                 </div>
+                                @include('company.components.nepali-date-field', ['adInputId' => 'return_date', 'adDate' => old('return_date', $return->return_date)])
                                 <div class="col-md-3">
                                     <label class="form-label" for="status">Status</label>
                                     <input type="text" id="status" class="form-control dg-input" value="{{ (int) $return->status === 1 ? 'Active' : 'Cancelled' }}" readonly>

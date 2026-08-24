@@ -9,7 +9,9 @@ use App\Models\SalesCostSnapshot;
 use App\Models\SalesInvoice;
 use App\Models\SalesItem;
 use App\Models\StockMovement;
+use App\Services\Accounting\Builders\SalesAccountingDataBuilder;
 use App\Services\Accounting\Integrations\SalesCogsAccountingIntegrationService;
+use App\Services\Accounting\Profiles\SalesPostingProfile;
 use App\Services\SalesInventoryCostService;
 use App\Services\StockService;
 use Illuminate\Database\Schema\Blueprint;
@@ -24,9 +26,28 @@ class SalesCogsInventoryAccountingTest extends TestCase
     {
         parent::setUp();
 
-        foreach (['sales_cost_snapshots', 'inventory_valuations', 'accounting_entry_lines', 'accounting_entries', 'stock_movements', 'sales_items', 'sales_invoices', 'purchase_invoices', 'products', 'chart_accounts'] as $table) {
+        foreach (['sales_cost_snapshots', 'inventory_valuations', 'accounting_entry_lines', 'accounting_entries', 'stock_movements', 'sales_items', 'sales_invoices', 'purchase_invoices', 'products', 'chart_accounts', 'financial_years'] as $table) {
             Schema::dropIfExists($table);
         }
+
+        Schema::create('financial_years', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->date('start_date');
+            $table->date('end_date');
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
+        DB::table('financial_years')->insert([
+            'id' => 1,
+            'company_id' => 1,
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         Schema::create('products', function (Blueprint $table): void {
             $table->id();
@@ -143,6 +164,7 @@ class SalesCogsInventoryAccountingTest extends TestCase
         Schema::create('accounting_entries', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('financial_year_id');
             $table->string('entry_number');
             $table->date('entry_date');
             $table->string('reference_number')->nullable();
@@ -298,6 +320,74 @@ class SalesCogsInventoryAccountingTest extends TestCase
         $this->assertSame(0, AccountingEntry::count());
     }
 
+    public function test_sales_value_profile_carries_the_persisted_financial_year_and_business_date(): void
+    {
+        $sale = new SalesInvoice(['financial_year_id' => 7]);
+        $builder = \Mockery::mock(SalesAccountingDataBuilder::class);
+        $builder->shouldReceive('build')->once()->with($sale)->andReturn([
+            'company_id' => 3,
+            'sale_id' => 9,
+            'sale_date' => '2026-08-09',
+            'invoice_number' => 'SI-3-7-0001',
+            'customer_id' => 5,
+            'created_by' => 4,
+            'status' => 1,
+            'totals' => [
+                'product_revenue' => '100.0000',
+                'service_revenue' => '0.0000',
+                'revenue_before_tax' => '100.0000',
+                'tax_amount' => '0.0000',
+                'grand_total' => '100.0000',
+                'paid_amount' => '0.0000',
+                'due_amount' => '100.0000',
+                'discount_amount' => '0.0000',
+            ],
+            'payments' => [],
+        ]);
+
+        $payload = (new SalesPostingProfile($builder))->build($sale);
+
+        $this->assertSame(7, $payload['financial_year_id']);
+        $this->assertSame('2026-08-09', $payload['entry_date']);
+    }
+
+    public function test_cogs_rejects_an_out_of_financial_year_business_date(): void
+    {
+        $this->seedCharts(1);
+        $product = $this->product(1, 'Out-of-FY product');
+        StockService::increase($product, 2, 'opening_stock', 'OPENING', 1, '2026-01-01', '5.00000000');
+        $sale = $this->sale(1, 'SA-OUT-FY');
+        $sale->update(['sale_date' => '2027-01-01']);
+        $this->sell($sale->fresh(), $product, 1);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('must belong to the active company Financial Year');
+        $this->cogs()->postSaleCogs($sale->fresh());
+    }
+
+    public function test_cogs_rejects_a_cross_company_financial_year(): void
+    {
+        DB::table('financial_years')->insert([
+            'id' => 2,
+            'company_id' => 2,
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->seedCharts(1);
+        $product = $this->product(1, 'Cross-company FY product');
+        StockService::increase($product, 2, 'opening_stock', 'OPENING', 1, '2026-01-01', '5.00000000');
+        $sale = $this->sale(1, 'SA-CROSS-FY');
+        $sale->update(['financial_year_id' => 2]);
+        $this->sell($sale->fresh(), $product, 1);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('must belong to the active company Financial Year');
+        $this->cogs()->postSaleCogs($sale->fresh());
+    }
+
     private function sell(SalesInvoice $sale, Product $product, string|int $quantity): SalesCostSnapshot
     {
         $item = $this->productItem($sale, $product, $quantity);
@@ -343,6 +433,8 @@ class SalesCogsInventoryAccountingTest extends TestCase
         $entry = AccountingEntry::where('company_id', $sale->company_id)->where('source_key', 'sales-cogs:' . $sale->id . ':created')->with('lines.chartAccount')->firstOrFail();
         $this->assertSame('sales_cogs', $entry->source_type);
         $this->assertSame('created', $entry->source_event);
+        $this->assertSame((int) $sale->financial_year_id, (int) $entry->financial_year_id);
+        $this->assertSame($sale->sale_date->format('Y-m-d'), $entry->entry_date->format('Y-m-d'));
         $this->assertSame(2, $entry->lines->count());
         $this->assertSame($amount, $entry->lines->firstWhere('chartAccount.system_code', 'COST_OF_GOODS_SOLD')->debit);
         $this->assertSame($amount, $entry->lines->firstWhere('chartAccount.system_code', 'INVENTORY')->credit);

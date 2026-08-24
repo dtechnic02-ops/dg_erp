@@ -25,7 +25,7 @@ class JournalPhaseOneTest extends TestCase
         Schema::create('chart_accounts', fn (Blueprint $t) => [$t->id(),$t->unsignedBigInteger('company_id'),$t->string('code'),$t->string('name'),$t->unsignedTinyInteger('level'),$t->boolean('allow_manual_entry'),$t->string('status'),$t->boolean('is_locked')->default(false),$t->timestamps(),$t->softDeletes()]);
         Schema::create('accounts', fn (Blueprint $t) => [$t->id(),$t->unsignedBigInteger('company_id'),$t->string('account_name'),$t->integer('status'),$t->timestamps()]);
         Schema::create('accounting_period_locks', fn (Blueprint $t) => [$t->id(),$t->unsignedBigInteger('company_id'),$t->unsignedBigInteger('financial_year_id'),$t->date('date_from'),$t->date('date_to'),$t->boolean('is_locked'),$t->timestamps()]);
-        Schema::create('journals', function (Blueprint $t) {$t->id();$t->unsignedBigInteger('company_id');$t->unsignedBigInteger('financial_year_id');$t->string('journal_no');$t->date('journal_date');$t->string('journal_type');$t->string('reference_no')->nullable();$t->text('description');$t->text('remarks')->nullable();$t->text('note')->nullable();$t->uuid('request_key');$t->decimal('total_amount',20,4);$t->unsignedBigInteger('created_by');$t->unsignedBigInteger('updated_by')->nullable();$t->boolean('is_locked')->default(false);$t->string('status');$t->timestamps();$t->unique(['company_id','financial_year_id','journal_no']);$t->unique(['company_id','request_key']);});
+        Schema::create('journals', function (Blueprint $t) {$t->id();$t->unsignedBigInteger('company_id');$t->unsignedBigInteger('financial_year_id');$t->string('journal_no');$t->date('journal_date');$t->string('journal_type');$t->string('reference_no')->nullable();$t->text('description');$t->text('remarks')->nullable();$t->text('note')->nullable();$t->string('source_module')->nullable();$t->string('source_type')->nullable();$t->unsignedBigInteger('source_id')->nullable();$t->string('source_key')->nullable();$t->uuid('request_key');$t->decimal('total_amount',20,4);$t->unsignedBigInteger('created_by');$t->unsignedBigInteger('updated_by')->nullable();foreach(['submitted_by','approved_by','rejected_by','posted_by','cancelled_by','reversed_by','locked_by','unlocked_by'] as $c)$t->unsignedBigInteger($c)->nullable();foreach(['submitted_at','approved_at','rejected_at','posted_at','cancelled_at','reversed_at','locked_at','unlocked_at'] as $c)$t->timestamp($c)->nullable();foreach(['rejection_reason','cancellation_reason','cancel_reason','reversal_reason','lock_reason','unlock_reason'] as $c)$t->text($c)->nullable();$t->date('cancelled_date')->nullable();$t->unsignedBigInteger('reversal_of_journal_id')->nullable();$t->boolean('is_locked')->default(false);$t->string('status');$t->timestamps();$t->unique(['company_id','financial_year_id','journal_no']);$t->unique(['company_id','request_key']);});
         Schema::create('journal_items', function (Blueprint $t) {$t->id();$t->unsignedBigInteger('company_id');$t->unsignedBigInteger('journal_id');$t->unsignedBigInteger('chart_account_id');$t->unsignedBigInteger('account_id')->nullable();$t->string('type');$t->decimal('amount',20,4);$t->decimal('debit',20,4);$t->decimal('credit',20,4);$t->text('description')->nullable();$t->string('reference')->nullable();$t->unsignedInteger('line_number');$t->string('sub_ledger_type')->nullable();$t->unsignedBigInteger('sub_ledger_id')->nullable();$t->text('note')->nullable();$t->integer('status');$t->timestamps();});
         Schema::create('journal_number_sequences', fn (Blueprint $t) => [$t->unsignedBigInteger('company_id'),$t->unsignedBigInteger('financial_year_id'),$t->unsignedBigInteger('next_number'),$t->timestamps(),$t->primary(['company_id','financial_year_id'])]);
         Schema::create('journal_audit_events', function (Blueprint $t) {$t->id();$t->unsignedBigInteger('company_id');$t->unsignedBigInteger('financial_year_id');$t->unsignedBigInteger('journal_id');$t->string('event');$t->string('previous_status')->nullable();$t->string('new_status')->nullable();$t->unsignedBigInteger('actor_id');$t->timestamp('event_at');$t->text('reason')->nullable();$t->json('metadata')->nullable();});
@@ -72,6 +72,44 @@ class JournalPhaseOneTest extends TestCase
     public function test_status_transition_rules_are_centralized(): void
     {
         $this->service()->assertTransition(Journal::STATUS_DRAFT,Journal::STATUS_SUBMITTED);$this->expectException(RuntimeException::class);$this->service()->assertTransition(Journal::STATUS_POSTED,Journal::STATUS_DRAFT);
+    }
+
+    public function test_phase_two_submit_approve_reject_cancel_and_lock_workflow(): void
+    {
+        DB::table('users')->insert([['id'=>2,'company_id'=>1,'name'=>'Checker'],['id'=>3,'company_id'=>1,'name'=>'Poster']]);
+        $service=$this->service();
+        $journal=$service->createDraft($this->payload(),1,1);
+        $submitted=$service->submit($journal,1);
+        $this->assertSame(Journal::STATUS_SUBMITTED,$submitted->status);
+        $this->expectException(RuntimeException::class);
+        $service->approve($submitted,1);
+    }
+
+    public function test_phase_two_authorized_approval_rejection_cancel_and_lock_audit(): void
+    {
+        DB::table('users')->insert(['id'=>2,'company_id'=>1,'name'=>'Checker']);
+        $service=$this->service();
+        $first=$service->submit($service->createDraft($this->payload(),1,1),1);
+        $approved=$service->approve($first,2);
+        $this->assertSame(Journal::STATUS_APPROVED,$approved->status);
+
+        $second=$service->submit($service->createDraft($this->payload(['request_key'=>(string)Str::uuid()]),1,1),1);
+        $rejected=$service->reject($second,2,'Correction required');
+        $this->assertSame(Journal::STATUS_DRAFT,$rejected->status);
+        $this->assertSame('Correction required',$rejected->rejection_reason);
+        $service->setLock($rejected,2,true,'Review hold');
+        $service->setLock($rejected->fresh(),2,false,'Review complete');
+        $cancelled=$service->cancel($rejected->fresh(),2,'Not required');
+        $this->assertSame(Journal::STATUS_CANCELLED,$cancelled->status);
+        $this->assertSame(['created','submitted','rejected','locked','unlocked','cancelled'],$cancelled->auditEvents()->pluck('event')->all());
+    }
+
+    public function test_source_generated_opening_balance_journal_cannot_be_mutated(): void
+    {
+        $journal=$this->service()->createDraft($this->payload(),1,1);
+        $journal->update(['source_module'=>'opening_balance']);
+        $this->expectException(RuntimeException::class);
+        $this->service()->submit($journal->fresh(),1);
     }
 
     private function reject(array $payload): void {try{$this->service()->createDraft($payload,1,1);$this->fail('Invalid financial context accepted.');}catch(ValidationException){$this->assertTrue(true);}}

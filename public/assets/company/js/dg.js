@@ -857,7 +857,7 @@ DG.salesBilling = (function () {
 
         var saleDateField = qs('#sale_date');
 
-        if (!saleDateField || !saleDateField.value) {
+        if (saleDateField && !saleDateField.value) {
             errors.push('Please select the sale date.');
             markInvalid(saleDateField);
             firstInvalid = firstInvalid || saleDateField;

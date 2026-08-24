@@ -58,6 +58,7 @@ class PurchaseReturnRefundAccountingTest extends TestCase
             $table->unsignedBigInteger('company_id');
             $table->date('start_date');
             $table->date('end_date');
+            $table->boolean('is_active')->default(true);
         });
 
         Schema::create('purchase_returns', function (Blueprint $table) {
@@ -166,7 +167,7 @@ class PurchaseReturnRefundAccountingTest extends TestCase
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
-            ['PURCHASE_RETURNS', 'INPUT_TAX_RECEIVABLE', 'ACCOUNTS_PAYABLE', 'CASH_IN_HAND']
+            ['PURCHASE_RETURNS', 'INPUT_TAX_RECEIVABLE', 'ACCOUNTS_PAYABLE', 'CASH_IN_HAND', 'INVENTORY', 'SUPPLIER_RETURN_RECEIVABLE']
         ));
 
         DB::table('financial_years')->insert([
@@ -188,9 +189,8 @@ class PurchaseReturnRefundAccountingTest extends TestCase
         $this->assertSame('purchase_return_refund', $entry->source_type);
         $this->assertSame($refund->id, $entry->source_id);
         $this->assertSame('created', $entry->source_event);
-        $this->assertLine($entry, 'PURCHASE_RETURNS', '0.0000', '270.0000');
-        $this->assertLine($entry, 'INPUT_TAX_RECEIVABLE', '0.0000', '30.0000');
         $this->assertLine($entry, 'CASH_IN_HAND', '300.0000', '0.0000', self::CASH_ACCOUNT_ID);
+        $this->assertLine($entry, 'SUPPLIER_RETURN_RECEIVABLE', '0.0000', '300.0000');
         $this->assertBalanced($entry);
         $this->assertUnrelatedCodesAreAbsent($entry);
     }
@@ -203,10 +203,9 @@ class PurchaseReturnRefundAccountingTest extends TestCase
         $this->postRefund($refund);
 
         $entry = $this->entryFor($refund->id);
-        $this->assertLine($entry, 'PURCHASE_RETURNS', '0.0000', '270.0000');
-        $this->assertLine($entry, 'INPUT_TAX_RECEIVABLE', '0.0000', '30.0000');
         $this->assertLine($entry, 'ACCOUNTS_PAYABLE', '300.0000', '0.0000', null, 'supplier', self::SUPPLIER_ID);
-        $this->assertSame(3, $entry->lines()->count());
+        $this->assertLine($entry, 'SUPPLIER_RETURN_RECEIVABLE', '0.0000', '300.0000');
+        $this->assertSame(2, $entry->lines()->count());
         $this->assertBalanced($entry);
     }
 
@@ -220,6 +219,7 @@ class PurchaseReturnRefundAccountingTest extends TestCase
         $entry = $this->entryFor($refund->id);
         $this->assertLine($entry, 'ACCOUNTS_PAYABLE', '100.0000', '0.0000', null, 'supplier', self::SUPPLIER_ID);
         $this->assertLine($entry, 'CASH_IN_HAND', '200.0000', '0.0000', self::CASH_ACCOUNT_ID);
+        $this->assertLine($entry, 'SUPPLIER_RETURN_RECEIVABLE', '0.0000', '300.0000');
         $this->assertSame('300.0000', $this->sumDebits($entry));
         $this->assertSame('300.0000', $this->sumCredits($entry));
         $this->assertBalanced($entry);
@@ -241,14 +241,10 @@ class PurchaseReturnRefundAccountingTest extends TestCase
         $secondEntry = $this->entryFor($second->id);
         $thirdEntry = $this->entryFor($third->id);
 
-        $this->assertLine($firstEntry, 'PURCHASE_RETURNS', '0.0000', '270.0000');
-        $this->assertLine($firstEntry, 'INPUT_TAX_RECEIVABLE', '0.0000', '30.0000');
-        $this->assertLine($secondEntry, 'PURCHASE_RETURNS', '0.0000', '360.0000');
-        $this->assertLine($secondEntry, 'INPUT_TAX_RECEIVABLE', '0.0000', '40.0000');
-        $this->assertLine($thirdEntry, 'PURCHASE_RETURNS', '0.0000', '270.0000');
-        $this->assertLine($thirdEntry, 'INPUT_TAX_RECEIVABLE', '0.0000', '30.0000');
-        $this->assertSame('900.0000', $this->componentCreditFor([$firstEntry, $secondEntry, $thirdEntry], 'PURCHASE_RETURNS'));
-        $this->assertSame('100.0000', $this->componentCreditFor([$firstEntry, $secondEntry, $thirdEntry], 'INPUT_TAX_RECEIVABLE'));
+        $this->assertLine($firstEntry, 'SUPPLIER_RETURN_RECEIVABLE', '0.0000', '300.0000');
+        $this->assertLine($secondEntry, 'SUPPLIER_RETURN_RECEIVABLE', '0.0000', '400.0000');
+        $this->assertLine($thirdEntry, 'SUPPLIER_RETURN_RECEIVABLE', '0.0000', '300.0000');
+        $this->assertSame('1000.0000', $this->componentCreditFor([$firstEntry, $secondEntry, $thirdEntry], 'SUPPLIER_RETURN_RECEIVABLE'));
         $this->assertSame('1000.0000', $this->sumCredits($firstEntry, $secondEntry, $thirdEntry));
 
         foreach ([$firstEntry, $secondEntry, $thirdEntry] as $entry) {
@@ -274,7 +270,7 @@ class PurchaseReturnRefundAccountingTest extends TestCase
                 ->where('source_id', $refund->id)
                 ->where('source_event', 'created')
                 ->count());
-            $this->assertSame(3, DB::table('accounting_entry_lines')->count());
+            $this->assertSame(4, DB::table('accounting_entry_lines')->count());
         }
     }
 
@@ -317,8 +313,7 @@ class PurchaseReturnRefundAccountingTest extends TestCase
 
         $this->postRefund($current);
         $currentEntry = $this->entryFor($current->id);
-        $this->assertLine($currentEntry, 'PURCHASE_RETURNS', '0.0000', '630.0000');
-        $this->assertLine($currentEntry, 'INPUT_TAX_RECEIVABLE', '0.0000', '70.0000');
+        $this->assertLine($currentEntry, 'SUPPLIER_RETURN_RECEIVABLE', '0.0000', '700.0000');
 
         try {
             $this->postRefund($legacy);
@@ -339,7 +334,7 @@ class PurchaseReturnRefundAccountingTest extends TestCase
     public function test_accounting_failure_rolls_back_the_enclosing_refund_transaction(): void
     {
         $returnId = $this->createPurchaseReturn('300.0000', '30.0000');
-        DB::table('chart_accounts')->where('system_code', 'INPUT_TAX_RECEIVABLE')->delete();
+        DB::table('chart_accounts')->where('system_code', 'SUPPLIER_RETURN_RECEIVABLE')->delete();
 
         try {
             DB::transaction(function () use ($returnId): void {
@@ -348,19 +343,19 @@ class PurchaseReturnRefundAccountingTest extends TestCase
             });
             $this->fail('Posting with a missing required chart account must fail.');
         } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('INPUT_TAX_RECEIVABLE', $exception->getMessage());
+            $this->assertStringContainsString('SUPPLIER_RETURN_RECEIVABLE', $exception->getMessage());
         }
 
         $this->assertDatabaseMissing('purchase_return_refunds', ['id' => 11]);
         $this->assertDatabaseMissing('account_transactions', ['reference_id' => 11]);
         $this->assertDatabaseMissing('supplier_transactions', ['reference_id' => 11]);
-        $this->assertSame(0, DB::table('accounting_entries')->count());
-        $this->assertSame(0, DB::table('accounting_entry_lines')->count());
+        $this->assertSame(1, DB::table('accounting_entries')->count());
+        $this->assertSame(2, DB::table('accounting_entry_lines')->count());
     }
 
     private function createPurchaseReturn(string $grandTotal, string $tax): int
     {
-        return (int) DB::table('purchase_returns')->insertGetId([
+        $returnId = (int) DB::table('purchase_returns')->insertGetId([
             'company_id' => self::COMPANY_ID,
             'financial_year_id' => self::FINANCIAL_YEAR_ID,
             'supplier_id' => self::SUPPLIER_ID,
@@ -368,6 +363,17 @@ class PurchaseReturnRefundAccountingTest extends TestCase
             'grand_total' => $grandTotal,
             'status' => 1,
         ]);
+
+        $entryId = DB::table('accounting_entries')->insertGetId([
+            'company_id'=>self::COMPANY_ID,'entry_number'=>'PR-'.$returnId,'entry_date'=>'2026-06-15','source_module'=>'purchase_return',
+            'source_type'=>'purchase_return','source_id'=>$returnId,'source_event'=>'created','source_key'=>'purchase_return:'.$returnId.':created',
+            'status'=>'posted','posted_at'=>now(),'created_at'=>now(),'updated_at'=>now(),
+        ]);
+        foreach ([['SUPPLIER_RETURN_RECEIVABLE',$grandTotal,'0.0000'],['INVENTORY','0.0000',$grandTotal]] as $number=>[$code,$debit,$credit]) {
+            DB::table('accounting_entry_lines')->insert(['accounting_entry_id'=>$entryId,'chart_account_id'=>DB::table('chart_accounts')->where('system_code',$code)->value('id'),
+                'line_number'=>$number+1,'debit'=>$debit,'credit'=>$credit,'created_at'=>now(),'updated_at'=>now()]);
+        }
+        return $returnId;
     }
 
     private function createRefund(int $id, int $returnId, string $settlement, string $adjustment, string $cash): PurchaseReturnRefund

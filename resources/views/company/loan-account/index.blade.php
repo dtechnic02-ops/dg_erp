@@ -272,7 +272,7 @@
                                         <tr class="dg-row">
                                             <td>{{ $loans->firstItem() + $loop->index }}</td>
                                             <td>{{ $loan->loan_no }}</td>
-                                            <td>{{ optional($loan->start_date)->format('d-m-Y') ?: '-' }}</td>
+                                            <td>{{ optional($loan->start_date)->format('d-m-Y') ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $loan->start_date])</td>
                                             <td>{{ $loan->partyAccount->name ?? '-' }}</td>
                                             <td>{{ $loan->loan_name }}</td>
                                             <td>

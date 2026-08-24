@@ -61,10 +61,9 @@ class JournalController extends Controller
             $query->where('financial_year_id', $activeFy->id);
         }
 
-        if (!$request->has('status')) {
-            $query->where('status', Journal::STATUS_ACTIVE);
-        } elseif ($request->filled('status')) {
-            $query->where('status', (string) $request->status);
+        $statusFilter = $this->resolveListStatusFilter($request);
+        if ($statusFilter !== '') {
+            $query->where('status', $statusFilter);
         }
 
         if ($request->filled('search')) {
@@ -86,6 +85,19 @@ class JournalController extends Controller
         }
 
         return $query;
+    }
+
+    protected function resolveListStatusFilter(Request $request): string
+    {
+        if (!$request->has('status')) {
+            return Journal::STATUS_DRAFT;
+        }
+
+        if ($request->filled('status')) {
+            return (string) $request->status;
+        }
+
+        return '';
     }
 
     protected function generateJournalNo(int $companyId, FinancialYear $activeFy): string
@@ -127,6 +139,16 @@ class JournalController extends Controller
             ->when(\Illuminate\Support\Facades\Schema::hasColumn('chart_accounts', 'is_locked'), fn ($q) => $q->where('is_locked', 0))
             ->orderBy('code')
             ->get();
+    }
+
+    protected function operationalAccountsForJournal(int $companyId)
+    {
+        return Account::where('company_id', $companyId)
+            ->whereIn('status', [1, 'active'])
+            ->whereIn('account_type', ['Cash', 'Bank', 'ATM', 'Wallet'])
+            ->orderBy('account_type')
+            ->orderBy('account_name')
+            ->get(['id', 'account_name', 'account_type', 'current_balance']);
     }
 
     protected function subLedgerCollections(int $companyId): array
@@ -394,6 +416,7 @@ class JournalController extends Controller
         $this->authorizeJournalPermission('journal.view', 'view_journal');
 
         $companyId = auth()->user()->company_id;
+        $statusFilter = $this->resolveListStatusFilter($request);
         $query = $this->buildJournalQuery($request, $companyId);
 
         $summaryQuery = clone $query;
@@ -412,7 +435,7 @@ class JournalController extends Controller
             $perPage = 10;
         }
 
-        $journals = $query->latest()->paginate($perPage)->withQueryString();
+        $journals = $query->orderByDesc('journal_date')->orderByDesc('id')->paginate($perPage)->withQueryString();
 
         $financialYears = FinancialYear::where('company_id', $companyId)
             ->latest('id')
@@ -429,7 +452,8 @@ class JournalController extends Controller
             'totalAmount',
             'activeCount',
             'totalCount',
-            'perPage'
+            'perPage',
+            'statusFilter'
         ));
     }
 
@@ -448,12 +472,13 @@ class JournalController extends Controller
         }
 
         $chartAccounts = $this->chartAccountsForJournal($companyId);
+        $operationalAccounts = $this->operationalAccountsForJournal($companyId);
         $subLedgerData = $this->subLedgerCollections($companyId);
         $requestKey = (string) Str::uuid();
 
         return view('company.journal.create', array_merge(
             $subLedgerData,
-            compact('chartAccounts', 'activeFy', 'requestKey')
+            compact('chartAccounts', 'operationalAccounts', 'activeFy', 'requestKey')
         ));
     }
 
@@ -476,6 +501,17 @@ class JournalController extends Controller
                 'financialYear',
                 'createdBy',
                 'updatedByUser',
+                'submittedByUser',
+                'approvedByUser',
+                'postedByUser',
+                'rejectedByUser',
+                'cancelledByUser',
+                'reversedByUser',
+                'lockedByUser',
+                'unlockedByUser',
+                'reversalJournal',
+                'originalJournal',
+                'accountingEntry',
             ])
             ->where('company_id', auth()->user()->company_id)
             ->findOrFail($id);
@@ -509,11 +545,12 @@ class JournalController extends Controller
         }
 
         $chartAccounts = $this->chartAccountsForJournal($companyId);
+        $operationalAccounts = $this->operationalAccountsForJournal($companyId);
         $subLedgerData = $this->subLedgerCollections($companyId);
 
         return view('company.journal.edit', array_merge(
             $subLedgerData,
-            compact('journal', 'chartAccounts')
+            compact('journal', 'chartAccounts', 'operationalAccounts')
         ));
     }
 
@@ -529,167 +566,72 @@ class JournalController extends Controller
 
     }
 
+    public function submit($id)
+    {
+        return $this->runWorkflowAction('journal.submit', $id, fn (Journal $journal) => $this->journalService->submit($journal, auth()->id()), 'Journal submitted successfully.');
+    }
+
+    public function approve($id)
+    {
+        return $this->runWorkflowAction('journal.approve', $id, fn (Journal $journal) => $this->journalService->approve($journal, auth()->id()), 'Journal approved successfully.');
+    }
+
+    public function reject(Request $request, $id)
+    {
+        $request->validate(['reason' => ValidationService::requiredText(1000)]);
+        return $this->runWorkflowAction('journal.reject', $id, fn (Journal $journal) => $this->journalService->reject($journal, auth()->id(), (string) $request->input('reason')), 'Journal rejected and returned to Draft.');
+    }
+
+    public function post($id)
+    {
+        return $this->runWorkflowAction('journal.post', $id, fn (Journal $journal) => $this->journalService->post($journal, auth()->id()), 'Journal posted successfully.');
+    }
+
+    public function cancelJournal(Request $request, $id)
+    {
+        $request->validate(['reason' => ValidationService::requiredText(1000)]);
+        return $this->runWorkflowAction('journal.cancel', $id, fn (Journal $journal) => $this->journalService->cancel($journal, auth()->id(), (string) $request->input('reason')), 'Journal cancelled successfully.');
+    }
+
+    public function reverseJournal(Request $request, $id)
+    {
+        $request->validate(['reason' => ValidationService::requiredText(1000)]);
+        return $this->runWorkflowAction('journal.reverse', $id, fn (Journal $journal) => $this->journalService->reverse($journal, auth()->id(), (string) $request->input('reason')), 'Journal reversed successfully.', true);
+    }
+
+    public function lockJournal(Request $request, $id)
+    {
+        $request->validate(['reason' => ValidationService::requiredText(1000)]);
+        return $this->runWorkflowAction('journal.lock', $id, fn (Journal $journal) => $this->journalService->setLock($journal, auth()->id(), true, (string) $request->input('reason')), 'Journal locked successfully.');
+    }
+
+    public function unlockJournal(Request $request, $id)
+    {
+        $request->validate(['reason' => ValidationService::requiredText(1000)]);
+        return $this->runWorkflowAction('journal.unlock', $id, fn (Journal $journal) => $this->journalService->setLock($journal, auth()->id(), false, (string) $request->input('reason')), 'Journal unlocked successfully.');
+    }
+
+    private function runWorkflowAction(string $permission, int $id, callable $action, string $message, bool $redirectToResult = false)
+    {
+        $this->authorizeJournalPermission($permission);
+        $journal = Journal::where('company_id', auth()->user()->company_id)->findOrFail($id);
+
+        try {
+            $result = $action($journal);
+            return redirect()->route('company.journal.show', $redirectToResult ? $result->id : $journal->id)->with('success', $message);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            report($exception);
+            return back()->with('error', 'The Journal action could not be completed because its integrity requirements were not satisfied.');
+        }
+    }
+
     public function audit($id)
     {
         $this->authorizeCompanyPermission('journal.audit-view');
         $journal = Journal::with(['auditEvents', 'financialYear'])->where('company_id', auth()->user()->company_id)->findOrFail($id);
         return view('company.journal.audit', compact('journal'));
-    }
-
-    public function reverse(Request $request, $id)
-    {
-        $this->authorizeJournalPermission('journal.reverse');
-
-        $request->validate([
-            'cancel_reason' => ValidationService::requiredText(1000),
-        ]);
-
-        try {
-            $reversal = DB::transaction(function () use ($request, $id) {
-                $companyId = auth()->user()->company_id;
-                $original = Journal::with('items')
-                    ->where('company_id', $companyId)
-                    ->lockForUpdate()
-                    ->findOrFail($id);
-
-                if (!$original->isPosted() || $original->reversal_of_journal_id) {
-                    throw new \Exception('Only an original posted journal can be reversed.');
-                }
-
-                if (Journal::where('company_id', $companyId)
-                    ->where('reversal_of_journal_id', $original->id)
-                    ->lockForUpdate()
-                    ->exists()) {
-                    throw new \Exception('This journal has already been reversed.');
-                }
-
-                $financialYear = FinancialYear::where('company_id', $companyId)
-                    ->whereKey($original->financial_year_id)
-                    ->firstOrFail();
-                $reason = trim($request->cancel_reason);
-                $reversal = Journal::create([
-                    'company_id' => $companyId,
-                    'financial_year_id' => $financialYear->id,
-                    'journal_no' => $this->generateJournalNo($companyId, $financialYear),
-                    'journal_date' => $original->journal_date,
-                    'reference_no' => $original->reference_no,
-                    'total_amount' => $original->total_amount,
-                    'note' => 'Reversal of ' . $original->journal_no . ': ' . $reason,
-                    'created_by' => auth()->id(),
-                    'posted_by' => auth()->id(),
-                    'posted_at' => now(),
-                    'reversal_of_journal_id' => $original->id,
-                    'status' => Journal::STATUS_POSTED,
-                ]);
-
-                foreach ($original->items as $originalItem) {
-                    $originalAccountTransaction = AccountTransaction::where('company_id', $companyId)
-                        ->where('reference_type', 'Journal')
-                        ->where('reference_id', $original->id)
-                        ->where('journal_item_id', $originalItem->id)
-                        ->where('status', 1)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (!$originalAccountTransaction) {
-                        throw new \Exception('Journal reversal requires transaction traceability for every original journal line.');
-                    }
-
-                    $reversalItem = JournalItem::create([
-                        'company_id' => $companyId,
-                        'journal_id' => $reversal->id,
-                        'account_id' => $originalItem->account_id,
-                        'sub_ledger_type' => $originalItem->sub_ledger_type,
-                        'sub_ledger_id' => $originalItem->sub_ledger_id,
-                        'type' => $originalItem->type === JournalItem::TYPE_DEBIT ? JournalItem::TYPE_CREDIT : JournalItem::TYPE_DEBIT,
-                        'amount' => $originalItem->amount,
-                        'note' => 'Reversal of journal item #' . $originalItem->id,
-                        'status' => 1,
-                    ]);
-
-                    $description = 'Reversal of ' . $original->journal_no . ': ' . $reason;
-                    AccountBalanceService::createTransaction([
-                        'company_id' => $companyId,
-                        'financial_year_id' => $financialYear->id,
-                        'account_id' => $originalAccountTransaction->account_id,
-                        'transaction_date' => $original->journal_date->format('Y-m-d'),
-                        'voucher_no' => $reversal->journal_no,
-                        'reference_type' => 'Journal',
-                        'reference_id' => $reversal->id,
-                        'journal_item_id' => $reversalItem->id,
-                        'reversed_transaction_id' => $originalAccountTransaction->id,
-                        'description' => $description,
-                        'debit' => $originalAccountTransaction->credit,
-                        'credit' => $originalAccountTransaction->debit,
-                    ], false);
-
-                    $this->createReversalSubLedgerTransaction($original, $reversal, $originalItem, $reversalItem, $financialYear, $description, $companyId);
-                }
-
-                $original->update($this->appendUpdatedBy([
-                    'status' => Journal::STATUS_REVERSED,
-                    'cancelled_by' => auth()->id(),
-                    'cancelled_date' => now()->toDateString(),
-                    'cancel_reason' => $reason,
-                    'reversed_by' => auth()->id(),
-                    'reversed_at' => now(),
-                ], $original));
-
-                return $reversal;
-            });
-
-            return redirect()->route('company.journal.show', $reversal->id)
-                ->with('success', 'Journal reversed successfully.');
-        } catch (\Throwable $e) {
-            return back()->with('error', $e->getMessage());
-        }
-    }
-
-    protected function createReversalSubLedgerTransaction(
-        Journal $original,
-        Journal $reversal,
-        JournalItem $originalItem,
-        JournalItem $reversalItem,
-        FinancialYear $financialYear,
-        string $description,
-        int $companyId
-    ): void {
-        if (!in_array($originalItem->sub_ledger_type, [Account::SUB_LEDGER_CUSTOMER, Account::SUB_LEDGER_SUPPLIER], true)) {
-            return;
-        }
-
-        $transactionModel = $originalItem->sub_ledger_type === Account::SUB_LEDGER_CUSTOMER
-            ? CustomerTransaction::class
-            : SupplierTransaction::class;
-        $service = $originalItem->sub_ledger_type === Account::SUB_LEDGER_CUSTOMER
-            ? CustomerTransactionService::class
-            : SupplierTransactionService::class;
-        $originalTransaction = $transactionModel::where('company_id', $companyId)
-            ->where('reference_type', 'Journal')
-            ->where('reference_id', $original->id)
-            ->where('journal_item_id', $originalItem->id)
-            ->where('status', 1)
-            ->lockForUpdate()
-            ->firstOrFail();
-        $partyKey = $originalItem->sub_ledger_type === Account::SUB_LEDGER_CUSTOMER ? 'customer_id' : 'supplier_id';
-
-        $service::createTransaction([
-            'company_id' => $companyId,
-            'financial_year_id' => $financialYear->id,
-            $partyKey => $originalTransaction->{$partyKey},
-            'transaction_date' => $original->journal_date->format('Y-m-d'),
-            'voucher_no' => $reversal->journal_no,
-            'reference_type' => 'Journal',
-            'reference_id' => $reversal->id,
-            'journal_item_id' => $reversalItem->id,
-            'reversed_transaction_id' => $originalTransaction->id,
-            'reference_no' => $originalTransaction->reference_no,
-            'description' => $description,
-            'debit' => $originalTransaction->credit,
-            'credit' => $originalTransaction->debit,
-            'created_by' => auth()->id(),
-            'status' => 1,
-        ]);
     }
 
     public function print()
@@ -717,7 +659,7 @@ class JournalController extends Controller
             $query->where('financial_year_id', request('financial_year'));
         }
 
-        $journals = $query->latest()->get();
+        $journals = $query->orderByDesc('journal_date')->orderByDesc('id')->get();
 
         return view('company.journal.print', compact('journals'));
     }

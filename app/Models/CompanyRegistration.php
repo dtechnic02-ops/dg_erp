@@ -16,7 +16,12 @@ class CompanyRegistration extends Model
         'password',
         'mobile_no',
         'country',
+        'country_id',
         'selected_user_limit',
         'status',
     ];
+    public function countryMaster()
+    {
+        return $this->belongsTo(Country::class, 'country_id');
+    }
 }

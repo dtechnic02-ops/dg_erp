@@ -29,6 +29,7 @@ class IncomePostingProfile
 
         return [
             'company_id' => $this->positiveInteger($data['company_id'] ?? null, 'company_id'),
+            'financial_year_id' => $this->positiveInteger($data['financial_year_id'] ?? null, 'financial_year_id'),
             'entry_date' => $this->requiredString($data, 'income_date'),
             'reference_number' => $incomeNumber,
             'source_module' => 'income',

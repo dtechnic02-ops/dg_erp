@@ -38,6 +38,6 @@ class SalesCogsAccountingIntegrationService
             if ($this->profile->hasProductItems($sale)) throw new \RuntimeException('Every product sale requires an inventory valuation cost snapshot before COGS can be reversed.');
             return;
         }
-        $this->postingService->reverseBySource(['company_id' => $sale->company_id, 'entry_date' => $date, 'original_source_key' => 'sales-cogs:' . $sale->id . ':created', 'original_source_event' => 'created', 'original_source_types' => ['sales_cogs'], 'reversal_source_key' => 'sales-cogs:' . $sale->id . ':cancelled', 'source_module' => 'sales_cogs', 'source_type' => 'sales_cogs', 'source_id' => $sale->id, 'source_event' => 'cancelled', 'reference_number' => $sale->invoice_no, 'description' => 'Sales COGS cancellation - ' . $sale->invoice_no, 'posted_by' => $postedBy]);
+        $this->postingService->reverseBySource(['company_id' => $sale->company_id, 'financial_year_id' => $sale->financial_year_id, 'entry_date' => $date, 'original_source_key' => 'sales-cogs:' . $sale->id . ':created', 'original_source_event' => 'created', 'original_source_types' => ['sales_cogs'], 'reversal_source_key' => 'sales-cogs:' . $sale->id . ':cancelled', 'source_module' => 'sales_cogs', 'source_type' => 'sales_cogs', 'source_id' => $sale->id, 'source_event' => 'cancelled', 'reference_number' => $sale->invoice_no, 'description' => 'Sales COGS cancellation - ' . $sale->invoice_no, 'posted_by' => $postedBy]);
     }
 }

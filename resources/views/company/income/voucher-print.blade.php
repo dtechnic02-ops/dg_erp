@@ -97,7 +97,7 @@
                                         <div class="dg-summary-bar-item">
                                             <span class="dg-summary-bar-label text-muted">Income Date</span>
                                             <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
-                                            <span class="dg-summary-bar-value">{{ $income->income_date?->format('d-m-Y') ?? '-' }}</span>
+                                            <span class="dg-summary-bar-value">{{ $income->income_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $income->income_date])</span>
                                         </div>
                                         <div class="dg-summary-bar-item">
                                             <span class="dg-summary-bar-label text-muted">Status</span>

@@ -22,6 +22,8 @@ class SalesCogsAccountingDataBuilder
         }
 
         $companyId = $this->positiveInteger($sale->company_id, 'company_id');
+        $financialYearId = $this->positiveInteger($sale->financial_year_id, 'financial_year_id');
+        $saleDate = $this->date($sale->sale_date);
         $snapshots = SalesCostSnapshot::query()
             ->where('company_id', $companyId)
             ->where('sales_invoice_id', $sale->id)
@@ -50,7 +52,8 @@ class SalesCogsAccountingDataBuilder
 
         return [
             'company_id' => $companyId,
-            'entry_date' => $this->date($sale->sale_date),
+            'financial_year_id' => $financialYearId,
+            'entry_date' => $saleDate,
             'reference_number' => $sale->invoice_no,
             'source_module' => 'sales_cogs',
             'source_type' => 'sales_cogs',
@@ -85,7 +88,7 @@ class SalesCogsAccountingDataBuilder
     private function date(mixed $value): string
     {
         if ($value instanceof DateTimeInterface) {
-            $value = $value->format('Y-m-d');
+            return $value->format('Y-m-d');
         }
 
         if (! is_string($value) || trim($value) === '') {
@@ -93,6 +96,11 @@ class SalesCogsAccountingDataBuilder
         }
 
         $value = trim($value);
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2} 00:00:00$/', $value) === 1) {
+            $value = substr($value, 0, 10);
+        }
+
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
         $errors = DateTimeImmutable::getLastErrors();
 

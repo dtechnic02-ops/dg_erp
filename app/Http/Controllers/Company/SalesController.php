@@ -28,8 +28,10 @@ use App\Services\SalesInventoryRestorationService;
 use App\Models\AccountTransaction;
 use App\Models\CustomerTransaction;
 use App\Models\StockMovement;
+use App\Models\Company;
 
 use App\Services\ValidationService;
+use App\Services\NepaliDateService;
 use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
 class SalesController extends Controller
@@ -40,7 +42,8 @@ class SalesController extends Controller
         private readonly SalesAccountingIntegrationService $salesAccountingIntegrationService,
         private readonly SalesInventoryCostService $salesInventoryCostService,
         private readonly SalesCogsAccountingIntegrationService $salesCogsAccountingIntegrationService,
-        private readonly SalesInventoryRestorationService $salesInventoryRestorationService
+        private readonly SalesInventoryRestorationService $salesInventoryRestorationService,
+        private readonly NepaliDateService $nepaliDateService
     ) {
     }
 
@@ -241,7 +244,7 @@ public function index(Request $request)
     }
 
     $invoices = $query
-        ->latest()
+        ->orderByDesc('sale_date')->orderByDesc('id')
         ->paginate($perPage)
         ->withQueryString();
 
@@ -431,7 +434,7 @@ public function printList(Request $request)
     $cancelledCount = (clone $query)->where('status', 0)->count();
 
     $invoices = $query
-        ->latest()
+        ->orderByDesc('sale_date')->orderByDesc('id')
         ->get();
 
     return view(
@@ -458,6 +461,12 @@ public function create()
 {
     $companyId =
         auth()->user()->company_id;
+
+    $company = Company::with('countryMaster')->findOrFail($companyId);
+    $isNepalCompany = $company->countryMaster?->iso_code === 'NP';
+    $saleDateBs = $isNepalCompany
+        ? $this->deriveBsDate(old('sale_date', now()->toDateString()))
+        : null;
 
     $activeFy = FinancialYear::where(
             'company_id',
@@ -549,7 +558,9 @@ public function create()
             'vats',
             'accounts',
             'invoiceNo',
-            'activeFy'
+            'activeFy',
+            'isNepalCompany',
+            'saleDateBs'
         )
     );
 }
@@ -1131,7 +1142,7 @@ try {
 
 }
 
-protected function calculateStoreAmounts(Request $request, int $companyId): array
+public function calculateStoreAmounts(Request $request, int $companyId): array
 {
     $lineItems = [];
     $subtotal = 0;
@@ -1386,6 +1397,7 @@ public function print($id)
             'customer',
             'items.product.unit',
             'items.service',
+            'company.countryMaster',
         ])
         ->where(
             'company_id',
@@ -1393,10 +1405,13 @@ public function print($id)
         )
         ->findOrFail($id);
 
+    $saleDateBs = $this->deriveBsDateForCompany($invoice->company, $invoice->sale_date);
+
     return view(
         'company.sales.print',
         compact(
-            'invoice'
+            'invoice',
+            'saleDateBs'
         )
     );
 }
@@ -1417,7 +1432,7 @@ public function print($id)
 
         'items.service',
 
-        'company',
+        'company.countryMaster',
 
     ])
     ->where(
@@ -1426,10 +1441,13 @@ public function print($id)
     )
     ->findOrFail($id);
 
+    $saleDateBs = $this->deriveBsDateForCompany($invoice->company, $invoice->sale_date);
+
     return view(
         'company.sales.show',
         compact(
-            'invoice'
+            'invoice',
+            'saleDateBs'
         )
     );
 }
@@ -1444,9 +1462,15 @@ public function edit($id)
             'items.service',
             'financialYear',
             'payments.account',
+            'company.countryMaster',
         ])
         ->where('company_id', $companyId)
         ->findOrFail($id);
+
+    $isNepalCompany = $invoice->company?->countryMaster?->iso_code === 'NP';
+    $saleDateBs = $isNepalCompany
+        ? $this->deriveBsDate(old('sale_date', $invoice->sale_date->format('Y-m-d')))
+        : null;
 
     if ($invoice->status == 0)
     {
@@ -1473,7 +1497,7 @@ public function edit($id)
 
     return view(
         'company.sales.edit',
-        compact('invoice')
+        compact('invoice', 'isNepalCompany', 'saleDateBs')
     );
 }
 
@@ -1586,6 +1610,24 @@ public function update(Request $request, $id)
     return redirect()
         ->route('company.sales.index')
         ->with('success', 'Sales invoice updated successfully.');
+}
+
+private function deriveBsDate(string $adDate): ?string
+{
+    try {
+        return $this->nepaliDateService->adToBs($adDate);
+    } catch (\InvalidArgumentException) {
+        return null;
+    }
+}
+
+private function deriveBsDateForCompany(Company $company, string|\DateTimeInterface $adDate): ?string
+{
+    try {
+        return $this->nepaliDateService->adToBsForCompany($company, $adDate);
+    } catch (\InvalidArgumentException) {
+        return null;
+    }
 }
 
     protected function syncInvoiceSaleBusinessDate(

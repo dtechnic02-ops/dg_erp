@@ -69,7 +69,7 @@
                                 <div class="dg-invoice-field-row">
                                     <span class="dg-invoice-field-label">Journal Date</span>
                                     <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                    <span class="dg-invoice-field-value">{{ $journal->journal_date?->format('d-m-Y') ?? '-' }}</span>
+                                    <span class="dg-invoice-field-value">{{ $journal->journal_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $journal->journal_date])</span>
                                 </div>
                                 <div class="dg-invoice-field-row">
                                     <span class="dg-invoice-field-label">Reference No</span>

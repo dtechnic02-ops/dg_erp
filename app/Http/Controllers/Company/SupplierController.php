@@ -4,6 +4,7 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use Illuminate\Http\Request;
 use App\Models\Supplier;
 
@@ -13,6 +14,7 @@ use App\Services\ValidationService;
 use Illuminate\Support\Facades\DB;
 class SupplierController extends Controller
 {
+    use AuthorizesCompanyPermission;
 
     // 🔥 SHARED FILTERED QUERY
     // Used by index() and any other action (e.g. summary totals)
@@ -46,6 +48,8 @@ auth()->user()->company_id
     // 🔥 LIST
     public function index(Request $request)
     {
+        $this->authorizeCompanyPermission('view_supplier');
+
         $totalCurrentBalance = $this->filteredSupplierQuery($request)
             ->sum('current_balance');
 
@@ -73,6 +77,8 @@ auth()->user()->company_id
     // 🔥 STORE
 public function store(Request $request)
 {
+    $this->authorizeCompanyPermission('create_supplier');
+
     $request->validate([
         'credit_days' => ValidationService::quantity(),
         'name' => 'required|max:255',
@@ -190,6 +196,8 @@ public function update(
      DB::beginTransaction();
 
     try{
+    $this->authorizeCompanyPermission('edit_supplier');
+
     $supplier = Supplier::where(
         'id',
         $id
@@ -299,6 +307,8 @@ SHOW
 
 public function show($id)
 {
+    $this->authorizeCompanyPermission('view_supplier');
+
     $supplier = Supplier::where(
         'company_id',
         auth()->user()->company_id
@@ -332,6 +342,8 @@ unless no filter is applied).
 
 public function print(Request $request)
 {
+    $this->authorizeCompanyPermission('print_supplier');
+
     $suppliers = $this->filteredSupplierQuery($request)
         ->latest()
         ->get();
@@ -365,6 +377,8 @@ $print = true, exactly like the Customer module.
 
 public function printProfile($id)
 {
+    $this->authorizeCompanyPermission('print_supplier');
+
     $companyId = auth()->user()->company_id;
 
     $supplier = Supplier::where('company_id', $companyId)
@@ -381,7 +395,8 @@ public function printProfile($id)
 
 public function destroy($id)
 {
-   
+    $this->authorizeCompanyPermission('delete_supplier');
+
 $supplier = Supplier::where(
     'id',
     $id

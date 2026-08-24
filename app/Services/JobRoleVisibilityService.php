@@ -19,6 +19,40 @@ class JobRoleVisibilityService
         'company_staff' => 'Company Staff',
     ];
 
+    private const OPERATIONAL_DOMAINS = [
+        'sub_admin' => ['*'],
+        'manager' => ['sales', 'purchase', 'inventory', 'delivery', 'hr', 'reports'],
+        'hr' => ['staff_management', 'hr', 'payroll'],
+        'accountant' => ['accounts', 'cash_accounts', 'account_transactions', 'income', 'expense', 'journal', 'contra', 'vat', 'reports'],
+        'sales' => ['sales', 'customers'],
+        'cashier' => ['sales', 'sales_payments', 'cash_accounts'],
+        'receiver' => ['purchase', 'suppliers', 'inventory'],
+        'delivery' => ['delivery'],
+        'company_staff' => [],
+    ];
+
+    private const DOMAIN_PERMISSION_MODULES = [
+        'staff_management' => ['module_users'],
+        'sales' => ['module_sales'],
+        'sales_payments' => ['module_sales_payment'],
+        'customers' => ['module_customer'],
+        'purchase' => ['module_purchase'],
+        'suppliers' => ['module_supplier'],
+        'inventory' => ['module_stock'],
+        'delivery' => ['module_delivery'],
+        'hr' => ['module_hr'],
+        'payroll' => ['module_payroll'],
+        'accounts' => ['module_accounts'],
+        'cash_accounts' => ['module_accounts'],
+        'account_transactions' => ['module_account_transaction'],
+        'income' => ['module_income'],
+        'expense' => ['module_expense'],
+        'journal' => ['module_journal'],
+        'contra' => ['module_contra'],
+        'vat' => ['module_vat'],
+        'reports' => ['module_reports'],
+    ];
+
     public static function jobRoles(): array
     {
         return self::JOB_ROLES;
@@ -38,22 +72,38 @@ class JobRoleVisibilityService
 
     public function canSeeMenu(User $user, string $menu): bool
     {
-        $role = $this->visibilityRole($user);
-
-        if (in_array($role, ['company_admin', 'sub_admin'], true)) {
+        $domains = $this->operationalDomains($user);
+        if (in_array('*', $domains, true)) {
             return true;
         }
 
-        return in_array($menu, match ($role) {
-            'manager' => ['sales', 'purchase', 'inventory', 'delivery', 'hr', 'reports'],
-            'hr' => ['staff_management', 'hr'],
-            'accountant' => ['accounts', 'cash_accounts', 'account_transactions', 'income', 'expense', 'journal', 'contra', 'vat', 'reports'],
-            'sales' => ['sales', 'customers'],
-            'cashier' => ['sales', 'sales_payments', 'cash_accounts'],
-            'receiver' => ['purchase', 'suppliers', 'inventory'],
-            'delivery' => ['delivery'],
-            default => [],
-        }, true);
+        return in_array($menu, $domains, true);
+    }
+
+    public function operationalDomains(User $user): array
+    {
+        $role = $this->visibilityRole($user);
+
+        if ($role === 'company_admin') {
+            return ['*'];
+        }
+
+        return self::OPERATIONAL_DOMAINS[$role] ?? [];
+    }
+
+    public function assignablePermissionModules(User $user): array
+    {
+        $domains = $this->operationalDomains($user);
+        if (in_array('*', $domains, true)) {
+            return ['*'];
+        }
+
+        $modules = [];
+        foreach ($domains as $domain) {
+            $modules = array_merge($modules, self::DOMAIN_PERMISSION_MODULES[$domain] ?? []);
+        }
+
+        return array_values(array_unique($modules));
     }
 
     public function canSeeDashboard(User $user, string $section): bool

@@ -122,6 +122,7 @@ class DefaultChartAccountSeeder extends Seeder
             $this->account('1160', 'Loan Receivable', 'asset', 'loan_receivable', 'debit', 'LOAN_RECEIVABLE', 'CURRENT_ASSETS', 3, false, false),
             $this->account('1165', 'Loan Compulsory Saving', 'asset', 'loan_deposit_asset', 'debit', 'LOAN_COMPULSORY_SAVING_ASSET', 'CURRENT_ASSETS', 3, false, false),
             $this->account('1170', 'Other Current Assets', 'asset', 'other_current_asset', 'debit', 'OTHER_CURRENT_ASSETS', 'CURRENT_ASSETS', 3, false, true),
+            $this->account('1175', 'Supplier Return Receivable', 'asset', 'supplier_return_receivable', 'debit', 'SUPPLIER_RETURN_RECEIVABLE', 'CURRENT_ASSETS', 3, true, false),
             $this->account('1210', 'Property, Plant and Equipment', 'asset', 'fixed_asset', 'debit', 'PROPERTY_PLANT_EQUIPMENT', 'NON_CURRENT_ASSETS', 3, false, true),
             $this->account('1220', 'Accumulated Depreciation', 'asset', 'accumulated_depreciation', 'credit', 'ACCUMULATED_DEPRECIATION', 'NON_CURRENT_ASSETS', 3, false, true),
             $this->account('2110', 'Accounts Payable', 'liability', 'payable', 'credit', 'ACCOUNTS_PAYABLE', 'CURRENT_LIABILITIES', 3, false, false),

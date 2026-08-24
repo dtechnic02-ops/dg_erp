@@ -100,6 +100,7 @@
                                     <label class="form-label" for="income_date">Income Date <span class="text-danger">*</span></label>
                                     <input type="date" name="income_date" id="income_date" class="form-control dg-input" value="{{ old('income_date', $income->income_date?->format('Y-m-d')) }}" required>
                                 </div>
+                                @include('company.components.nepali-date-field', ['adInputId' => 'income_date', 'adDate' => old('income_date', $income->income_date)])
 
                                 <div class="col-md-6">
                                     <label class="form-label" for="attachment">Attachment</label>

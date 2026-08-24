@@ -222,7 +222,7 @@
                                     <tr class="dg-row">
                                         <td class="dg-col-num">{{ $loop->iteration }}</td>
                                         <td>{{ $invoice->invoice_no }}</td>
-                                        <td class="dg-col-date">{{ \Illuminate\Support\Carbon::parse($invoice->purchase_date)->format('d-m-Y') }}</td>
+                                        <td class="dg-col-date">{{ \Illuminate\Support\Carbon::parse($invoice->purchase_date)->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $invoice->purchase_date])</td>
                                         <td>{{ $invoice->supplier->name ?? '-' }}</td>
                                         <td class="dg-col-num">{{ number_format($invoice->grand_total, 2) }}</td>
                                         <td class="dg-col-num">{{ number_format($invoice->paid_amount, 2) }}</td>

@@ -34,7 +34,7 @@ class ProductOpeningStockAccountingDataBuilder
         $movement = $movements->first();
         $quantity = $this->positiveInteger($movement->quantity, 'opening stock quantity');
         $unitPrice = $this->amount($movement->unit_price, 'opening stock unit_price');
-        $transactionDate = $this->date($movement->getRawOriginal('transaction_date') ?? $movement->transaction_date, 'transaction_date');
+        $transactionDate = $this->date($movement->transaction_date, 'transaction_date');
         $financialYearId = $this->positiveInteger($movement->financial_year_id, 'financial_year_id');
 
         if ($unitPrice === '0.0000') {
@@ -52,6 +52,7 @@ class ProductOpeningStockAccountingDataBuilder
 
         return [
             'company_id' => $companyId,
+            'financial_year_id' => $financialYearId,
             'product_id' => $productId,
             'transaction_date' => $transactionDate,
             'reference_number' => 'OPENING-' . $productId,

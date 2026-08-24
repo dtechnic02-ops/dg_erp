@@ -25,7 +25,9 @@ class InventoryValuationMigrationTest extends TestCase
             $table->id();
         });
 
-        $migration = require base_path('database/migrations/2026_07_29_000204_create_inventory_valuations_table.php');
+        $matches = glob(database_path('migrations/*_create_inventory_valuations_table.php')) ?: [];
+        $this->assertCount(1, $matches, 'Expected exactly one final inventory valuations migration.');
+        $migration = require $matches[0];
         $migration->up();
 
         $this->assertTrue(Schema::hasTable('inventory_valuations'));

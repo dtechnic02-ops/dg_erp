@@ -14,13 +14,21 @@ use App\Services\InvoiceNumberService;
 use App\Services\PurchaseReturnSyncService;
 use App\Services\StockService;
 use App\Services\ValidationService;
+use App\Services\Accounting\PurchaseReturnValuationService;
+use App\Services\Accounting\Integrations\PurchaseReturnAccountingIntegrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 
 class PurchaseReturnController extends Controller
 {
+    public function __construct(
+        private readonly PurchaseReturnValuationService $purchaseReturnValuationService,
+        private readonly PurchaseReturnAccountingIntegrationService $purchaseReturnAccountingIntegrationService
+    ) {}
+
     use HandlesTransactionDocumentationEdit;
     public function index(Request $request)
     {
@@ -101,7 +109,7 @@ class PurchaseReturnController extends Controller
         $grandTotal = (clone $totalsQuery)->sum('grand_total');
 
         $returns = $query
-            ->latest()
+            ->orderByDesc('return_date')->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 
@@ -197,7 +205,7 @@ class PurchaseReturnController extends Controller
                 'invoice',
                 'returnNo',
                 'availableQuantities'
-            )
+            ) + ['requestKey' => (string) Str::uuid()]
         );
     }
 
@@ -207,6 +215,7 @@ class PurchaseReturnController extends Controller
 
         $request->validate([
             'purchase_invoice_id' => 'required|exists:purchase_invoices,id,company_id,' . $companyId,
+            'request_key'         => 'required|uuid',
             'supplier_id'         => 'required|exists:suppliers,id,company_id,' . $companyId,
             'return_date'         => 'required|date',
             'purchase_item_id'    => 'required|array|min:1',
@@ -234,6 +243,9 @@ class PurchaseReturnController extends Controller
 
         try {
             $return = DB::transaction(function () use ($request, $companyId) {
+                if (PurchaseReturn::where('company_id', $companyId)->where('request_key', $request->request_key)->lockForUpdate()->exists()) {
+                    throw new \Exception('This Purchase Return request has already been submitted.');
+                }
                 $activeFy = FinancialYear::where('company_id', $companyId)
                     ->where('is_active', 1)
                     ->first();
@@ -281,6 +293,16 @@ class PurchaseReturnController extends Controller
                     );
                 }
 
+                $requestedQuantities = [];
+                foreach ($request->purchase_item_id as $key => $purchaseItemId) {
+                    $quantity = $request->quantity[$key] ?? 0;
+                    if ((float) $quantity > 0) {
+                        if (array_key_exists((int) $purchaseItemId, $requestedQuantities)) throw new \Exception('Invalid purchase item for this invoice.');
+                        $requestedQuantities[(int) $purchaseItemId] = $quantity;
+                    }
+                }
+                $approvedValues = $this->purchaseReturnValuationService->calculate($invoice, $requestedQuantities);
+
                 $returnNo = InvoiceNumberService::generate(
                     'PR',
                     $companyId,
@@ -306,6 +328,7 @@ class PurchaseReturnController extends Controller
                     'purchase_invoice_id' => $request->purchase_invoice_id,
                     'supplier_id'         => $request->supplier_id,
                     'return_no'           => $returnNo,
+                    'request_key'         => $request->request_key,
                     'return_date'         => $request->return_date,
                     'subtotal'            => 0,
                     'total_vat'           => 0,
@@ -316,9 +339,6 @@ class PurchaseReturnController extends Controller
                     'status'              => 1,
                 ]);
 
-                $totalSubtotal = 0;
-                $totalVat = 0;
-                $grandTotal = 0;
                 $hasReturn = false;
 
                 foreach ($request->purchase_item_id as $key => $purchaseItemId) {
@@ -354,18 +374,11 @@ class PurchaseReturnController extends Controller
                         );
                     }
 
-                    $subtotal = $returnQty * $purchaseItem->unit_price;
-
-                    $vatAmount = round(
-                        ($subtotal * $purchaseItem->vat_rate) / 100,
-                        2
-                    );
-
-                    $total = $subtotal + $vatAmount;
-
-                    $totalSubtotal += $subtotal;
-                    $totalVat += $vatAmount;
-                    $grandTotal += $total;
+                    $approvedLine = $approvedValues['items'][$purchaseItem->id] ?? null;
+                    if (! $approvedLine) throw new \Exception('The approved original Purchase value could not be resolved.');
+                    $subtotal = $approvedLine['net'];
+                    $vatAmount = $approvedLine['tax'];
+                    $total = $approvedLine['total'];
 
                     $returnItemData = [
                         'company_id'          => $companyId,
@@ -444,12 +457,14 @@ class PurchaseReturnController extends Controller
                 }
 
                 $return->update([
-                    'subtotal'    => $totalSubtotal,
-                    'total_vat'   => $totalVat,
-                    'grand_total' => $grandTotal,
+                    'subtotal'    => bcadd($approvedValues['product_net'], $approvedValues['service_net'], 4),
+                    'total_vat'   => $approvedValues['tax'],
+                    'grand_total' => $approvedValues['total'],
                 ]);
 
                 PurchaseReturnSyncService::sync($return, true);
+
+                $this->purchaseReturnAccountingIntegrationService->postReturn($return->fresh(['items']));
 
                 return $return;
             });
@@ -663,6 +678,12 @@ class PurchaseReturnController extends Controller
                 if ($refundedAmount > 0) {
                     throw new \Exception('Cannot cancel a purchase return with refund settlements.');
                 }
+
+                $this->purchaseReturnAccountingIntegrationService->reverseReturn(
+                    $return,
+                    $cancelBusinessDate,
+                    auth()->id()
+                );
 
                 foreach ($return->items as $item) {
                     if ((int) $item->status !== 1) {

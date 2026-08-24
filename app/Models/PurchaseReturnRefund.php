@@ -49,6 +49,7 @@ class PurchaseReturnRefund extends Model
         'purchase_return_id',
         'supplier_id',
         'account_id',
+        'idempotency_key',
         'refund_no',
         'refund_date',
         'refund_amount',

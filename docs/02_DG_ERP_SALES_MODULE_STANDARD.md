@@ -370,7 +370,7 @@ Generate Invoice Number
 Validate Financial Year
 
 The transaction date must satisfy all rules defined in
-03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md.
+03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md.
 
 This includes:
 
@@ -1419,7 +1419,7 @@ This module does not define Financial Year behaviour.
 
 The official authority for Financial Year, Business Date, Posting Date, Reporting Date, Active Financial Year, Back-Date Entry, Company Isolation, Business Date Filtering, and Cancelled Record behaviour is:
 
-**03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md**
+**03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md**
 
 Every Sales operation must follow that document without exception.
 

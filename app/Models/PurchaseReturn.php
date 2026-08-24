@@ -12,6 +12,7 @@ class PurchaseReturn extends Model
         'purchase_invoice_id',
         'supplier_id',
         'return_no',
+        'request_key',
         'return_date',
         'subtotal',
         'total_vat',

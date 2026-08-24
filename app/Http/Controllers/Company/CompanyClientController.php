@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Company;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\AuthorizesCompanyProfile;
 use Illuminate\Http\Request;
+use App\Models\Country;
+use Illuminate\Validation\Rule;
 
 class CompanyClientController extends Controller
 {
@@ -16,7 +18,8 @@ class CompanyClientController extends Controller
 
         $company = auth()->user()->company;
 
-        return view('company.profile', compact('company'));
+        $countries = Country::query()->where('is_active', true)->orderBy('name')->get();
+        return view('company.profile', compact('company', 'countries'));
     }
 
     public function edit()
@@ -25,7 +28,8 @@ class CompanyClientController extends Controller
 
         $company = auth()->user()->company;
 
-        return view('company.profile', compact('company'));
+        $countries = Country::query()->where('is_active', true)->orderBy('name')->get();
+        return view('company.profile', compact('company', 'countries'));
     }
 
     public function update(Request $request)
@@ -45,6 +49,8 @@ class CompanyClientController extends Controller
 
         'email' =>
             'nullable|email',
+
+        'country_id' => ['required', Rule::exists('countries', 'id')->where(fn ($query) => $query->where('is_active', true))],
 
         /**
          * 🔥 ONLY JPG PNG
@@ -71,7 +77,7 @@ class CompanyClientController extends Controller
      * 🔥 CREATE FOLDER
      */
 
-    if (!file_exists($folder))
+    if (($request->hasFile('logo') || $request->hasFile('signature')) && !file_exists($folder))
     {
         mkdir(
             $folder,
@@ -105,7 +111,10 @@ class CompanyClientController extends Controller
             $request->website,
 
         'country' =>
-            $request->country,
+            $company->country,
+
+        'country_id' =>
+            $request->integer('country_id'),
 
         'language' =>
             $request->language,

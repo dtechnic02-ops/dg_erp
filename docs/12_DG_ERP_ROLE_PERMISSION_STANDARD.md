@@ -7,6 +7,249 @@ Applies To: Authentication, Authorization, Platform, Company, Staff, Subscriptio
 Reference: docs/01_DG_ERP_MASTER_DEVELOPMENT_STANDARD.md
 ==========================================================
 
+==========================================================
+BUSINESS OWNER AMENDMENT — JOB ROLE CHANGE PERMISSION RESET
+Version: 4.3 Authority Freeze
+Status: FINAL — BUSINESS OWNER APPROVED
+Effective: 2026-08-09
+==========================================================
+
+This amendment freezes Job Role change as a security-sensitive Company Staff
+event. Where wording elsewhere in this document conflicts with this amendment,
+this amendment controls.
+
+THREE DISTINCT SECURITY CONCEPTS
+
+A. Job Role
+
+Job Role is the staff member's organizational role, visibility profile, and
+assignable-permission catalog boundary. Job Role grants zero backend business
+authority.
+
+B. Explicit User Permissions
+
+Company Staff backend authority exists only through explicitly assigned
+`scope=company` Module and Action permissions.
+
+C. Job Role Change
+
+An actual Company Staff Job Role change is a confirmed security event that
+resets the target staff member's old explicit company permission assignments.
+
+CONFIRMED JOB ROLE CHANGE RULE
+
+When an authorized Company Admin or Sub Admin changes a Company Staff member's
+Job Role, including a staff member designated as Sub Admin, the system must:
+
+1. warn that the target staff member's existing explicit company permissions
+   will be reset;
+2. require explicit confirmation;
+3. atomically update the Job Role and remove only that target staff member's
+   explicit `scope=company` user permission assignments;
+4. grant no permissions automatically for the new Job Role; and
+5. direct the authorized user to explicitly assign the new Job Role's required
+   Module and Action permissions through its filtered assignment catalog.
+
+NO-CHANGE AND CANCEL RULES
+
+If the submitted Job Role equals the stored Job Role, saving name, email,
+phone, or any other staff information must not reset permissions.
+
+If confirmation is cancelled or absent for an actual Job Role change, neither
+the Job Role nor existing permissions may change.
+
+ATOMICITY
+
+The confirmed Job Role update and explicit company-permission reset must occur
+in one database transaction. Either both succeed or neither occurs. A changed
+Job Role with surviving old permissions is forbidden.
+
+BOUNDARIES
+
+- Reset only the target Company Staff member's explicit `scope=company`
+  assignments.
+- Do not delete Permission master/catalog records.
+- Do not affect another staff member.
+- Do not affect Company Admin implicit own-company authority.
+- Do not affect Super Admin or Super Staff platform permissions.
+- Do not auto-assign permissions for the new Job Role.
+
+==========================================================
+END BUSINESS OWNER AMENDMENT — VERSION 4.3
+==========================================================
+
+==========================================================
+BUSINESS OWNER AMENDMENT — JOB ROLE ASSIGNMENT-CATALOG FILTER
+Version: 4.2 Authority Freeze
+Status: FINAL — BUSINESS OWNER APPROVED
+Effective: 2026-08-09
+==========================================================
+
+This amendment freezes the distinction between Job Role visibility, the
+assignable-permission catalog, and backend authorization. Where wording
+elsewhere in this document conflicts with this amendment, this amendment
+controls.
+
+JOB ROLE BACKEND AUTHORITY — NONE
+
+Job Role grants zero backend business authority. It does not auto-assign a
+permission, auto-allow an action, replace a permission check, or bypass Module
+and Action permission enforcement.
+
+JOB ROLE ASSIGNMENT-CATALOG FILTER
+
+For Company Staff permission management, Job Role may restrict which
+`scope=company` permissions Company Admin or an explicitly authorized Sub
+Admin may assign to the staff member. This is an assignment-catalog boundary
+only. It is not authorization.
+
+The assignable catalog shall contain only the company Module and Action
+permissions belonging to the staff member's approved Job Role operational
+domains. Both the Module Permission and Action Permission must still be
+explicitly assigned before backend authority exists.
+
+Receiver operational domains are frozen as:
+
+- Purchase;
+- Suppliers;
+- Inventory.
+
+CRM, Income, HR, Payroll, Journal, and other unrelated domains are not newly
+assignable to Receiver unless the Business Owner changes the Receiver Job Role
+definition.
+
+LEGACY OUT-OF-ROLE ASSIGNMENTS
+
+Introducing or changing a Job Role catalog filter must never silently delete,
+revoke, deny, or rewrite an existing explicit user permission outside the new
+filter. Such assignments must remain visible for review and may be changed only
+through an explicit authorized cleanup decision.
+
+AUTHORIZATION REMAINS PERMISSION-BASED
+
+Company Staff and Sub Admin backend authority continues to require an
+explicitly assigned `scope=company` Module Permission and corresponding Action
+Permission. Company Admin retains automatic full own-company authority through
+the Company-Scope Permission Policy. Platform/company scope separation and all
+owner-reserved boundaries remain unchanged.
+
+==========================================================
+END BUSINESS OWNER AMENDMENT — VERSION 4.2
+==========================================================
+
+==========================================================
+BUSINESS OWNER AMENDMENT — COMPANY ADMIN / SUB ADMIN AUTHORITY
+Version: 4.1 Authority Freeze
+Status: FINAL — BUSINESS OWNER APPROVED
+Effective: 2026-08-09
+==========================================================
+
+This amendment resolves ambiguity in Version 4.0. It does not create a new
+System Role or a new authorization architecture. Where wording elsewhere in
+this document conflicts with this amendment, this amendment controls.
+
+SYSTEM ROLE FREEZE
+
+DG ERP continues to have exactly four System Roles:
+
+1. Super Admin
+2. Company Admin
+3. Company Staff
+4. Super Staff
+
+Company Sub Admin is not a System Role. System Role identifies the security
+domain, user category, and dashboard-routing category. `role_id` must never be
+used as a general business-action authorization shortcut.
+
+COMPANY ADMIN — FULL OWN-COMPANY AUTHORITY
+
+Company Admin is the primary owner-side administrator of its own company.
+Company Admin automatically has full company-scope operational authority.
+This authority is non-removable while the user remains Company Admin, applies
+strictly inside that user's own company, and never grants platform authority.
+
+Company Admin does not require individual `permission_user` rows for every
+company action. Full authority must be resolved through the approved
+Company-Scope Permission Policy, never through a direct
+`role_id == COMPANY_ADMIN` allow-all shortcut.
+
+The Company-Scope Permission Policy must satisfy the normal authorization
+contract for the requested operation:
+
+- permission scope is `company`;
+- the applicable company Module Permission is allowed;
+- the applicable company Action Permission is allowed;
+- the company context is the Company Admin's own company.
+
+The policy must not resolve or grant any platform-scope permission.
+
+COMPANY SUB ADMIN — IDENTITY AND AUTHORITY
+
+Company Sub Admin is:
+
+- System Role: Company Staff;
+- Job Role: Sub Admin;
+- business authority: individually assigned `scope=company` Module and Action
+  permissions.
+
+The Sub Admin Job Role grants zero backend business authority. It controls only
+the visibility and organizational behavior approved by the Job Role and Menu
+Visibility Standard.
+
+Company Admin may assign a Sub Admin broad operational company permissions,
+including normal operations, products/services, customers/suppliers,
+sales/purchase, inventory, financial modules, reports, staff creation and
+editing, approved staff activation/deactivation, Job Role management, and
+Company Staff permission assignment/revocation. Every such power requires both
+the corresponding company Module Permission and company Action Permission.
+
+The general rule that ordinary Company Staff cannot access User Management does
+not prohibit an explicitly authorized Sub Admin from performing approved staff
+management. This is a permission-based Sub Admin exception. It is not granted
+by System Role, Job Role name, or menu visibility.
+
+OWNER-RESERVED AND PLATFORM-RESERVED BOUNDARY
+
+The following authority is not grantable to Sub Admin or ordinary Company
+Staff:
+
+- Company Profile ownership-level administration;
+- Company Reset;
+- Database Reset;
+- Dangerous Maintenance Tools;
+- System Maintenance;
+- Cache Clear;
+- Queue Restart;
+- Log Management;
+- Maintenance Mode;
+- System Utilities;
+- Company Delete or tenant-destructive deletion;
+- platform company approval;
+- platform company blocking;
+- platform company deletion;
+- any other action explicitly classified by this Constitution as Company
+  Admin owner-only or Platform-only.
+
+Broad assigned permissions never override this reserved boundary.
+
+ORDINARY COMPANY STAFF
+
+Ordinary Company Staff receive backend business authority only through
+individually assigned `scope=company` Module and Action permissions. Both
+levels are mandatory. Job Role grants no backend authority.
+
+SECURITY BOUNDARY FREEZE
+
+Company Admin full authority, Sub Admin assigned authority, and ordinary
+Company Staff assigned authority are restricted to the user's own company. No
+company user may receive platform-scope authority or use these rules to access
+another company's data. Platform and Company permission scopes remain strictly
+separated.
+
+==========================================================
+END BUSINESS OWNER AMENDMENT — VERSION 4.1
+==========================================================
+
 PURPOSE
 
 This document freezes the official DG ERP Role and Permission

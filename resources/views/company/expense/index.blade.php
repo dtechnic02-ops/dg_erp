@@ -6,10 +6,10 @@
 
 @php
     $user = auth()->user();
-    $canCreate = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('create_expense'));
-    $canEdit = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('edit_expense'));
-    $canPrint = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('print_expense'));
-    $canManageCategories = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('manage_expense_categories'));
+    $canCreate = $user?->hasPermission('create_expense') ?? false;
+    $canEdit = $user?->hasPermission('edit_expense') ?? false;
+    $canPrint = $user?->hasPermission('print_expense') ?? false;
+    $canManageCategories = $user?->hasPermission('manage_expense_categories') ?? false;
 @endphp
 
 <div class="dg-page">
@@ -207,7 +207,7 @@
                                             <td>{{ $expense->category->name ?? '-' }}</td>
                                             <td>{{ $expense->account->account_name ?? '-' }}</td>
                                             <td>{{ number_format($expense->amount, 2) }}</td>
-                                            <td>{{ $expense->expense_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $expense->expense_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $expense->expense_date])</td>
                                             <td>
                                                 @if ($expense->isActive())
                                                     <span class="badge bg-success">Active</span>

@@ -101,7 +101,7 @@
                                 <div class="col-md-6">
                                     <div class="dg-row">
                                         <span class="dg-label d-inline mb-0">Loan Date :</span>
-                                        {{ optional($loan->start_date)->format('d-m-Y') ?: '-' }}
+                                        {{ optional($loan->start_date)->format('d-m-Y') ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $loan->start_date])
                                     </div>
                                 </div>
 

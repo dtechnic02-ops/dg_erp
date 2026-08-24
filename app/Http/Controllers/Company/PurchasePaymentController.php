@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use App\Models\Account;
 use App\Models\AccountTransaction;
 use App\Models\FinancialYear;
@@ -25,6 +26,7 @@ use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 class PurchasePaymentController extends Controller
 {
     use HandlesTransactionDocumentationEdit;
+    use AuthorizesCompanyPermission;
 
     public function __construct(
         private readonly PurchasePaymentAccountingIntegrationService $purchasePaymentAccountingIntegrationService
@@ -33,6 +35,8 @@ class PurchasePaymentController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorizeCompanyPermission('view_purchase');
+
         $companyId = auth()->user()->company_id;
 
         $query = PurchasePayment::with([
@@ -108,7 +112,7 @@ class PurchasePaymentController extends Controller
         $totalCount   = (clone $query)->count();
 
         $payments = $query
-            ->latest()
+            ->orderByDesc('payment_date')->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 
@@ -141,6 +145,8 @@ class PurchasePaymentController extends Controller
 
     public function create($id)
     {
+        $this->authorizeCompanyPermission('create_purchase');
+
         $companyId = auth()->user()->company_id;
 
         $invoice = DB::transaction(function () use ($companyId, $id) {
@@ -197,6 +203,8 @@ class PurchasePaymentController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeCompanyPermission('create_purchase');
+
         $companyId = auth()->user()->company_id;
 
         $request->validate([
@@ -369,6 +377,8 @@ class PurchasePaymentController extends Controller
 
     public function cancel(Request $request, $id)
     {
+        $this->authorizeCompanyPermission('cancel_purchase');
+
         $companyId = auth()->user()->company_id;
 
         $request->validate([
@@ -483,6 +493,8 @@ class PurchasePaymentController extends Controller
 
     public function show($id)
     {
+        $this->authorizeCompanyPermission('view_purchase');
+
         $payment = PurchasePayment::with([
                 'invoice',
                 'supplier',
@@ -501,6 +513,8 @@ class PurchasePaymentController extends Controller
 
     public function printList(Request $request)
     {
+        $this->authorizeCompanyPermission('print_purchase');
+
         $companyId = auth()->user()->company_id;
 
         $query = PurchasePayment::with([
@@ -574,7 +588,7 @@ class PurchasePaymentController extends Controller
         $cancelledCount = (clone $query)->where('status', 0)->count();
 
         $payments = $query
-            ->latest()
+            ->orderByDesc('payment_date')->orderByDesc('id')
             ->get();
 
         $suppliers = Supplier::where('company_id', $companyId)
@@ -607,6 +621,8 @@ class PurchasePaymentController extends Controller
 
     public function print($id)
     {
+        $this->authorizeCompanyPermission('print_purchase');
+
         $payment = PurchasePayment::with([
                 'invoice',
                 'supplier',
@@ -625,6 +641,8 @@ class PurchasePaymentController extends Controller
 
     public function edit($id)
     {
+        $this->authorizeCompanyPermission('edit_purchase');
+
         $companyId = auth()->user()->company_id;
 
         $payment = PurchasePayment::with([
@@ -650,6 +668,8 @@ class PurchasePaymentController extends Controller
 
     public function update(Request $request, $id)
     {
+        $this->authorizeCompanyPermission('edit_purchase');
+
         $companyId = auth()->user()->company_id;
 
         $request->validate(

@@ -63,6 +63,7 @@
                                     <label class="form-label" for="payment_date">Payment Date</label>
                                     <input type="date" id="payment_date" class="form-control dg-input" value="{{ $payment->payment_date?->format('Y-m-d') }}" readonly>
                                 </div>
+                                @include('company.components.nepali-date-field', ['adInputId' => 'payment_date', 'adDate' => $payment->payment_date])
                                 <div class="col-md-3">
                                     <label class="form-label" for="status">Status</label>
                                     <input type="text" id="status" class="form-control dg-input" value="{{ $payment->isActive() ? 'Active' : 'Cancelled' }}" readonly>

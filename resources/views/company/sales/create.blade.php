@@ -95,6 +95,8 @@
                                     <input type="date" name="sale_date" id="sale_date" class="form-control dg-input" value="{{ old('sale_date', date('Y-m-d')) }}" required>
                                 </div>
 
+                                @include('company.components.nepali-date-field')
+
                                 <div class="col-md-3">
                                     <label for="customer_id" class="form-label">Customer</label>
                                     <select name="customer_id" id="customer_id" class="form-select dg-select" required>

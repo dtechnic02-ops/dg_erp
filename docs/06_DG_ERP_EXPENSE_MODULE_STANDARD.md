@@ -13,7 +13,7 @@
 
 | Priority | Document | Role |
 |----------|----------|------|
-| 1 | `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD.md` | Financial Year, Business Date, Cancelled Record Rule |
+| 1 | `03_DG_ERP_FINANCIAL_YEAR_AND_DATE_STANDARD_v1.1.md` | Financial Year, Business Date, Cancelled Record Rule |
 | 2 | `04_DG_ERP_MASTER_BUSINESS_STANDARD.md` | Master principles, cancel philosophy |
 | 3 | `01_DG_ERP_MASTER_UI_FRAMEWORK_STANDARD.md` | UI framework, print framework |
 | 4 | `05_DG_ERP_INCOME_MODULE_STANDARD.md` | Mirror architecture reference |

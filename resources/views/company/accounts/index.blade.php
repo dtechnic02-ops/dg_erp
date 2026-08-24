@@ -135,7 +135,11 @@
                     </div>
 
                     <div class="modal-body">
-                        @include('company.accounts.form', ['account' => $account])
+                        @include('company.accounts.form', [
+                            'account' => $account,
+                            'formPrefix' => 'edit-' . $account->id,
+                            'formMode' => 'edit',
+                        ])
                     </div>
 
                     <div class="modal-footer">
@@ -151,8 +155,9 @@
 <div class="modal fade" id="accountModal" tabindex="-1" aria-labelledby="addAccountLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <form method="POST" enctype="multipart/form-data" action="{{ route('company.accounts.store') }}">
+            <form method="POST" enctype="multipart/form-data" action="{{ route('company.accounts.store') }}" id="addAccountForm">
                 @csrf
+                <input type="hidden" name="_account_form" value="create">
 
                 <div class="modal-header">
                     <h5 class="modal-title" id="addAccountLabel">Add Account</h5>
@@ -160,7 +165,10 @@
                 </div>
 
                 <div class="modal-body">
-                    @include('company.accounts.form')
+                    @include('company.accounts.form', [
+                        'formPrefix' => 'add',
+                        'formMode' => 'create',
+                    ])
                 </div>
 
                 <div class="modal-footer">
@@ -170,5 +178,73 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const addModal = document.getElementById('accountModal');
+    const addForm = document.getElementById('addAccountForm');
+
+    if (!addModal || !addForm) {
+        return;
+    }
+
+    addModal.addEventListener('show.bs.modal', function () {
+        if (addForm.dataset.preserveAfterValidation === '1') {
+            addForm.dataset.preserveAfterValidation = '0';
+            return;
+        }
+
+        addForm.reset();
+
+        const currency = addForm.querySelector('#add_currency');
+        if (currency) {
+            currency.value = 'AED';
+        }
+
+        const status = addForm.querySelector('#add_status');
+        if (status) {
+            status.value = 'active';
+        }
+
+        const balance = addForm.querySelector('#add_current_balance');
+        if (balance) {
+            balance.value = '0';
+        }
+
+        const hiddenMarker = addForm.querySelector('input[name="_account_form"]');
+        if (hiddenMarker) {
+            hiddenMarker.value = 'create';
+        }
+
+        const preview = addForm.querySelector('.account-image-preview');
+        if (preview) {
+            preview.innerHTML = '';
+        }
+
+        const fileInput = addForm.querySelector('.account-image-input');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+    });
+});
+</script>
+@if ($errors->any() && old('_account_form') === 'create')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const addForm = document.getElementById('addAccountForm');
+    const addModal = document.getElementById('accountModal');
+
+    if (addForm) {
+        addForm.dataset.preserveAfterValidation = '1';
+    }
+
+    if (addModal && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(addModal).show();
+    }
+});
+</script>
+@endif
+@endpush
 
 @endsection

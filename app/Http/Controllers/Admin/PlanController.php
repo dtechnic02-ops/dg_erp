@@ -12,7 +12,7 @@ class PlanController extends Controller
     // 🔥 LIST
     public function index()
     {
-        abort_unless(auth()->check() && (int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_plans_manage'), 403);
 
         $plans = Plan::latest()->get();
         return view('admin.plans', compact('plans'));
@@ -21,7 +21,7 @@ class PlanController extends Controller
     // 🔥 STORE
     public function store(Request $request)
 {
-    abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+    abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_plans_manage'), 403);
 
     $request->validate([
         'name' => 'required|string|max:100',
@@ -53,7 +53,7 @@ class PlanController extends Controller
     // 🔥 EDIT
     public function edit($id)
     {
-        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_plans_manage'), 403);
 
         $plan = Plan::findOrFail($id);
         return view('admin.plan_edit', compact('plan'));
@@ -62,7 +62,7 @@ class PlanController extends Controller
     // 🔥 UPDATE
     public function update(Request $request, $id)
 {
-    abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+    abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_plans_manage'), 403);
 
     $request->validate([
         'name' => 'required|string|max:100',
@@ -97,7 +97,7 @@ class PlanController extends Controller
     // 🔥 DELETE
     public function delete($id)
     {
-        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_plans_manage'), 403);
 
         Plan::findOrFail($id)->delete();
 

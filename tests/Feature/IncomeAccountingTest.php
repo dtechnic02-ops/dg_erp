@@ -41,12 +41,11 @@ class IncomeAccountingTest extends TestCase
         Schema::create('income_categories', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('chart_account_id')->nullable();
             $table->string('name');
             $table->integer('status')->default(1);
             $table->timestamps();
         });
-
-        (require base_path('database/migrations/2026_07_28_000203_add_chart_account_id_to_income_categories_table.php'))->up();
 
         Schema::create('accounts', function (Blueprint $table): void {
             $table->id();

@@ -22,6 +22,7 @@ class PurchaseAccountingDataBuilder
 
         $companyId = $this->positiveInteger($purchase->company_id, 'company_id');
         $purchaseId = $this->positiveInteger($purchase->id, 'purchase_id');
+        $financialYearId = $this->positiveInteger($purchase->financial_year_id, 'financial_year_id');
         $purchaseDate = $this->date($purchase->purchase_date, 'purchase_date');
         $purchaseNumber = $this->requiredString($purchase->invoice_no, 'invoice_no');
         $supplierId = $this->nullablePositiveInteger($purchase->supplier_id, 'supplier_id');
@@ -80,6 +81,7 @@ class PurchaseAccountingDataBuilder
 
         return [
             'company_id' => $companyId,
+            'financial_year_id' => $financialYearId,
             'purchase_id' => $purchaseId,
             'purchase_date' => $purchaseDate,
             'purchase_number' => $purchaseNumber,

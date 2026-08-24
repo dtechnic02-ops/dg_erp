@@ -3,13 +3,18 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use App\Models\Vat;
 use Illuminate\Http\Request;
 
 class VatController extends Controller
 {
+    use AuthorizesCompanyPermission;
+
     public function index()
     {
+        $this->authorizeCompanyPermission('view_vat');
+
         $vats = Vat::where('company_id', auth()->user()->company_id)
             ->latest()
             ->get();
@@ -19,6 +24,8 @@ class VatController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeCompanyPermission('create_vat');
+
         $request->validate([
             'name' => 'required|string|max:255',
             'rate' => 'required|numeric|min:0',
@@ -38,6 +45,8 @@ class VatController extends Controller
 
     public function update(Request $request, $id)
     {
+        $this->authorizeCompanyPermission('edit_vat');
+
         $vat = Vat::where('company_id', auth()->user()->company_id)
             ->findOrFail($id);
 
@@ -59,6 +68,8 @@ class VatController extends Controller
 
     public function destroy($id)
     {
+        $this->authorizeCompanyPermission('delete_vat');
+
         $vat = Vat::where('company_id', auth()->user()->company_id)
             ->findOrFail($id);
 

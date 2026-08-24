@@ -59,49 +59,15 @@ class User extends Authenticatable
 }
 
     // 🔐 Permission check
-    public function hasPermission(string $permission): bool
+    public function hasPermission(string $permission, ?int $companyId = null): bool
 {
-    if (!auth()->check()) {
-        return false;
+    $scope = Permission::query()->where('name', $permission)->value('scope');
+    if ($scope === Permission::SCOPE_PLATFORM) {
+        return app(\App\Services\PlatformAuthorizationService::class)->can($this, $permission);
     }
-
-    // Super Admin
-    if ((int) $this->role_id === Role::SUPER_ADMIN_ID) {
-        return true;
+    if ($scope === Permission::SCOPE_COMPANY) {
+        return app(\App\Services\CompanyAuthorizationService::class)->can($this, $permission, $companyId ?? $this->company_id);
     }
-    if ((int) $this->role_id === Role::COMPANY_ADMIN_ID) {
-    return true;
-}
-
-    // Super Staff receives only explicitly assigned platform permissions.
-    if ((int) $this->role_id === Role::SUPER_STAFF_ID) {
-        return $this->permissions()
-            ->where('permissions.name', $permission)
-            ->where('permissions.scope', Permission::SCOPE_PLATFORM)
-            ->wherePivot('is_allowed', true)
-            ->exists();
-    }
-
-    // Individual User Permission
-    if (
-        $this->permissions()
-            ->where('permissions.name', $permission)
-            ->wherePivot('is_allowed', true)
-            ->exists()
-    ) {
-        return true;
-    }
-
-    // Role Permission
-    if (
-        $this->role &&
-        $this->role->permissions()
-            ->where('name', $permission)
-            ->exists()
-    ) {
-        return true;
-    }
-
     return false;
 }
 

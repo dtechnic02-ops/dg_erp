@@ -112,7 +112,7 @@ class SalesReturnRefundController extends Controller
         $totalCash = (clone $totalsQuery)->sum('cash_amount');
 
         $refunds = $query
-            ->latest()
+            ->orderByDesc('refund_date')->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 

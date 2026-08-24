@@ -42,6 +42,7 @@
 
             <form method="POST" action="{{ route('company.purchase-return.store') }}" enctype="multipart/form-data" id="dgPurchaseReturnForm">
                 @csrf
+                <input type="hidden" name="request_key" value="{{ $requestKey }}">
 
                 <input type="hidden" name="purchase_invoice_id" value="{{ $invoice->id }}">
                 <input type="hidden" name="supplier_id" value="{{ $invoice->supplier_id }}">
@@ -63,6 +64,7 @@
                                             <label for="return_date" class="form-label">Return Date</label>
                                             <input type="date" name="return_date" id="return_date" class="form-control dg-input" value="{{ date('Y-m-d') }}">
                                         </div>
+                                        @include('company.components.nepali-date-field', ['adInputId' => 'return_date', 'adDate' => old('return_date', date('Y-m-d'))])
                                         <div class="col-md-6">
                                             <label for="invoice_display" class="form-label">Invoice No</label>
                                             <input type="text" id="invoice_display" class="form-control dg-input" value="{{ $invoice->invoice_no }}" readonly>

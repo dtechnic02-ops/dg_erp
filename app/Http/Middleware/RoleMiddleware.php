@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Role;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -16,30 +17,10 @@ return redirect('/login');
 
 }
 
-$userRole=(int)auth()->user()->role_id;
-
-$allowedRoles=[];
-
-foreach($roles as $role){
-
-$allowedRoles=array_merge(
-$allowedRoles,
-explode('|',$role)
-);
-
-}
-
-$allowedRoles=
-array_map(
-'intval',
-$allowedRoles
-);
-
-if(!in_array($userRole,$allowedRoles)){
-
-abort(403);
-
-}
+$user = auth()->user();
+$platform = $user->company_id === null && in_array((int) $user->role_id, [Role::SUPER_ADMIN_ID, Role::SUPER_STAFF_ID], true);
+$company = $user->company_id !== null && in_array((int) $user->role_id, [Role::COMPANY_ADMIN_ID, Role::COMPANY_STAFF_ID], true);
+abort_unless($platform || $company, 403);
 
 return $next($request);
 

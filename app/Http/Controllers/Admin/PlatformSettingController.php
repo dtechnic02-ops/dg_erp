@@ -79,6 +79,6 @@ class PlatformSettingController extends Controller
 
     private function authorizeSuperAdmin(): void
     {
-        abort_unless((int) auth()->user()?->role_id === Role::SUPER_ADMIN_ID, 403);
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_settings_manage'), 403);
     }
 }

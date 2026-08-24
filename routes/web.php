@@ -40,6 +40,8 @@ use App\Http\Controllers\Company\CashAccountController;
 use App\Http\Controllers\Company\PurchaseController;
 use App\Http\Controllers\Company\VatController;
 use App\Http\Controllers\Company\SalesController;
+use App\Http\Controllers\Company\QuotationController;
+use App\Http\Controllers\Company\NepaliDateController;
 use App\Http\Controllers\Company\DeliveryNoteController;
 use App\Http\Controllers\Company\CrmDashboardController;
 use App\Http\Controllers\Company\CrmLeadController;
@@ -79,6 +81,7 @@ use App\Http\Controllers\Company\EmployeePaymentController;
 use App\Http\Controllers\Company\EmployeeLedgerController;
 use App\Http\Controllers\Company\PayrollRegisterController;
 use App\Http\Controllers\Company\AccountTransactionController;
+use App\Http\Controllers\Company\AccountingReportController;
 use App\Http\Controllers\Company\SupplierLedgerController;
 use App\Http\Controllers\Company\MaintenanceController;
 use App\Http\Controllers\Company\SupplierStatementController;
@@ -144,15 +147,21 @@ Route::post('/logout', function (Request $request) {
 
 //SUPER ADMIN ROUTES
 
-Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_STAFF_ID])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function () {
+
+    Route::middleware('platform.permission:platform_settings_manage')->prefix('countries')->name('admin.countries.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\CountryController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Admin\CountryController::class, 'store'])->name('store');
+        Route::put('/{country}', [\App\Http\Controllers\Admin\CountryController::class, 'update'])->name('update');
+    });
 
     Route::get('/dashboard', [DashboardController::class, 'index'])
-        ->middleware('role:' . Role::SUPER_ADMIN_ID)
+        ->middleware('platform.permission:platform_dashboard_view')
         ->name('admin.dashboard');
 
     Route::view('/no-access', 'admin.no_access')->name('admin.no-access');
 
-    Route::middleware('role:' . Role::SUPER_ADMIN_ID)->prefix('platform-settings')->name('admin.platform-settings.')->group(function () {
+    Route::middleware('platform.permission:platform_settings_manage')->prefix('platform-settings')->name('admin.platform-settings.')->group(function () {
         Route::get('/', [PlatformSettingController::class, 'index'])->name('index');
         Route::put('/general', [PlatformSettingController::class, 'updateGeneral'])->name('general.update');
         Route::put('/branding', [PlatformSettingController::class, 'updateBranding'])->name('branding.update');
@@ -167,15 +176,15 @@ Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_ST
 
     Route::post('/company/block/{id}', [CompanyController::class, 'block'])->name('admin.company.block');
     Route::post('/company/unblock/{id}', [CompanyController::class, 'unblock'])->name('admin.company.unblock');
-    Route::post('/company/delete/{id}', [CompanyController::class, 'delete'])->middleware('permission:delete_company')->name('admin.company.delete');
+    Route::post('/company/delete/{id}', [CompanyController::class, 'delete'])->middleware('platform.permission:platform_companies_delete')->name('admin.company.delete');
 
-    Route::post('/company/limit/{id}', [CompanyController::class, 'updateLimit'])->middleware('permission:edit_company')->name('admin.company.limit');
-    Route::post('/company/customer-limit/{id}', [CompanyController::class, 'updateCustomerLimit'])->middleware('permission:edit_company')->name('admin.company.customer.limit');
-    Route::post('/company/reset/{company}', [CompanyController::class, 'requestPasswordReset'])->middleware('permission:reset_company_password')->name('admin.company.reset');
-    Route::get('/company/{company}/reset/verify', [CompanyController::class, 'showPasswordResetVerification'])->middleware('permission:reset_company_password')->name('admin.company.reset.verify.form');
-    Route::post('/company/{company}/reset/verify', [CompanyController::class, 'verifyPasswordResetOtp'])->middleware('permission:reset_company_password')->name('admin.company.reset.verify');
-    Route::get('/company/{company}/reset/password', [CompanyController::class, 'showPasswordResetForm'])->middleware('permission:reset_company_password')->name('admin.company.reset.password.form');
-    Route::post('/company/{company}/reset/password', [CompanyController::class, 'completePasswordReset'])->middleware('permission:reset_company_password')->name('admin.company.reset.password');
+    Route::post('/company/limit/{id}', [CompanyController::class, 'updateLimit'])->middleware('platform.permission:platform_companies_edit')->name('admin.company.limit');
+    Route::post('/company/customer-limit/{id}', [CompanyController::class, 'updateCustomerLimit'])->middleware('platform.permission:platform_companies_edit')->name('admin.company.customer.limit');
+    Route::post('/company/reset/{company}', [CompanyController::class, 'requestPasswordReset'])->middleware('platform.permission:platform_companies_reset_password')->name('admin.company.reset');
+    Route::get('/company/{company}/reset/verify', [CompanyController::class, 'showPasswordResetVerification'])->middleware('platform.permission:platform_companies_reset_password')->name('admin.company.reset.verify.form');
+    Route::post('/company/{company}/reset/verify', [CompanyController::class, 'verifyPasswordResetOtp'])->middleware('platform.permission:platform_companies_reset_password')->name('admin.company.reset.verify');
+    Route::get('/company/{company}/reset/password', [CompanyController::class, 'showPasswordResetForm'])->middleware('platform.permission:platform_companies_reset_password')->name('admin.company.reset.password.form');
+    Route::post('/company/{company}/reset/password', [CompanyController::class, 'completePasswordReset'])->middleware('platform.permission:platform_companies_reset_password')->name('admin.company.reset.password');
 
 
     // Subscription Module
@@ -227,7 +236,7 @@ Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_ST
     
         //Payments legacy removed — use subscription-payments routes
 
-    Route::middleware('role:' . Role::SUPER_ADMIN_ID)
+    Route::middleware('platform.permission:platform_super_staff_manage')
         ->prefix('super-staff')
         ->name('admin.super-staff.')
         ->controller(\App\Http\Controllers\Admin\SuperStaffController::class)
@@ -260,6 +269,29 @@ Route::middleware(['auth', 'role:' . Role::SUPER_ADMIN_ID . ',' . Role::SUPER_ST
 
 
 Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::class,'subscription'])->prefix('company')->name('company.')->group(function () {
+
+    Route::get('/calendar/ad-to-bs', NepaliDateController::class)->name('calendar.ad-to-bs');
+
+    Route::prefix('quotations')->name('quotations.')->group(function () {
+        Route::get('/', [QuotationController::class, 'index'])->middleware('permission:view_quotation')->name('index');
+        Route::get('/create', [QuotationController::class, 'create'])->middleware('permission:create_quotation')->name('create');
+        Route::post('/', [QuotationController::class, 'store'])->middleware('permission:create_quotation')->name('store');
+        Route::get('/{quotation}', [QuotationController::class, 'show'])->middleware('permission:view_quotation')->name('show');
+        Route::get('/{quotation}/edit', [QuotationController::class, 'edit'])->middleware('permission:edit_quotation')->name('edit');
+        Route::put('/{quotation}', [QuotationController::class, 'update'])->middleware('permission:edit_quotation')->name('update');
+        Route::delete('/{quotation}', [QuotationController::class, 'destroy'])->middleware('permission:delete_quotation')->name('destroy');
+        Route::post('/{quotation}/approve', [QuotationController::class, 'approve'])->middleware('permission:approve_quotation')->name('approve');
+        Route::post('/{quotation}/convert', [QuotationController::class, 'convert'])->middleware('permission:generate_quotation_invoice')->name('convert');
+        Route::get('/{quotation}/print', [QuotationController::class, 'print'])->middleware('permission:print_quotation')->name('print');
+    });
+
+    Route::prefix('accounting-reports')->name('accounting-reports.')->middleware('permission:view_reports')->group(function () {
+        Route::get('/general-ledger', [AccountingReportController::class, 'generalLedger'])->name('general-ledger');
+        Route::get('/trial-balance', [AccountingReportController::class, 'trialBalance'])->name('trial-balance');
+        Route::get('/profit-loss', [AccountingReportController::class, 'profitLoss'])->name('profit-loss');
+        Route::get('/balance-sheet', [AccountingReportController::class, 'balanceSheet'])->name('balance-sheet');
+    });
+
     Route::prefix('opening-balances')->name('opening-balances.')->group(function () {
         Route::get('/', [OpeningBalanceController::class, 'index'])->middleware('permission:opening-balance.view')->name('index');
         Route::get('/create', [OpeningBalanceController::class, 'create'])->middleware('permission:opening-balance.create')->name('create');
@@ -289,7 +321,9 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
     Route::post('/profile/update',[\App\Http\Controllers\Company\CompanyClientController::class, 'update'])->middleware('permission:edit_company_profile')->name('profile.update');
 
     Route::get('/subscription', [\App\Http\Controllers\Company\SubscriptionController::class, 'index'])->name('subscription.index');
-    Route::post('/subscription/payment', [\App\Http\Controllers\Company\PaymentController::class, 'store'])->name('subscription.payment.store');
+    Route::post('/subscription/payment', [\App\Http\Controllers\Company\PaymentController::class, 'store'])
+        ->middleware('permission:manage_subscription_module')
+        ->name('subscription.payment.store');
     
   
     /*
@@ -349,15 +383,19 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
             ->name('edit');
 
         Route::put('/{user}', [UserPermissionController::class, 'update'])
+            ->middleware('permission:manage_users')
             ->name('update');
 
         Route::post('/{user}/assign/{permission}', [UserPermissionController::class, 'assign'])
+            ->middleware('permission:manage_users')
             ->name('assign');
 
         Route::post('/{user}/deny/{permission}', [UserPermissionController::class, 'deny'])
+            ->middleware('permission:manage_users')
             ->name('deny');
 
         Route::delete('/{user}/revoke/{permission}', [UserPermissionController::class, 'revoke'])
+            ->middleware('permission:manage_users')
             ->name('revoke');
 
     });
@@ -383,6 +421,7 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
     
     */
     Route::prefix('maintenance')
+    ->middleware('permission:system_maintenance')
     ->name('maintenance.')
     ->group(function () {
 
@@ -835,7 +874,7 @@ Route::prefix('vat-reports')
         Route::post(
             '/store',
             [SalesController::class, 'store']
-        )->name('store');
+        )->middleware('permission:create_sales')->name('store');
 
         Route::get(
             '/show/{id}',
@@ -850,7 +889,7 @@ Route::prefix('vat-reports')
         Route::put(
             '/update/{id}',
             [SalesController::class, 'update']
-        )->name('update');
+        )->middleware('permission:edit_sales')->name('update');
 
         /**
          * PRINT ROUTE
@@ -869,7 +908,7 @@ Route::prefix('vat-reports')
         Route::post(
             '/cancel/{id}',
             [SalesController::class, 'cancel']
-        )->name('cancel');
+        )->middleware('permission:cancel_sales')->name('cancel');
 
     });
 
@@ -1031,7 +1070,7 @@ Route::prefix('vat-reports')
     Route::post(
         '/store',
         [SalesReturnController::class, 'store']
-    )->name('store');
+    )->middleware('permission:create_sales')->name('store');
 
     Route::get(
         '/show/{id}',
@@ -1046,7 +1085,7 @@ Route::prefix('vat-reports')
     Route::post(
         '/update/{id}',
         [SalesReturnController::class, 'update']
-    )->name('update');
+    )->middleware('permission:edit_sales')->name('update');
 
     Route::get(
         '/print/{id}',
@@ -1056,7 +1095,7 @@ Route::prefix('vat-reports')
     Route::post(
         '/cancel/{id}',
         [SalesReturnController::class, 'cancel']
-    )->name('cancel');
+    )->middleware('permission:cancel_sales')->name('cancel');
 
     
 
@@ -1160,7 +1199,7 @@ Route::prefix('vat-reports')
 
         Route::post('/store',
             [InvoicePaymentController::class, 'store']
-        )->name('store');
+        )->middleware('permission:create_sales_payment')->name('store');
 
     });
     /*
@@ -1215,7 +1254,7 @@ Route::prefix('purchase-payments')
 
                 Route::post('/store',
         [PurchaseReturnController::class, 'store']
-              )->name('store');
+              )->middleware('permission:create_purchase')->name('store');
 
                Route::get('/show/{id}',
         [PurchaseReturnController::class, 'show']
@@ -1227,7 +1266,7 @@ Route::prefix('purchase-payments')
 
                Route::post('/update/{id}',
         [PurchaseReturnController::class, 'update']
-        )->name('update');
+        )->middleware('permission:edit_purchase')->name('update');
 
         Route::get(
             '/print-list',
@@ -1242,7 +1281,7 @@ Route::prefix('purchase-payments')
 Route::post(
     '/cancel/{id}',
     [PurchaseReturnController::class, 'cancel']
-)->name('cancel');
+)->middleware('permission:cancel_purchase')->name('cancel');
 
 
     });
@@ -1266,7 +1305,7 @@ Route::post(
 
     Route::post('/store',
         [PurchaseReturnRefundController::class, 'store']
-    )->name('store');
+    )->middleware('permission:create_purchase')->name('store');
 
     Route::get('/show/{id}',
         [PurchaseReturnRefundController::class, 'show']
@@ -1278,7 +1317,7 @@ Route::post(
 
     Route::post('/update/{id}',
         [PurchaseReturnRefundController::class, 'update']
-    )->name('update');
+    )->middleware('permission:edit_purchase')->name('update');
 
         Route::get(
             '/print-list',
@@ -1293,7 +1332,7 @@ Route::post(
 Route::post(
     '/cancel/{id}',
     [PurchaseReturnRefundController::class,'cancel']
-)->name('cancel');
+)->middleware('permission:cancel_purchase')->name('cancel');
 
 });
 /*
@@ -1371,7 +1410,7 @@ Route::prefix('sales-return-refunds')
     Route::post(
         '/store',
         [SalesReturnRefundController::class, 'store']
-    )->name('store');
+    )->middleware('permission:create_sales_payment')->name('store');
 
     Route::get(
         '/show/{id}',
@@ -1386,7 +1425,7 @@ Route::prefix('sales-return-refunds')
     Route::post(
         '/update/{id}',
         [SalesReturnRefundController::class, 'update']
-    )->name('update');
+    )->middleware('permission:edit_sales_payment')->name('update');
 
     Route::get(
         '/print/{id}',
@@ -1396,7 +1435,7 @@ Route::prefix('sales-return-refunds')
     Route::post(
         '/cancel/{id}',
         [SalesReturnRefundController::class, 'cancel']
-    )->name('cancel');
+    )->middleware('permission:cancel_sales_payment')->name('cancel');
 
 });
 
@@ -1417,7 +1456,7 @@ Route::prefix('sales-payments')
     Route::post(
         '/store',
         [SalesPaymentController::class, 'store']
-    )->name('store');
+    )->middleware('permission:create_sales_payment')->name('store');
 
     Route::get(
         '/show/{id}',
@@ -1432,7 +1471,7 @@ Route::prefix('sales-payments')
     Route::post(
         '/update/{id}',
         [SalesPaymentController::class, 'update']
-    )->name('update');
+    )->middleware('permission:edit_sales_payment')->name('update');
 
     Route::get(
         '/print-list',
@@ -1447,7 +1486,7 @@ Route::prefix('sales-payments')
     Route::post(
         '/cancel/{id}',
         [SalesPaymentController::class, 'cancel']
-    )->name('cancel');
+    )->middleware('permission:cancel_sales_payment')->name('cancel');
 
 });
 
@@ -1623,6 +1662,14 @@ Route::prefix('income')
         Route::get('/show/{id}', 'show')->name('show');
         Route::get('/edit/{id}', 'edit')->name('edit');
         Route::put('/update/{id}', 'update')->name('update');
+        Route::post('/{id}/submit', 'submit')->name('submit');
+        Route::post('/{id}/approve', 'approve')->name('approve');
+        Route::post('/{id}/reject', 'reject')->name('reject');
+        Route::post('/{id}/post', 'post')->name('post');
+        Route::post('/{id}/cancel', 'cancelJournal')->name('cancel');
+        Route::post('/{id}/reverse', 'reverseJournal')->name('reverse');
+        Route::post('/{id}/lock', 'lockJournal')->name('lock');
+        Route::post('/{id}/unlock', 'unlockJournal')->name('unlock');
         Route::get('/audit/{id}', 'audit')->name('audit');
         Route::get('/print', 'print')->name('print');
         Route::get('/print/{id}', 'printVoucher')->name('print-voucher');
@@ -1651,7 +1698,7 @@ Route::prefix('income')
     Route::post(
         '/store',
         [ContraController::class,'store']
-    )->name('store');
+    )->middleware('permission:create_contra')->name('store');
 
     Route::get(
         '/show/{id}',
@@ -1666,12 +1713,12 @@ Route::prefix('income')
     Route::post(
         '/update/{id}',
         [ContraController::class,'update']
-    )->name('update');
+    )->middleware('permission:edit_contra')->name('update');
 
     Route::post(
         '/delete/{id}',
         [ContraController::class,'destroy'
-    ])->name('delete');
+    ])->middleware('permission:delete_contra')->name('delete');
 
     Route::get(
         '/print',

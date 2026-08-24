@@ -6,10 +6,10 @@
 
 @php
     $user = auth()->user();
-    $canCreate = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('create_income'));
-    $canEdit = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('edit_income'));
-    $canPrint = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('print_income'));
-    $canManageCategories = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('manage_income_categories'));
+    $canCreate = $user?->hasPermission('create_income') ?? false;
+    $canEdit = $user?->hasPermission('edit_income') ?? false;
+    $canPrint = $user?->hasPermission('print_income') ?? false;
+    $canManageCategories = $user?->hasPermission('manage_income_categories') ?? false;
 @endphp
 
 <div class="dg-page">
@@ -207,7 +207,7 @@
                                             <td>{{ $income->category->name ?? '-' }}</td>
                                             <td>{{ $income->account->account_name ?? '-' }}</td>
                                             <td>{{ number_format($income->amount, 2) }}</td>
-                                            <td>{{ $income->income_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $income->income_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $income->income_date])</td>
                                             <td>
                                                 @if ($income->isActive())
                                                     <span class="badge bg-success">Active</span>

@@ -108,6 +108,7 @@ class SalesReturnRefundAccountingDataBuilder
 
         return [
             'company_id' => $companyId,
+            'financial_year_id' => (int) $financialYear->id,
             'refund_id' => $refundId,
             'refund_date' => $date,
             'refund_number' => $this->text($refund->refund_no, 'refund_no'),

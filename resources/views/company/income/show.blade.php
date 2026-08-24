@@ -7,9 +7,9 @@
 @php
     $company = auth()->user()->company;
     $user = auth()->user();
-    $canEdit = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('edit_income'));
-    $canCancel = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('cancel_income'));
-    $canPrint = $user && ((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID || $user->hasPermission('print_income'));
+    $canEdit = $user?->hasPermission('edit_income') ?? false;
+    $canCancel = $user?->hasPermission('cancel_income') ?? false;
+    $canPrint = $user?->hasPermission('print_income') ?? false;
 
     $paidAmount = (float) $income->amount;
     $amountRupees = (int) floor($paidAmount);
@@ -204,7 +204,7 @@
                                 <div class="dg-invoice-field-row">
                                     <span class="dg-invoice-field-label">Income Date</span>
                                     <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                    <span class="dg-invoice-field-value">{{ $income->income_date->format('d-m-Y') }}</span>
+                                    <span class="dg-invoice-field-value">{{ $income->income_date->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $income->income_date])</span>
                                 </div>
                             @endif
 

@@ -24,7 +24,7 @@ class UserController extends Controller
     // 🔥 USER LIST
     public function index(Request $request)
     {
-        abort_unless(auth()->check() && (int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_users_manage'), 403);
 
         $query = User::with('company');
 
@@ -53,7 +53,7 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        abort_unless(auth()->check() && (int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_users_manage'), 403);
 
         $user->load(['company', 'role']);
 
@@ -63,7 +63,7 @@ class UserController extends Controller
     // 🔥 DELETE USER
     public function delete($id)
     {
-        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_users_manage'), 403);
 
         $user = User::findOrFail($id);
 
@@ -80,7 +80,7 @@ class UserController extends Controller
     // 🔥 BLOCK USER
     public function block($id)
     {
-        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_users_manage'), 403);
 
         $user = User::findOrFail($id);
 
@@ -98,7 +98,7 @@ class UserController extends Controller
     // 🔥 UNBLOCK USER
     public function unblock($id)
     {
-        abort_unless((int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_users_manage'), 403);
 
         $user = User::findOrFail($id);
 
@@ -211,7 +211,7 @@ class UserController extends Controller
 
     private function authorizeSuperAdmin(): void
     {
-        abort_unless(auth()->check() && (int) auth()->user()->role_id === Role::SUPER_ADMIN_ID, 403);
+        abort_unless(app(\App\Services\PlatformAuthorizationService::class)->can(auth()->user(), 'platform_users_manage'), 403);
     }
 
     private function assertResetTarget(User $user): void
