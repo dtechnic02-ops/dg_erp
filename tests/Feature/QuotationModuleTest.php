@@ -57,7 +57,11 @@ class QuotationModuleTest extends TestCase
             $table->string('upload_path')->nullable(); $table->text('description')->nullable();
             $table->string('status')->default('active'); $table->unsignedBigInteger('created_by')->nullable(); $table->timestamps();
         });
-        (require database_path('migrations/2026_08_14_010000_create_quotations_module.php'))->up();
+        foreach (['quotations', 'quotation_items'] as $tableName) {
+            $matches = glob(database_path("migrations/*_create_{$tableName}_table.php")) ?: [];
+            $this->assertCount(1, $matches, "Expected one final {$tableName} migration.");
+            (require $matches[0])->up();
+        }
 
         $np = DB::table('countries')->insertGetId(['name' => 'Nepal', 'iso_code' => 'NP', 'is_active' => 1]);
         $role = $this->createCompanyDashboardRole();

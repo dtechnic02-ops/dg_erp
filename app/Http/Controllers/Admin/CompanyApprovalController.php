@@ -28,8 +28,6 @@ use Illuminate\Support\Facades\DB;
 
 use Illuminate\Support\Facades\File;
 
-use Illuminate\Support\Facades\Hash;
-
 use RuntimeException;
 
 
@@ -108,6 +106,10 @@ class CompanyApprovalController extends Controller
             return back()->with('error', 'The registration country is missing or inactive.');
         }
 
+        if (! is_string($reg->password) || trim($reg->password) === '') {
+            return back()->with('error', 'The registration password is missing. Company approval cannot continue.');
+        }
+
 
 
         try {
@@ -155,10 +157,6 @@ class CompanyApprovalController extends Controller
 
 
 
-                $passwordHash = $reg->password ?: Hash::make('123456');
-
-
-
                 $user = User::firstOrNew(['email' => $reg->email]);
 
                 $user->fill([
@@ -169,7 +167,7 @@ class CompanyApprovalController extends Controller
 
                     'role_id' => Role::COMPANY_ADMIN_ID,
 
-                    'password' => $passwordHash,
+                    'password' => $reg->password,
 
                 ]);
 

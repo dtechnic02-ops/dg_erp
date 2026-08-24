@@ -28,7 +28,7 @@ class ExpenseAccountingTest extends TestCase
     {
         parent::setUp();
 
-        foreach (['accounting_entry_lines', 'accounting_entries', 'account_transactions', 'expenses', 'expense_categories', 'chart_accounts', 'accounts', 'financial_years'] as $table) {
+        foreach (['permissions', 'accounting_entry_lines', 'accounting_entries', 'account_transactions', 'expenses', 'expense_categories', 'chart_accounts', 'accounts', 'financial_years'] as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -40,6 +40,16 @@ class ExpenseAccountingTest extends TestCase
             $table->integer('status')->default(1);
             $table->timestamps();
         });
+
+        Schema::create('permissions', function (Blueprint $table): void {
+            $table->id();
+            $table->string('name')->unique();
+            $table->string('scope')->default('company');
+            $table->timestamps();
+        });
+        foreach (['module_expense', 'create_expense', 'edit_expense', 'cancel_expense'] as $permission) {
+            DB::table('permissions')->insert(['name' => $permission, 'scope' => 'company', 'created_at' => now(), 'updated_at' => now()]);
+        }
 
         Schema::create('chart_accounts', function (Blueprint $table): void {
             $table->id();
@@ -56,13 +66,12 @@ class ExpenseAccountingTest extends TestCase
         Schema::create('expense_categories', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('chart_account_id')->nullable();
             $table->string('name');
             $table->text('description')->nullable();
             $table->tinyInteger('status')->default(1);
             $table->timestamps();
         });
-
-        (require base_path('database/migrations/2026_07_28_000202_add_chart_account_id_to_expense_categories_table.php'))->up();
 
         Schema::create('financial_years', function (Blueprint $table): void {
             $table->id();

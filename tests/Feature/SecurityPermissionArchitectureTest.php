@@ -31,6 +31,7 @@ class SecurityPermissionArchitectureTest extends TestCase
         DB::table('roles')->insert([['id'=>1,'name'=>'super_admin'],['id'=>2,'name'=>'company_admin'],['id'=>3,'name'=>'staff'],['id'=>4,'name'=>'super_staff']]);
         foreach ([
             ['module_income','company'], ['create_income','company'], ['edit_income','company'], ['cancel_income','company'],
+            ['module_sales','company'], ['create_sales','company'],
             ['module_journal','company'], ['journal.post','company'], ['journal.reverse','company'],
             ['module_loan','company'], ['create_loan_payment','company'], ['cancel_loan_payment','company'],
             ['module_users','company'], ['manage_users','company'],
@@ -65,6 +66,24 @@ class SecurityPermissionArchitectureTest extends TestCase
         $this->assertTrue($service->can($staff, 'manage_users', 1));
         $this->assign($staff, 'edit_company_profile');
         $this->assertFalse($service->can($staff, 'edit_company_profile', 1));
+    }
+
+    public function test_company_mutation_permission_preserves_admin_override_staff_assignment_and_company_scope(): void
+    {
+        $service = app(CompanyAuthorizationService::class);
+        $admin = $this->user(Role::COMPANY_ADMIN_ID, 1);
+        $staff = $this->user(Role::COMPANY_STAFF_ID, 1, 'sales');
+
+        $this->assertTrue($service->can($admin, 'create_sales', 1));
+        $this->assertFalse($service->can($admin, 'create_sales', 2));
+        $this->assertFalse($service->can($staff, 'create_sales', 1));
+
+        $this->assign($staff, 'module_sales');
+        $this->assertFalse($service->can($staff, 'create_sales', 1));
+
+        $this->assign($staff, 'create_sales');
+        $this->assertTrue($service->can($staff, 'create_sales', 1));
+        $this->assertFalse($service->can($staff, 'create_sales', 2));
     }
 
     public function test_role_defaults_and_cross_scope_assignments_do_not_authorize_company_staff(): void

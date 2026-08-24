@@ -38,13 +38,25 @@ trait CreatesCompanyRouteTestFoundation
     {
         $this->assertCompanyRouteTestDatabase();
 
-        foreach (['sales_cost_snapshots','inventory_valuations','accounting_entry_lines','accounting_entries','account_transactions','customer_transactions','sales_return_refund_adjustments','sales_return_refunds','sales_return_items','sales_items','sales_returns','sales_payments','sales_invoices','stock_movements','chart_accounts','products','customers','accounts','warehouses','financial_years','company_subscriptions','subscription_plans','users','roles','companies'] as $table) {
+        foreach (['user_permissions','permission_role','permissions','sales_cost_snapshots','inventory_valuations','accounting_entry_lines','accounting_entries','account_transactions','customer_transactions','sales_return_refund_adjustments','sales_return_refunds','sales_return_items','sales_items','sales_returns','sales_payments','sales_invoices','stock_movements','chart_accounts','products','customers','accounts','warehouses','financial_years','company_subscriptions','subscription_plans','users','roles','companies'] as $table) {
             Schema::dropIfExists($table);
         }
 
         Schema::create('roles', function (Blueprint $table): void {$table->id();$table->string('name');$table->timestamps();});
         Schema::create('companies', function (Blueprint $table): void {$table->id();$table->string('company_name');$table->string('email')->nullable();$table->string('mobile')->nullable();$table->string('status')->default('active');$table->timestamps();});
         Schema::create('users', function (Blueprint $table): void {$table->id();$table->string('name');$table->string('email')->unique();$table->timestamp('email_verified_at')->nullable();$table->string('password');$table->unsignedBigInteger('role_id')->nullable();$table->unsignedBigInteger('company_id')->nullable();$table->string('job_role')->nullable();$table->string('account_status')->default('active');$table->timestamp('last_seen')->nullable();$table->rememberToken();$table->timestamps();});
+        Schema::create('permissions', function (Blueprint $table): void {$table->id();$table->string('name')->unique();$table->string('scope')->default('company');$table->timestamps();});
+        Schema::create('permission_role', function (Blueprint $table): void {$table->id();$table->unsignedBigInteger('permission_id');$table->unsignedBigInteger('role_id');$table->timestamps();});
+        Schema::create('user_permissions', function (Blueprint $table): void {$table->id();$table->unsignedBigInteger('user_id');$table->unsignedBigInteger('permission_id');$table->boolean('is_allowed')->default(true);$table->timestamps();});
+        foreach ([
+            'module_sales', 'create_sales', 'cancel_sales',
+            'module_sales_payment', 'create_sales_payment', 'edit_sales_payment', 'cancel_sales_payment',
+            'module_loan', 'view_loan_account', 'create_loan_account', 'edit_loan_account', 'cancel_loan_account',
+            'view_loan_payment', 'create_loan_payment', 'edit_loan_payment', 'cancel_loan_payment', 'print_loan_payment',
+            'view_loan_saving_ledger', 'create_loan_saving_withdraw', 'cancel_loan_saving_withdraw',
+        ] as $permission) {
+            DB::table('permissions')->insert(['name' => $permission, 'scope' => 'company', 'created_at' => now(), 'updated_at' => now()]);
+        }
         Schema::create('subscription_plans', function (Blueprint $table): void {$table->id();$table->string('code')->unique();$table->string('name');$table->unsignedInteger('staff_limit');$table->json('hidden_modules')->nullable();$table->boolean('is_active')->default(true);$table->unsignedInteger('sort_order')->default(0);$table->timestamps();});
         Schema::create('company_subscriptions', function (Blueprint $table): void {$table->id();$table->unsignedBigInteger('company_id');$table->string('subscription_type')->default('paid');$table->unsignedBigInteger('subscription_plan_id')->nullable();$table->string('status')->default('active');$table->date('start_date');$table->date('expiry_date')->nullable();$table->unsignedInteger('staff_limit')->default(1);$table->json('hidden_modules')->nullable();$table->boolean('is_all_modules_enabled')->default(false);$table->timestamp('activated_at')->nullable();$table->timestamps();$table->index(['company_id','status']);});
         Schema::create('financial_years', function (Blueprint $table): void {$table->id();$table->unsignedBigInteger('company_id');$table->string('name');$table->date('start_date');$table->date('end_date');$table->boolean('is_active')->default(true);$table->unsignedBigInteger('created_by')->nullable();$table->timestamps();});

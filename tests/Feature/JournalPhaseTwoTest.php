@@ -36,6 +36,12 @@ class JournalPhaseTwoTest extends OpeningBalanceModuleTest
             ['id'=>8,'company_id'=>1,'code'=>'1120','name'=>'Bank','account_class'=>'asset','normal_balance'=>'debit','system_code'=>'BANK_ACCOUNTS','level'=>3,'is_control'=>0,'allow_manual_entry'=>1,'status'=>'active','created_at'=>now(),'updated_at'=>now()],
             ['id'=>9,'company_id'=>1,'code'=>'1110','name'=>'Cash','account_class'=>'asset','normal_balance'=>'debit','system_code'=>'CASH_IN_HAND','level'=>3,'is_control'=>0,'allow_manual_entry'=>1,'status'=>'active','created_at'=>now(),'updated_at'=>now()],
         ]);
+        foreach ([
+            'module_journal', 'journal.submit', 'journal.approve', 'journal.reject',
+            'journal.post', 'journal.cancel', 'journal.reverse', 'journal.lock', 'journal.unlock',
+        ] as $permission) {
+            DB::table('permissions')->insert(['name' => $permission, 'scope' => 'company', 'created_at' => now(), 'updated_at' => now()]);
+        }
     }
 
     public function test_approved_posting_creates_one_exact_balanced_official_entry_visible_to_ledger_queries(): void

@@ -28,7 +28,17 @@ class CountryFoundationTest extends TestCase
         DB::table('companies')->insert([['id'=>1,'company_name'=>'Nepal Legacy','mobile'=>'100','email'=>'one@example.test','country'=>'NEPAL'],['id'=>2,'company_name'=>'Unmapped Legacy','mobile'=>'200','email'=>'two@example.test','country'=>'Atlantis']]);
         DB::table('company_registrations')->insert([['id'=>1,'company_name'=>'NP Registration','full_name'=>'One','email'=>'reg@example.test','username'=>'reg','password'=>'x','mobile_no'=>'300','country'=>'NP','status'=>'pending'],['id'=>2,'company_name'=>'Unknown Registration','full_name'=>'Two','email'=>'unknown@example.test','username'=>'unknown','password'=>'x','mobile_no'=>'400','country'=>'Unknown Land','status'=>'pending']]);
         Log::spy();
-        (require database_path('migrations/2026_08_14_000000_create_country_master_and_company_relations.php'))->up();
+        $countryMigrations = glob(database_path('migrations/*_create_countries_table.php')) ?: [];
+        $this->assertCount(1, $countryMigrations, 'Expected one final countries migration.');
+        (require $countryMigrations[0])->up();
+        Schema::table('companies', fn (Blueprint $t) => $t->unsignedBigInteger('country_id')->nullable());
+        Schema::table('company_registrations', fn (Blueprint $t) => $t->unsignedBigInteger('country_id')->nullable());
+        $nepalId = DB::table('countries')->insertGetId(['name'=>'Nepal','iso_code'=>'NP','is_active'=>1,'created_at'=>now(),'updated_at'=>now()]);
+        DB::table('companies')->whereRaw('UPPER(country) = ?', ['NEPAL'])->update(['country_id'=>$nepalId]);
+        DB::table('company_registrations')->whereRaw('UPPER(country) = ?', ['NP'])->update(['country_id'=>$nepalId]);
+        foreach ([['companies', 2, 'Atlantis'], ['company_registrations', 2, 'Unknown Land']] as [$table, $id, $country]) {
+            Log::warning('Unmapped legacy country', compact('table', 'id', 'country'));
+        }
 
         Schema::create('roles', fn(Blueprint $t)=>[$t->id(),$t->string('name'),$t->timestamps()]);
         Schema::create('users', function(Blueprint $t){$t->id();$t->string('name');$t->string('email')->unique();$t->string('password');$t->unsignedBigInteger('role_id')->nullable();$t->unsignedBigInteger('company_id')->nullable();$t->string('account_status')->default('active');$t->timestamp('last_seen')->nullable();$t->rememberToken();$t->timestamps();});
@@ -103,5 +113,8 @@ class CountryFoundationTest extends TestCase
         $this->assertDatabaseHas('companies',['email'=>'approved@example.test','country_id'=>$nepal->id]);
         $inactive=Country::create(['name'=>'Inactive','iso_code'=>'ZZ','is_active'=>0]);$bad=CompanyRegistration::create(['company_name'=>'Bad Co','full_name'=>'Bad Owner','email'=>'bad-approval@example.test','username'=>'bad-approval','password'=>'x','mobile_no'=>'601','country_id'=>$inactive->id,'status'=>'pending']);
         app(CompanyApprovalController::class)->approve($bad->id);$this->assertDatabaseMissing('companies',['email'=>'bad-approval@example.test']);
+
+        $missingPassword=CompanyRegistration::create(['company_name'=>'No Password Co','full_name'=>'No Password Owner','email'=>'no-password@example.test','username'=>'no-password','password'=>'','mobile_no'=>'602','country_id'=>$nepal->id,'status'=>'pending']);
+        app(CompanyApprovalController::class)->approve($missingPassword->id);$this->assertDatabaseMissing('companies',['email'=>'no-password@example.test']);
     }
 }

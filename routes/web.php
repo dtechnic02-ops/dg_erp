@@ -321,7 +321,9 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
     Route::post('/profile/update',[\App\Http\Controllers\Company\CompanyClientController::class, 'update'])->middleware('permission:edit_company_profile')->name('profile.update');
 
     Route::get('/subscription', [\App\Http\Controllers\Company\SubscriptionController::class, 'index'])->name('subscription.index');
-    Route::post('/subscription/payment', [\App\Http\Controllers\Company\PaymentController::class, 'store'])->name('subscription.payment.store');
+    Route::post('/subscription/payment', [\App\Http\Controllers\Company\PaymentController::class, 'store'])
+        ->middleware('permission:manage_subscription_module')
+        ->name('subscription.payment.store');
     
   
     /*
@@ -381,15 +383,19 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
             ->name('edit');
 
         Route::put('/{user}', [UserPermissionController::class, 'update'])
+            ->middleware('permission:manage_users')
             ->name('update');
 
         Route::post('/{user}/assign/{permission}', [UserPermissionController::class, 'assign'])
+            ->middleware('permission:manage_users')
             ->name('assign');
 
         Route::post('/{user}/deny/{permission}', [UserPermissionController::class, 'deny'])
+            ->middleware('permission:manage_users')
             ->name('deny');
 
         Route::delete('/{user}/revoke/{permission}', [UserPermissionController::class, 'revoke'])
+            ->middleware('permission:manage_users')
             ->name('revoke');
 
     });
@@ -868,7 +874,7 @@ Route::prefix('vat-reports')
         Route::post(
             '/store',
             [SalesController::class, 'store']
-        )->name('store');
+        )->middleware('permission:create_sales')->name('store');
 
         Route::get(
             '/show/{id}',
@@ -883,7 +889,7 @@ Route::prefix('vat-reports')
         Route::put(
             '/update/{id}',
             [SalesController::class, 'update']
-        )->name('update');
+        )->middleware('permission:edit_sales')->name('update');
 
         /**
          * PRINT ROUTE
@@ -902,7 +908,7 @@ Route::prefix('vat-reports')
         Route::post(
             '/cancel/{id}',
             [SalesController::class, 'cancel']
-        )->name('cancel');
+        )->middleware('permission:cancel_sales')->name('cancel');
 
     });
 
@@ -1064,7 +1070,7 @@ Route::prefix('vat-reports')
     Route::post(
         '/store',
         [SalesReturnController::class, 'store']
-    )->name('store');
+    )->middleware('permission:create_sales')->name('store');
 
     Route::get(
         '/show/{id}',
@@ -1079,7 +1085,7 @@ Route::prefix('vat-reports')
     Route::post(
         '/update/{id}',
         [SalesReturnController::class, 'update']
-    )->name('update');
+    )->middleware('permission:edit_sales')->name('update');
 
     Route::get(
         '/print/{id}',
@@ -1089,7 +1095,7 @@ Route::prefix('vat-reports')
     Route::post(
         '/cancel/{id}',
         [SalesReturnController::class, 'cancel']
-    )->name('cancel');
+    )->middleware('permission:cancel_sales')->name('cancel');
 
     
 
@@ -1193,7 +1199,7 @@ Route::prefix('vat-reports')
 
         Route::post('/store',
             [InvoicePaymentController::class, 'store']
-        )->name('store');
+        )->middleware('permission:create_sales_payment')->name('store');
 
     });
     /*
@@ -1248,7 +1254,7 @@ Route::prefix('purchase-payments')
 
                 Route::post('/store',
         [PurchaseReturnController::class, 'store']
-              )->name('store');
+              )->middleware('permission:create_purchase')->name('store');
 
                Route::get('/show/{id}',
         [PurchaseReturnController::class, 'show']
@@ -1260,7 +1266,7 @@ Route::prefix('purchase-payments')
 
                Route::post('/update/{id}',
         [PurchaseReturnController::class, 'update']
-        )->name('update');
+        )->middleware('permission:edit_purchase')->name('update');
 
         Route::get(
             '/print-list',
@@ -1275,7 +1281,7 @@ Route::prefix('purchase-payments')
 Route::post(
     '/cancel/{id}',
     [PurchaseReturnController::class, 'cancel']
-)->name('cancel');
+)->middleware('permission:cancel_purchase')->name('cancel');
 
 
     });
@@ -1299,7 +1305,7 @@ Route::post(
 
     Route::post('/store',
         [PurchaseReturnRefundController::class, 'store']
-    )->name('store');
+    )->middleware('permission:create_purchase')->name('store');
 
     Route::get('/show/{id}',
         [PurchaseReturnRefundController::class, 'show']
@@ -1311,7 +1317,7 @@ Route::post(
 
     Route::post('/update/{id}',
         [PurchaseReturnRefundController::class, 'update']
-    )->name('update');
+    )->middleware('permission:edit_purchase')->name('update');
 
         Route::get(
             '/print-list',
@@ -1326,7 +1332,7 @@ Route::post(
 Route::post(
     '/cancel/{id}',
     [PurchaseReturnRefundController::class,'cancel']
-)->name('cancel');
+)->middleware('permission:cancel_purchase')->name('cancel');
 
 });
 /*
@@ -1404,7 +1410,7 @@ Route::prefix('sales-return-refunds')
     Route::post(
         '/store',
         [SalesReturnRefundController::class, 'store']
-    )->name('store');
+    )->middleware('permission:create_sales_payment')->name('store');
 
     Route::get(
         '/show/{id}',
@@ -1419,7 +1425,7 @@ Route::prefix('sales-return-refunds')
     Route::post(
         '/update/{id}',
         [SalesReturnRefundController::class, 'update']
-    )->name('update');
+    )->middleware('permission:edit_sales_payment')->name('update');
 
     Route::get(
         '/print/{id}',
@@ -1429,7 +1435,7 @@ Route::prefix('sales-return-refunds')
     Route::post(
         '/cancel/{id}',
         [SalesReturnRefundController::class, 'cancel']
-    )->name('cancel');
+    )->middleware('permission:cancel_sales_payment')->name('cancel');
 
 });
 
@@ -1450,7 +1456,7 @@ Route::prefix('sales-payments')
     Route::post(
         '/store',
         [SalesPaymentController::class, 'store']
-    )->name('store');
+    )->middleware('permission:create_sales_payment')->name('store');
 
     Route::get(
         '/show/{id}',
@@ -1465,7 +1471,7 @@ Route::prefix('sales-payments')
     Route::post(
         '/update/{id}',
         [SalesPaymentController::class, 'update']
-    )->name('update');
+    )->middleware('permission:edit_sales_payment')->name('update');
 
     Route::get(
         '/print-list',
@@ -1480,7 +1486,7 @@ Route::prefix('sales-payments')
     Route::post(
         '/cancel/{id}',
         [SalesPaymentController::class, 'cancel']
-    )->name('cancel');
+    )->middleware('permission:cancel_sales_payment')->name('cancel');
 
 });
 
@@ -1692,7 +1698,7 @@ Route::prefix('income')
     Route::post(
         '/store',
         [ContraController::class,'store']
-    )->name('store');
+    )->middleware('permission:create_contra')->name('store');
 
     Route::get(
         '/show/{id}',
@@ -1707,12 +1713,12 @@ Route::prefix('income')
     Route::post(
         '/update/{id}',
         [ContraController::class,'update']
-    )->name('update');
+    )->middleware('permission:edit_contra')->name('update');
 
     Route::post(
         '/delete/{id}',
         [ContraController::class,'destroy'
-    ])->name('delete');
+    ])->middleware('permission:delete_contra')->name('delete');
 
     Route::get(
         '/print',

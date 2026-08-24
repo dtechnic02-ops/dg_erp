@@ -34,14 +34,20 @@ class PurchasePaymentAccountingTest extends TestCase
         foreach ([
             'accounting_entry_lines', 'accounting_entries', 'purchase_return_refund_adjustments',
             'supplier_transactions', 'account_transactions', 'purchase_payments', 'purchase_invoices',
-            'financial_years', 'chart_accounts', 'suppliers', 'accounts', 'users',
+            'permissions', 'financial_years', 'chart_accounts', 'suppliers', 'accounts', 'users',
         ] as $table) {
             Schema::dropIfExists($table);
         }
 
         Schema::create('users', function (Blueprint $table) {
-            $table->id(); $table->unsignedBigInteger('company_id')->nullable(); $table->string('name'); $table->string('email'); $table->string('password'); $table->timestamps();
+            $table->id(); $table->unsignedBigInteger('company_id')->nullable(); $table->unsignedBigInteger('role_id')->nullable(); $table->string('name'); $table->string('email'); $table->string('password'); $table->timestamps();
         });
+        Schema::create('permissions', function (Blueprint $table) {
+            $table->id(); $table->string('name')->unique(); $table->string('scope')->default('company'); $table->timestamps();
+        });
+        foreach (['module_purchase', 'cancel_purchase'] as $permission) {
+            DB::table('permissions')->insert(['name' => $permission, 'scope' => 'company', 'created_at' => now(), 'updated_at' => now()]);
+        }
         Schema::create('accounts', function (Blueprint $table) {
             $table->id(); $table->unsignedBigInteger('company_id'); $table->string('account_type'); $table->string('status'); $table->decimal('current_balance', 20, 4)->default(0); $table->timestamps();
         });
@@ -76,7 +82,7 @@ class PurchasePaymentAccountingTest extends TestCase
             $table->id(); $table->unsignedBigInteger('accounting_entry_id'); $table->unsignedBigInteger('chart_account_id'); $table->unsignedBigInteger('operational_account_id')->nullable(); $table->unsignedInteger('line_number'); $table->text('description')->nullable(); $table->decimal('debit', 20, 4); $table->decimal('credit', 20, 4); $table->string('subledger_type')->nullable(); $table->unsignedBigInteger('subledger_id')->nullable(); $table->timestamps();
         });
 
-        DB::table('users')->insert(['id' => 1, 'company_id' => self::COMPANY_ID, 'name' => 'Tester', 'email' => 'tester@example.test', 'password' => 'secret', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('users')->insert(['id' => 1, 'company_id' => self::COMPANY_ID, 'role_id' => \App\Models\Role::COMPANY_ADMIN_ID, 'name' => 'Tester', 'email' => 'tester@example.test', 'password' => 'secret', 'created_at' => now(), 'updated_at' => now()]);
         DB::table('accounts')->insert([
             ['id' => self::CASH_ACCOUNT_ID, 'company_id' => self::COMPANY_ID, 'account_type' => 'Cash', 'status' => 'active', 'current_balance' => '1000.0000', 'created_at' => now(), 'updated_at' => now()],
             ['id' => self::BANK_ACCOUNT_ID, 'company_id' => self::COMPANY_ID, 'account_type' => 'Bank', 'status' => 'active', 'current_balance' => '1000.0000', 'created_at' => now(), 'updated_at' => now()],
