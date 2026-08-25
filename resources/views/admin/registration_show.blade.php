@@ -3,10 +3,32 @@
 @section('title', 'Registration Details')
 
 @section('content')
+@php
+    $platformAuthorization = app(\App\Services\PlatformAuthorizationService::class);
+    $adminUser = auth()->user();
+    $canApproveRegistration = $platformAuthorization->can($adminUser, 'platform_registrations_approve');
+    $canRejectRegistration = $platformAuthorization->can($adminUser, 'platform_registrations_reject');
+@endphp
 <div class="dg-page dg-record-print">
     <div class="dg-page-header dg-print-hide">
         <div class="dg-page-header-content"><h2 class="dg-page-title">Registration Details</h2><p class="dg-page-subtitle">Company registration request and applicant information.</p></div>
-        <div class="d-flex gap-2 flex-wrap"><a href="{{ route('admin.registrations') }}" class="btn btn-light dg-btn dg-btn-light">Back</a><button type="button" class="btn btn-primary dg-btn dg-btn-primary" onclick="window.print()">Print A4</button></div>
+        <div class="d-flex gap-2 flex-wrap">
+            @if($registration->status === 'pending')
+                @if($canApproveRegistration)
+                    <form method="POST" action="{{ route('admin.approve', $registration->id) }}" onsubmit="return confirm('Approve this company registration?')">
+                        @csrf
+                        <button type="submit" class="btn btn-success dg-btn dg-btn-success">Approve</button>
+                    </form>
+                @endif
+                @if($canRejectRegistration)
+                    <form method="POST" action="{{ route('admin.reject', $registration->id) }}" onsubmit="return confirm('Reject this company registration?')">
+                        @csrf
+                        <button type="submit" class="btn btn-danger dg-btn dg-btn-danger">Reject</button>
+                    </form>
+                @endif
+            @endif
+            <a href="{{ route('admin.registrations') }}" class="btn btn-light dg-btn dg-btn-light">Back</a><button type="button" class="btn btn-primary dg-btn dg-btn-primary" onclick="window.print()">Print A4</button>
+        </div>
     </div>
 
     <article id="printArea" class="dg-card card dg-record-sheet">
