@@ -24,6 +24,7 @@ class PlatformSetting extends Model
     }
 
     public function socialLinks(): HasMany { return $this->hasMany(PlatformSocialLink::class)->orderBy('display_order'); }
+    public function loginSetting(): HasOne { return $this->hasOne(PlatformLoginSetting::class); }
     public function smtpSetting(): HasOne { return $this->hasOne(PlatformSmtpSetting::class); }
     public function paymentGateways(): HasMany { return $this->hasMany(PlatformPaymentGateway::class); }
 }

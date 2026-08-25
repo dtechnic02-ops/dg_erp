@@ -14,6 +14,7 @@ class CompanyAuthorizationService
         'dangerous_maintenance', 'system_maintenance', 'cache_clear', 'queue_restart',
         'log_management', 'maintenance_mode', 'system_utilities', 'company_delete',
         'approve_company', 'block_company', 'delete_company',
+        'reset_password',
     ];
 
     public function can(?User $user, string $permission, ?int $companyId = null): bool

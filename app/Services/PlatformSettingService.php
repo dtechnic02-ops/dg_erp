@@ -8,11 +8,13 @@ use App\Models\PlatformSmtpSetting;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class PlatformSettingService
 {
     private const CACHE_KEY = 'platform_settings.safe_public';
+    private const LOGIN_MEDIA_PREFIX = 'platform/login/';
 
     public function settings(): PlatformSetting
     {
@@ -25,6 +27,95 @@ class PlatformSettingService
     public function safePublicSettings(): array
     {
         return Cache::rememberForever(self::CACHE_KEY, fn () => $this->settings()->only(['platform_name', 'logo_path', 'favicon_path', 'support_email', 'support_mobile', 'website_url', 'timezone', 'currency_code', 'language_code', 'date_format', 'time_format']));
+    }
+
+    public function publicLoginPageData(): array
+    {
+        if (!Schema::hasTable('platform_settings')) {
+            return $this->defaultLoginPageData();
+        }
+
+        $setting = $this->settings();
+        $login = Schema::hasTable('platform_login_settings') ? $setting->loginSetting()->first() : null;
+        $published = $login?->is_published === true;
+        $gallery = $published
+            ? collect($login->gallery_images ?? [])->where('is_active', true)->sortBy('display_order')->values()->all()
+            : [];
+
+        return [
+            'platformSetting' => $setting,
+            'loginSetting' => $published ? $login : null,
+            'loginGallery' => $gallery,
+            'loginLinks' => $published && Schema::hasTable('platform_social_links')
+                ? $setting->socialLinks()->where('is_active', true)->get()
+                : collect(),
+        ];
+    }
+
+    public function updateLoginPage(array $data, int $userId): PlatformSetting
+    {
+        $setting = $this->settings()->loadMissing('loginSetting');
+        $login = $setting->loginSetting;
+        $oldHero = $login?->hero_image_path;
+        $oldGallery = collect($login?->gallery_images ?? [])->pluck('path')->filter()->all();
+        $newPaths = [];
+
+        try {
+            $heroPath = $oldHero;
+            if (($data['hero_image'] ?? null) instanceof UploadedFile) {
+                $heroPath = $data['hero_image']->store(self::LOGIN_MEDIA_PREFIX.'hero', 'public');
+                $newPaths[] = $heroPath;
+            } elseif (!empty($data['remove_hero_image'])) {
+                $heroPath = null;
+            }
+
+            $gallery = [];
+            foreach ($data['gallery'] ?? [] as $index => $item) {
+                if (!empty($item['remove'])) {
+                    continue;
+                }
+
+                $path = $this->validatedExistingLoginMediaPath($item['existing_path'] ?? null, $oldGallery);
+                if (($item['image'] ?? null) instanceof UploadedFile) {
+                    $path = $item['image']->store(self::LOGIN_MEDIA_PREFIX.'gallery', 'public');
+                    $newPaths[] = $path;
+                }
+                if (!$path) {
+                    continue;
+                }
+
+                $gallery[] = [
+                    'path' => $path,
+                    'alt_text' => trim((string) ($item['alt_text'] ?? '')),
+                    'display_order' => (int) ($item['display_order'] ?? $index),
+                    'is_active' => (bool) ($item['is_active'] ?? false),
+                ];
+            }
+
+            usort($gallery, fn (array $left, array $right): int => $left['display_order'] <=> $right['display_order']);
+
+            DB::transaction(function () use ($setting, $data, $userId, $heroPath, $gallery): void {
+                $setting->loginSetting()->updateOrCreate([], [
+                    'heading' => $data['heading'] ?? null,
+                    'description' => $data['description'] ?? null,
+                    'hero_image_path' => $heroPath,
+                    'address_line_2' => $data['address_line_2'] ?? null,
+                    'address_line_3' => $data['address_line_3'] ?? null,
+                    'gallery_images' => $gallery,
+                    'is_published' => (bool) ($data['is_published'] ?? false),
+                    'updated_by' => $userId,
+                ]);
+            });
+        } catch (\Throwable $exception) {
+            $this->deleteLoginMedia($newPaths);
+            throw $exception;
+        }
+
+        $retained = array_merge([$heroPath], array_column($gallery, 'path'));
+        $this->deleteLoginMedia(array_diff(array_merge([$oldHero], $oldGallery), array_filter($retained)));
+        $this->clearCache();
+
+        return $setting->refresh()->load('loginSetting');
     }
 
     public function updateGeneral(array $data, int $userId): PlatformSetting
@@ -84,4 +175,33 @@ class PlatformSettingService
     }
 
     public function clearCache(): void { Cache::forget(self::CACHE_KEY); }
+
+    private function validatedExistingLoginMediaPath(?string $path, array $knownPaths): ?string
+    {
+        if (!$path || !in_array($path, $knownPaths, true)) {
+            return null;
+        }
+
+        return str_starts_with(str_replace('\\', '/', $path), self::LOGIN_MEDIA_PREFIX) ? $path : null;
+    }
+
+    private function defaultLoginPageData(): array
+    {
+        return [
+            'platformSetting' => new PlatformSetting(['platform_name' => 'DG ERP']),
+            'loginSetting' => null,
+            'loginGallery' => [],
+            'loginLinks' => collect(),
+        ];
+    }
+
+    private function deleteLoginMedia(array $paths): void
+    {
+        foreach (array_unique(array_filter($paths)) as $path) {
+            $normalized = str_replace('\\', '/', $path);
+            if (str_starts_with($normalized, self::LOGIN_MEDIA_PREFIX) && !str_contains($normalized, '../')) {
+                Storage::disk('public')->delete($normalized);
+            }
+        }
+    }
 }

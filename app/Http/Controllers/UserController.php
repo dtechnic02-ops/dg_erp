@@ -2,16 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\UserPasswordResetLinkMail;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\StaffUserService;
 use App\Services\SubscriptionService;
+use App\Services\PlatformMailService;
+use App\Services\UserPasswordResetService;
 use App\Services\JobRoleVisibilityService;
 use App\Services\Permission\PermissionAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -20,7 +22,9 @@ class UserController extends Controller
     public function __construct(
         private SubscriptionService $subscriptionService,
         private StaffUserService $staffUserService,
-        private PermissionAssignmentService $permissionAssignmentService
+        private PermissionAssignmentService $permissionAssignmentService,
+        private UserPasswordResetService $passwordResets,
+        private PlatformMailService $platformMail,
     ) {
     }
 
@@ -172,26 +176,28 @@ class UserController extends Controller
         return back()->with('success', 'Staff member activated successfully.');
     }
 
-    public function resetPassword(Request $request, int $id)
+    public function resetPassword(int $id)
     {
         $user = $this->staffUserService->findStaffForCompany($id, (int) auth()->user()->company_id);
 
-        $request->validate([
-            'new_password' => 'nullable|string|min:8|confirmed',
-        ]);
+        abort_unless($user->account_status === 'active', 422, 'Only active staff members are eligible for password reset.');
 
-        $password = $request->filled('new_password')
-            ? $request->new_password
-            : $this->staffUserService->generateTemporaryPassword();
+        [$resetRequest, $token] = $this->passwordResets->initiate($user, auth()->user());
 
-        $user->update(['password' => $password]);
+        try {
+            $this->platformMail->send($user->email, new UserPasswordResetLinkMail(
+                $user->name,
+                auth()->user()->name,
+                route('password-reset.password.show', ['token' => $token]),
+                UserPasswordResetService::LINK_TTL_MINUTES,
+            ));
+        } catch (\Throwable) {
+            $this->passwordResets->invalidate($resetRequest);
 
-        return back()->with(
-            'success',
-            $request->filled('new_password')
-                ? 'Staff password updated successfully.'
-                : 'Staff password reset successfully. Share the new credentials through a secure channel.'
-        );
+            return back()->with('error', 'Unable to send password reset instructions. No password was changed.');
+        }
+
+        return back()->with('success', 'Password reset instructions have been sent to the user’s registered email.');
     }
 
     public function permissionPage()

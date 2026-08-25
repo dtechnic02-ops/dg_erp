@@ -5,7 +5,7 @@ namespace App\Services\Permission;
 final class PermissionModuleResolver
 {
     private const COMPANY_ALIASES = [
-        'users' => 'module_users', 'user' => 'module_users',
+        'users' => 'module_users', 'user' => 'module_users', 'password' => 'module_users',
         'income_categories' => 'module_income', 'income' => 'module_income',
         'expense_categories' => 'module_expense', 'expense' => 'module_expense',
         'loan_account' => 'module_loan', 'loan_payment' => 'module_loan',

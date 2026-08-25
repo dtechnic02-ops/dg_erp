@@ -216,7 +216,7 @@
                                                         @endif
                                                     @endif
 
-                                                    @if($canReset)
+                                                    @if($canReset && $staff->account_status === 'active')
                                                         <button type="button" class="btn btn-sm btn-outline-primary dg-action-btn" data-bs-toggle="modal" data-bs-target="#resetModal{{ $staff->id }}">Reset Password</button>
                                                     @endif
 
@@ -228,7 +228,7 @@
                                                     @endif
                                                 </div>
 
-                                                @if($canReset)
+                                                @if($canReset && $staff->account_status === 'active')
                                                 <div class="modal fade" id="resetModal{{ $staff->id }}" tabindex="-1" aria-labelledby="resetModalLabel{{ $staff->id }}" aria-hidden="true">
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
@@ -239,19 +239,11 @@
                                                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                 </div>
                                                                 <div class="modal-body">
-                                                                    <p class="small text-muted">Leave blank to generate a secure temporary password. Passwords are never shown on screen.</p>
-                                                                    <div class="mb-3">
-                                                                        <label for="new_password_{{ $staff->id }}" class="form-label">New Password</label>
-                                                                        <input type="password" name="new_password" id="new_password_{{ $staff->id }}" class="form-control dg-input" minlength="8">
-                                                                    </div>
-                                                                    <div class="mb-0">
-                                                                        <label for="new_password_confirmation_{{ $staff->id }}" class="form-label">Confirm Password</label>
-                                                                        <input type="password" name="new_password_confirmation" id="new_password_confirmation_{{ $staff->id }}" class="form-control dg-input" minlength="8">
-                                                                    </div>
+                                                                    Send secure password reset instructions to <strong>{{ $staff->name }}</strong> at {{ $staff->email }}? You will not set or see the user’s new password.
                                                                 </div>
                                                                 <div class="modal-footer">
                                                                     <button type="button" class="btn btn-outline-secondary dg-btn" data-bs-dismiss="modal">Cancel</button>
-                                                                    <button type="submit" class="btn btn-primary dg-btn">Reset Password</button>
+                                                                    <button type="submit" class="btn btn-primary dg-btn">Send Reset Link</button>
                                                                 </div>
                                                             </form>
                                                         </div>

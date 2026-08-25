@@ -5,6 +5,8 @@
 @section('content')
 @php
     $socialLinks = $setting->socialLinks->keyBy('provider');
+    $loginPage = $setting->loginSetting;
+    $loginGallery = collect($loginPage?->gallery_images ?? [])->values();
     $providers = ['facebook', 'instagram', 'x', 'linkedin', 'youtube', 'tiktok', 'telegram'];
     $gatewayLabels = ['esewa' => 'eSewa', 'khalti' => 'Khalti', 'fonepay' => 'Fonepay', 'stripe' => 'Stripe', 'paypal' => 'PayPal', 'razorpay' => 'Razorpay'];
 @endphp
@@ -15,7 +17,7 @@
     @if($errors->any())<div class="alert alert-danger dg-alert" role="alert">Please correct the highlighted fields and submit again.</div>@endif
 
     <nav class="nav nav-pills dg-tabs mb-3" aria-label="Platform settings sections">
-        <a class="nav-link" href="#general">General</a><a class="nav-link" href="#branding">Branding</a><a class="nav-link" href="#social">Social Media</a><a class="nav-link" href="#smtp">SMTP</a><a class="nav-link" href="#gateways">Payment Gateways</a>
+        <a class="nav-link" href="#general">General</a><a class="nav-link" href="#branding">Branding</a><a class="nav-link" href="#login-page">Login Page</a><a class="nav-link" href="#social">Social Media</a><a class="nav-link" href="#smtp">SMTP</a><a class="nav-link" href="#gateways">Payment Gateways</a>
     </nav>
 
     <section id="general" class="dg-section" aria-labelledby="general-title"><div class="dg-card card"><div class="dg-card-header card-header"><h3 id="general-title" class="h6 mb-0">General, contact, localization and defaults</h3></div><div class="dg-card-body card-body">
@@ -44,6 +46,49 @@
             </div>
         @endforeach
     </div><p class="form-text">Only approved image formats are accepted. Existing files remain unchanged when no replacement is selected.</p><button class="btn btn-primary dg-btn dg-btn-primary" type="submit">Update branding</button></form></div></div></section>
+
+    <section id="login-page" class="dg-section" aria-labelledby="login-page-title">
+        <div class="dg-card card">
+            <div class="dg-card-header card-header"><h3 id="login-page-title" class="h6 mb-0">Public login page</h3></div>
+            <div class="dg-card-body card-body">
+                <form method="POST" action="{{ route('admin.platform-settings.login-page.update') }}" enctype="multipart/form-data" class="dg-form">
+                    @csrf
+                    @method('PUT')
+                    <div class="row g-3">
+                        <div class="col-md-6"><label for="login_heading" class="form-label">Heading</label><input id="login_heading" name="heading" class="form-control dg-input @error('heading') is-invalid @enderror" value="{{ old('heading', $loginPage?->heading) }}" maxlength="200">@error('heading')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+                        <div class="col-md-6"><label for="login_hero_image" class="form-label">Main / title image</label><input id="login_hero_image" type="file" name="hero_image" class="form-control dg-input @error('hero_image') is-invalid @enderror" accept="image/jpeg,image/png,image/webp">@error('hero_image')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+                        <div class="col-12"><label for="login_description" class="form-label">Description</label><textarea id="login_description" name="description" class="form-control dg-textarea @error('description') is-invalid @enderror" rows="3" maxlength="2000">{{ old('description', $loginPage?->description) }}</textarea>@error('description')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+                        <div class="col-md-6"><label for="login_address_2" class="form-label">Address line 2</label><input id="login_address_2" name="address_line_2" class="form-control dg-input" value="{{ old('address_line_2', $loginPage?->address_line_2) }}" maxlength="255"></div>
+                        <div class="col-md-6"><label for="login_address_3" class="form-label">Address line 3</label><input id="login_address_3" name="address_line_3" class="form-control dg-input" value="{{ old('address_line_3', $loginPage?->address_line_3) }}" maxlength="255"></div>
+                        @if($loginPage?->hero_image_path)
+                            <div class="col-12"><div class="dg-upload-preview"><img src="{{ asset('storage/'.$loginPage->hero_image_path) }}" alt="Current login main image"><span>Current main image</span></div><div class="form-check mt-2"><input id="remove_login_hero" type="checkbox" name="remove_hero_image" value="1" class="form-check-input"><label for="remove_login_hero" class="form-check-label">Remove current main image</label></div></div>
+                        @endif
+                    </div>
+
+                    <h4 class="h6 mt-4">Gallery images (maximum 5)</h4>
+                    <div class="dg-table-scroll"><table class="table dg-table"><thead class="dg-head"><tr><th>Image</th><th>Alternative text</th><th>Order</th><th>Active</th><th>Remove</th></tr></thead><tbody>
+                        @for($index = 0; $index < 5; $index++)
+                            @php($image = $loginGallery->get($index))
+                            <tr>
+                                <td>
+                                    @if($image)<input type="hidden" name="gallery[{{ $index }}][existing_path]" value="{{ $image['path'] }}"><div class="dg-upload-preview mb-2"><img src="{{ asset('storage/'.$image['path']) }}" alt="{{ $image['alt_text'] ?: 'Current gallery image' }}"></div>@endif
+                                    <input type="file" name="gallery[{{ $index }}][image]" class="form-control dg-input @error('gallery.'.$index.'.image') is-invalid @enderror" accept="image/jpeg,image/png,image/webp" aria-label="Gallery image {{ $index + 1 }}">
+                                    @error('gallery.'.$index.'.image')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </td>
+                                <td><input name="gallery[{{ $index }}][alt_text]" class="form-control dg-input" value="{{ old('gallery.'.$index.'.alt_text', $image['alt_text'] ?? '') }}" maxlength="160" aria-label="Gallery image {{ $index + 1 }} alternative text"></td>
+                                <td><input type="number" min="0" max="100" name="gallery[{{ $index }}][display_order]" class="form-control dg-input" value="{{ old('gallery.'.$index.'.display_order', $image['display_order'] ?? $index) }}" aria-label="Gallery image {{ $index + 1 }} display order"></td>
+                                <td><input type="hidden" name="gallery[{{ $index }}][is_active]" value="0"><input type="checkbox" name="gallery[{{ $index }}][is_active]" value="1" class="form-check-input" {{ old('gallery.'.$index.'.is_active', $image['is_active'] ?? true) ? 'checked' : '' }} aria-label="Gallery image {{ $index + 1 }} active"></td>
+                                <td><input type="checkbox" name="gallery[{{ $index }}][remove]" value="1" class="form-check-input" aria-label="Remove gallery image {{ $index + 1 }}"></td>
+                            </tr>
+                        @endfor
+                    </tbody></table></div>
+                    <p class="form-text">Logo, phone, WhatsApp, website and address line 1 reuse General and Branding values. Active Social Media records are used as public link buttons. New files are stored before replaced files are safely removed.</p>
+                    <input type="hidden" name="is_published" value="0"><div class="form-check mb-3"><input id="login_page_published" type="checkbox" name="is_published" value="1" class="form-check-input" {{ old('is_published', $loginPage?->is_published ?? true) ? 'checked' : '' }}><label for="login_page_published" class="form-check-label">Publish public login information</label></div>
+                    <button class="btn btn-primary dg-btn dg-btn-primary" type="submit">Save public login page</button>
+                </form>
+            </div>
+        </div>
+    </section>
 
     <section id="social" class="dg-section" aria-labelledby="social-title"><div class="dg-card card"><div class="dg-card-header card-header"><h3 id="social-title" class="h6 mb-0">Social media links</h3></div><div class="dg-card-body card-body"><form method="POST" action="{{ route('admin.platform-settings.social.update') }}" class="dg-form">@csrf @method('PUT')<div class="dg-table-scroll"><table class="table dg-table"><thead class="dg-head"><tr><th>Provider</th><th>URL</th><th>Active</th><th>Order</th><th>Remove</th></tr></thead><tbody>
         @foreach($providers as $index => $provider) @php($link = $socialLinks->get($provider)) <tr class="dg-provider-row"><td><input name="links[{{ $index }}][provider]" class="form-control dg-input" value="{{ old("links.$index.provider", $provider) }}" aria-label="Provider"></td><td><input type="url" name="links[{{ $index }}][url]" class="form-control dg-input" value="{{ old("links.$index.url", $link?->url) }}" aria-label="URL"></td><td><input type="hidden" name="links[{{ $index }}][is_active]" value="0"><input type="checkbox" class="form-check-input" name="links[{{ $index }}][is_active]" value="1" {{ old("links.$index.is_active", $link?->is_active) ? 'checked' : '' }} aria-label="Active"></td><td><input type="number" min="0" name="links[{{ $index }}][display_order]" class="form-control dg-input" value="{{ old("links.$index.display_order", $link?->display_order ?? $index) }}" aria-label="Display order"></td><td><input type="checkbox" class="form-check-input" name="links[{{ $index }}][remove]" value="1" aria-label="Remove"></td></tr> @endforeach

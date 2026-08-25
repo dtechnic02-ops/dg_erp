@@ -11,6 +11,8 @@ use App\Models\Role;
 use App\Services\SubscriptionService;
 use App\Services\LoginRedirectService;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\PublicLoginController;
 use App\Http\Controllers\Admin\CompanyApprovalController;
 use App\Http\Controllers\Admin\SubscriptionPlanController;
 use App\Http\Controllers\Admin\SubscriptionController;
@@ -89,8 +91,8 @@ use App\Http\Controllers\Company\CustomerStatementController;
 use App\Http\Controllers\Company\UserPermissionController;
 
 
-Route::get('/', fn() => view('login'));
-Route::get('/login', fn() => view('login'))->name('login');
+Route::get('/', PublicLoginController::class);
+Route::get('/login', PublicLoginController::class)->name('login');
 
 Route::post('/login', function (Request $request) {
 
@@ -136,6 +138,13 @@ Route::post('/logout', function (Request $request) {
     return redirect('/login');
 })->name('logout');
 
+Route::middleware('throttle:10,1')->prefix('password-reset')->name('password-reset.')->group(function () {
+    Route::get('/{token}', [PasswordResetController::class, 'showPasswordForm'])->name('password.show');
+    Route::post('/{token}', [PasswordResetController::class, 'submitPassword'])->name('password.submit');
+    Route::get('/otp/{challenge}', [PasswordResetController::class, 'showOtpForm'])->name('otp.show');
+    Route::post('/otp/{challenge}', [PasswordResetController::class, 'verifyOtp'])->name('otp.verify');
+});
+
 
 
 
@@ -166,6 +175,7 @@ Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function ()
         Route::put('/general', [PlatformSettingController::class, 'updateGeneral'])->name('general.update');
         Route::put('/branding', [PlatformSettingController::class, 'updateBranding'])->name('branding.update');
         Route::put('/social-links', [PlatformSettingController::class, 'updateSocialLinks'])->name('social.update');
+        Route::put('/login-page', [PlatformSettingController::class, 'updateLoginPage'])->name('login-page.update');
         Route::put('/smtp', [PlatformSettingController::class, 'updateSmtp'])->name('smtp.update');
         Route::post('/smtp/test', [PlatformSettingController::class, 'testSmtp'])->name('smtp.test');
         Route::put('/payment-gateway', [PlatformSettingController::class, 'updatePaymentGateway'])->name('gateway.update');
@@ -261,10 +271,6 @@ Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function ()
      Route::post('/user/{id}/unblock', [AdminUserController::class, 'unblock'])->name('admin.user.unblock');
       Route::post('/user/delete/{id}', [UserController::class, 'delete'])->name('admin.user.delete');
       Route::post('/user/{user}/reset', [AdminUserController::class, 'requestPasswordReset'])->name('admin.user.reset');
-      Route::get('/user/{user}/reset/verify', [AdminUserController::class, 'showPasswordResetVerification'])->name('admin.user.reset.verify.form');
-      Route::post('/user/{user}/reset/verify', [AdminUserController::class, 'verifyPasswordResetOtp'])->name('admin.user.reset.verify');
-      Route::get('/user/{user}/reset/password', [AdminUserController::class, 'showPasswordResetForm'])->name('admin.user.reset.password.form');
-      Route::post('/user/{user}/reset/password', [AdminUserController::class, 'completePasswordReset'])->name('admin.user.reset.password');
 });
 
 
