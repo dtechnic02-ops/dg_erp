@@ -15,6 +15,7 @@ use App\Services\PlatformMailService;
 use App\Services\UserPasswordResetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -226,6 +227,29 @@ class AdminInitiatedPasswordResetTest extends TestCase
             ->assertSessionMissing('success');
         $this->assertStringNotContainsString('smtp-secret-password', $response->getContent());
         Mail::assertNothingSent();
+    }
+
+    public function test_stored_encryption_maps_to_supported_symfony_smtp_transport_schemes(): void
+    {
+        $smtp = PlatformSmtpSetting::query()->sole();
+        $configureMailer = new \ReflectionMethod(PlatformMailService::class, 'configureMailer');
+
+        foreach ([
+            'tls' => ['smtp', true],
+            'starttls' => ['smtp', true],
+            'ssl' => ['smtps', false],
+        ] as $storedEncryption => [$expectedScheme, $requiresTls]) {
+            $smtp->update(['encryption' => $storedEncryption]);
+            $configureMailer->invoke(app(PlatformMailService::class));
+
+            $mailerConfig = Config::get('mail.mailers.'.PlatformMailService::MAILER_NAME);
+            $this->assertSame($expectedScheme, $mailerConfig['scheme']);
+            $this->assertSame($requiresTls, $mailerConfig['require_tls']);
+
+            $transport = app('mail.manager')->mailer(PlatformMailService::MAILER_NAME)->getSymfonyTransport();
+            $this->assertStringStartsWith($expectedScheme.'://', (string) $transport);
+            app('mail.manager')->purge(PlatformMailService::MAILER_NAME);
+        }
     }
 
     private function user(string $email, int $roleId, ?int $companyId = null): User

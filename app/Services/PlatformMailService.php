@@ -52,7 +52,9 @@ class PlatformMailService
             'port' => $smtp->port,
             'username' => $smtp->username,
             'password' => $smtp->password,
-            'scheme' => $smtp->encryption === 'starttls' ? null : $smtp->encryption,
+            'scheme' => $smtp->encryption === 'ssl' ? 'smtps' : 'smtp',
+            'auto_tls' => in_array($smtp->encryption, ['tls', 'starttls'], true),
+            'require_tls' => in_array($smtp->encryption, ['tls', 'starttls'], true),
             'timeout' => null,
         ]);
         Config::set('mail.from', [
