@@ -70,19 +70,19 @@
                         <h2 class="h6 mb-0">Add Staff</h2>
                     </header>
                     <div class="card-body dg-card-body">
-                        <form method="POST" action="{{ route('company.users.store') }}" class="row g-3">
+                        <form method="POST" action="{{ route('company.users.store') }}" class="row g-3" autocomplete="off">
                             @csrf
                             <div class="col-md-3">
                                 <label for="name" class="form-label">Name</label>
-                                <input type="text" name="name" id="name" class="form-control dg-input" value="{{ old('name') }}" required>
+                                <input type="text" name="name" id="name" class="form-control dg-input" value="{{ old('name') }}" autocomplete="off" required>
                             </div>
                             <div class="col-md-3">
                                 <label for="email" class="form-label">Email</label>
-                                <input type="email" name="email" id="email" class="form-control dg-input" value="{{ old('email') }}" required>
+                                <input type="email" name="email" id="email" class="form-control dg-input" value="{{ old('email') }}" autocomplete="off" required>
                             </div>
                             <div class="col-md-2">
                                 <label for="password" class="form-label">Password</label>
-                                <input type="password" name="password" id="password" class="form-control dg-input" required>
+                                <input type="password" name="password" id="password" class="form-control dg-input" autocomplete="new-password" required>
                             </div>
                             <div class="col-md-2">
                                 <label for="job_role" class="form-label">Job Role</label>
