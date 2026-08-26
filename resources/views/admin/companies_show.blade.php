@@ -18,6 +18,9 @@
         <div class="d-flex gap-2 flex-wrap">
             <a href="{{ route('admin.companies') }}" class="btn btn-light dg-btn dg-btn-light">Back</a>
             <button type="button" class="btn btn-primary dg-btn dg-btn-primary" onclick="window.print()">Print A4</button>
+            @if((int) auth()->user()->role_id === \App\Models\Role::SUPER_ADMIN_ID && auth()->user()->hasPermission('platform_companies_delete'))
+                <a href="{{ route('admin.company.permanent-delete.show', $company) }}" class="btn btn-danger dg-btn dg-btn-danger">Permanent Delete</a>
+            @endif
         </div>
     </div>
 

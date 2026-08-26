@@ -113,8 +113,8 @@
                                         @if(auth()->user()->hasPermission('unblock_company') && $c->status !== 'active')
                                             <button type="button" class="btn btn-outline-success dg-btn dg-action-btn" data-bs-toggle="modal" data-bs-target="#company-unblock-modal-{{ $c->id }}">Unblock</button>
                                         @endif
-                                        @if(auth()->user()->hasPermission('delete_company'))
-                                            <button type="button" class="btn btn-outline-danger dg-btn dg-action-btn" data-bs-toggle="modal" data-bs-target="#company-delete-modal-{{ $c->id }}">Delete</button>
+                                        @if((int) auth()->user()->role_id === \App\Models\Role::SUPER_ADMIN_ID && auth()->user()->hasPermission('platform_companies_delete'))
+                                            <a href="{{ route('admin.company.permanent-delete.show', $c) }}" class="btn btn-outline-danger dg-btn dg-action-btn">Permanent Delete</a>
                                         @endif
                                     </div>
                                 </td>
@@ -146,9 +146,6 @@
     @endif
     @if(auth()->user()->hasPermission('unblock_company') && $c->status !== 'active')
         <div class="modal fade dg-modal" id="company-unblock-modal-{{ $c->id }}" tabindex="-1" aria-labelledby="company-unblock-title-{{ $c->id }}" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="company-unblock-title-{{ $c->id }}">Unblock company</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body">Restore access for <strong>{{ $c->company_name }}</strong>?</div><div class="modal-footer"><button type="button" class="btn btn-light dg-btn dg-btn-light" data-bs-dismiss="modal">Cancel</button><form method="POST" action="{{ route('admin.company.unblock', $c->id) }}">@csrf<button type="submit" class="btn btn-success dg-btn dg-btn-success">Unblock company</button></form></div></div></div></div>
-    @endif
-    @if(auth()->user()->hasPermission('delete_company'))
-        <div class="modal fade dg-modal" id="company-delete-modal-{{ $c->id }}" tabindex="-1" aria-labelledby="company-delete-title-{{ $c->id }}" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="company-delete-title-{{ $c->id }}">Delete company</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><form method="POST" action="{{ route('admin.company.delete', $c->id) }}" class="dg-form"><div class="modal-body"><p>This existing workflow permanently deletes <strong>{{ $c->company_name }}</strong> and its users. Enter your admin password to confirm.</p><label for="company-delete-password-{{ $c->id }}" class="form-label">Admin password</label><input id="company-delete-password-{{ $c->id }}" class="form-control dg-input" type="password" name="admin_password" autocomplete="current-password" required></div><div class="modal-footer">@csrf<button type="button" class="btn btn-light dg-btn dg-btn-light" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger dg-btn dg-btn-danger">Delete company</button></div></form></div></div></div>
     @endif
 @endforeach
 @endsection

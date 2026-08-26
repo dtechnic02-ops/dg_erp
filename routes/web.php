@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PlatformSettingController;
 use App\Http\Controllers\Admin\CompanyController;
+use App\Http\Controllers\Admin\CompanyPermanentDeletionController;
 use App\Http\Controllers\Admin\RolePermissionController;
 use App\Http\Controllers\Company\CustomerController;
 use App\Http\Controllers\CompanyRegisterController;
@@ -89,6 +90,7 @@ use App\Http\Controllers\Company\MaintenanceController;
 use App\Http\Controllers\Company\SupplierStatementController;
 use App\Http\Controllers\Company\CustomerStatementController;
 use App\Http\Controllers\Company\UserPermissionController;
+use App\Http\Controllers\Company\CompanyFactoryResetController;
 
 
 Route::get('/', PublicLoginController::class);
@@ -186,7 +188,13 @@ Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function ()
 
     Route::post('/company/block/{id}', [CompanyController::class, 'block'])->name('admin.company.block');
     Route::post('/company/unblock/{id}', [CompanyController::class, 'unblock'])->name('admin.company.unblock');
-    Route::post('/company/delete/{id}', [CompanyController::class, 'delete'])->middleware('platform.permission:platform_companies_delete')->name('admin.company.delete');
+    Route::middleware('platform.permission:platform_companies_delete')->prefix('/company/{company}/permanent-delete')->name('admin.company.permanent-delete.')->group(function () {
+        Route::get('/', [CompanyPermanentDeletionController::class, 'show'])->name('show');
+        Route::post('/otp', [CompanyPermanentDeletionController::class, 'sendOtp'])->name('otp');
+        Route::post('/destroy', [CompanyPermanentDeletionController::class, 'destroy'])->name('destroy');
+    });
+    Route::post('/company-deletion-audits/{audit}/retry-files', [CompanyPermanentDeletionController::class, 'retryFileCleanup'])
+        ->middleware('platform.permission:platform_companies_delete')->name('admin.company.permanent-delete.retry-files');
 
     Route::post('/company/limit/{id}', [CompanyController::class, 'updateLimit'])->middleware('platform.permission:platform_companies_edit')->name('admin.company.limit');
     Route::post('/company/customer-limit/{id}', [CompanyController::class, 'updateCustomerLimit'])->middleware('platform.permission:platform_companies_edit')->name('admin.company.customer.limit');
@@ -331,6 +339,13 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
             ->middleware('permission:view_company_profile')->name('edit');
         Route::put('/', [\App\Http\Controllers\Company\WhatsappSettingController::class, 'update'])
             ->middleware('permission:edit_company_profile')->name('update');
+    });
+
+    Route::prefix('settings/factory-reset')->name('settings.factory-reset.')->group(function () {
+        Route::get('/', [CompanyFactoryResetController::class, 'show'])->name('show');
+        Route::post('/otp', [CompanyFactoryResetController::class, 'sendOtp'])->name('otp');
+        Route::post('/execute', [CompanyFactoryResetController::class, 'execute'])->name('execute');
+        Route::post('/audits/{audit}/retry-files', [CompanyFactoryResetController::class, 'retryFileCleanup'])->name('retry-files');
     });
 
     Route::get('/subscription', [\App\Http\Controllers\Company\SubscriptionController::class, 'index'])->name('subscription.index');

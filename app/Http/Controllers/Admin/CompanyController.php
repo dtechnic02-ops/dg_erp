@@ -129,42 +129,6 @@ class CompanyController extends Controller
 
 
 
-    public function delete(Request $request, $id)
-
-    {
-
-        $this->authorizeDeleteCompany();
-
-
-
-        $admin = auth()->user();
-
-
-
-        if (! Hash::check($request->admin_password, $admin->password)) {
-
-            return back()->with('error', 'Wrong Admin Password');
-
-        }
-
-
-
-        $company = Company::findOrFail($id);
-
-
-
-        User::where('company_id', $company->id)->delete();
-
-        $company->delete();
-
-
-
-        return back()->with('success', 'Company Deleted');
-
-    }
-
-
-
     public function updateLimit(Request $request, $id)
 
     {

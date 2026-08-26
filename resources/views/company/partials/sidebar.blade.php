@@ -558,6 +558,11 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                                 <a href="{{ route('company.maintenance.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.maintenance.*') }}">Maintenance</a>
                             </div>
                             @endif
+                            @if((int) $user->role_id === \App\Models\Role::COMPANY_ADMIN_ID)
+                            <div class="dg-sidebar-child">
+                                <a href="{{ route('company.settings.factory-reset.show') }}" class="dg-sidebar-child-link text-danger {{ $linkActive('company.settings.factory-reset.*') }}">Factory Reset</a>
+                            </div>
+                            @endif
                         </div>
                     </div>
                 </div>

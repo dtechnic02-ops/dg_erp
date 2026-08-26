@@ -16,38 +16,30 @@ class DefaultChartAccountSeeder extends Seeder
             ->orderBy('id')
             ->chunkById(100, function ($companies): void {
                 foreach ($companies as $company) {
-                    DB::transaction(function () use ($company): void {
-                        $seededAccounts = [];
-
-                        foreach ($this->definitions() as $definition) {
-                            $parent = null;
-
-                            if ($definition['parent_system_code'] !== null) {
-                                $parent = $seededAccounts[$definition['parent_system_code']]
-                                    ?? ChartAccount::query()
-                                        ->forCompany($company->id)
-                                        ->where('system_code', $definition['parent_system_code'])
-                                        ->where('is_system', true)
-                                        ->first();
-
-                                if (! $parent) {
-                                    continue;
-                                }
-                            }
-
-                            $account = $this->upsertSystemAccount(
-                                $company->id,
-                                $definition,
-                                $parent?->id
-                            );
-
-                            if ($account) {
-                                $seededAccounts[$definition['system_code']] = $account;
-                            }
-                        }
-                    });
+                    $this->seedForCompany($company->id);
                 }
             });
+    }
+
+    public function seedForCompany(int $companyId): void
+    {
+        DB::transaction(function () use ($companyId): void {
+            $seededAccounts = [];
+
+            foreach ($this->definitions() as $definition) {
+                $parent = null;
+                if ($definition['parent_system_code'] !== null) {
+                    $parent = $seededAccounts[$definition['parent_system_code']]
+                        ?? ChartAccount::query()->forCompany($companyId)
+                            ->where('system_code', $definition['parent_system_code'])
+                            ->where('is_system', true)->first();
+                    if (! $parent) continue;
+                }
+
+                $account = $this->upsertSystemAccount($companyId, $definition, $parent?->id);
+                if ($account) $seededAccounts[$definition['system_code']] = $account;
+            }
+        });
     }
 
     private function upsertSystemAccount(int $companyId, array $definition, ?int $parentId): ?ChartAccount
