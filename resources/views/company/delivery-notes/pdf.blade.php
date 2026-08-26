@@ -35,7 +35,7 @@
         </tr>
         <tr>
             <th>Delivery Date</th>
-            <td>{{ $deliveryNote->delivery_date?->format('d-m-Y') ?? '-' }}</td>
+            <td>{{ $deliveryNote->delivery_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $deliveryNote->delivery_date])</td>
             <th>Status</th>
             <td>{{ \App\Models\DeliveryNote::statusLabel($deliveryNote->status) }}</td>
         </tr>

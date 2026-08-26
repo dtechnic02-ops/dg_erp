@@ -93,7 +93,7 @@
                                 <tbody>
                                     <tr><th width="220">Delivery No</th><td>{{ $deliveryNote->delivery_no }}</td></tr>
                                     <tr><th>Financial Year</th><td>{{ $deliveryNote->financialYear->name ?? '-' }}</td></tr>
-                                    <tr><th>Delivery Date</th><td>{{ $deliveryNote->delivery_date?->format('d-m-Y') ?? '-' }}</td></tr>
+                                    <tr><th>Delivery Date</th><td>{{ $deliveryNote->delivery_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $deliveryNote->delivery_date])</td></tr>
                                     <tr><th>Customer</th><td>{{ $deliveryNote->customer->name ?? '-' }}</td></tr>
                                     <tr><th>Sales Invoice</th><td>{{ $deliveryNote->salesInvoice->invoice_no ?? '-' }}</td></tr>
                                     <tr><th>Employee</th><td>{{ $deliveryNote->employee->full_name ?? '-' }}</td></tr>

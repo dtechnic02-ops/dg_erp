@@ -185,7 +185,7 @@
                                     @forelse ($transactions as $transaction)
                                         <tr class="dg-row">
                                             <td>{{ $transactions->firstItem() + $loop->index }}</td>
-                                            <td>{{ $transaction->transaction_date }}</td>
+                                            <td>{{ $transaction->transaction_date }} @include('company.components.nepali-date-display', ['adDate' => $transaction->transaction_date])</td>
                                             <td>{{ $transaction->voucher_no }}</td>
                                             <td>{{ $transaction->account->account_name ?? '' }}</td>
                                             <td>{{ $transaction->description }}</td>

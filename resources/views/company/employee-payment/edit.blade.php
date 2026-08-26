@@ -57,6 +57,7 @@
                                     <label for="payment_date" class="form-label">Payment Date *</label>
                                     <input type="date" name="payment_date" id="payment_date" value="{{ old('payment_date', $employeePayment->payment_date?->format('Y-m-d')) }}" class="form-control dg-input" required>
                                 </div>
+                                @include('company.components.nepali-date-field', ['adInputId' => 'payment_date', 'adDate' => old('payment_date', $employeePayment->payment_date), 'columnClass' => 'col-md-4'])
 
                                 <div class="col-md-4">
                                     <label for="account_id" class="form-label">Payment Account *</label>

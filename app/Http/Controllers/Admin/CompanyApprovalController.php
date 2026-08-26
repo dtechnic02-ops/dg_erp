@@ -20,15 +20,19 @@ use App\Models\SubscriptionPlan;
 use App\Models\Role;
 
 use App\Models\User;
+use App\Mail\CompanyRegistrationApprovedMail;
 
 use App\Services\SubscriptionService;
 use App\Services\PlatformAuthorizationService;
+use App\Services\PlatformMailService;
 
 use Illuminate\Support\Facades\DB;
 
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 use RuntimeException;
+use Throwable;
 
 
 
@@ -42,7 +46,8 @@ class CompanyApprovalController extends Controller
 
     public function __construct(
         private SubscriptionService $subscriptionService,
-        private PlatformAuthorizationService $platformAuthorization
+        private PlatformAuthorizationService $platformAuthorization,
+        private PlatformMailService $platformMail,
     )
 
     {
@@ -114,7 +119,7 @@ class CompanyApprovalController extends Controller
 
         try {
 
-            DB::transaction(function () use ($reg) {
+            [$company, $user] = DB::transaction(function () use ($reg) {
 
                 $company = Company::firstOrCreate(
 
@@ -185,12 +190,33 @@ class CompanyApprovalController extends Controller
 
                 $reg->update(['status' => 'approved']);
 
+                return [$company, $user];
+
             });
 
         } catch (RuntimeException $e) {
 
             return back()->with('error', $e->getMessage());
 
+        }
+
+        try {
+            $this->platformMail->send($reg->email, new CompanyRegistrationApprovedMail(
+                adminName: $user->name,
+                companyName: $company->company_name,
+                loginEmail: $user->email,
+                loginUrl: route('login'),
+            ));
+        } catch (Throwable $e) {
+            Log::warning('Company registration approval email could not be sent.', [
+                'registration_id' => $reg->id,
+                'company_id' => $company->id,
+                'user_id' => $user->id,
+                'exception' => $e::class,
+            ]);
+
+            return redirect()->route('admin.registrations')
+                ->with('warning', 'Company approved successfully, but the approval email could not be sent.');
         }
 
 

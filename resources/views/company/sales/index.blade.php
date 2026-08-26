@@ -62,13 +62,13 @@
                         <h2 class="h6 mb-0">Filter</h2>
                     </header>
 
-                    <div class="card-body dg-card-body">
+                    <div class="card-body dg-card-body dg-filter-card-body">
                         <form method="GET" action="{{ route('company.sales.index') }}">
-                            <div class="row g-2 align-items-end">
+                            <div class="dg-filter-grid">
 
-                                <div class="col-md-2 col-lg-1">
-                                    <label for="financial_year_id" class="form-label">Financial Year</label>
-                                    <select name="financial_year_id" id="financial_year_id" class="form-select dg-select">
+                                <div class="dg-filter-field dg-filter-field-fy">
+                                    <label for="financial_year_id" class="dg-filter-label">Financial Year</label>
+                                    <select name="financial_year_id" id="financial_year_id" class="form-select dg-select dg-filter-control">
                                         <option value="">All Years</option>
                                         @foreach ($financialYears as $financialYear)
                                             <option value="{{ $financialYear->id }}" @selected(
@@ -80,19 +80,19 @@
                                     </select>
                                 </div>
 
-                                <div class="col-md-2 col-lg-1">
-                                    <label for="start_date" class="form-label">Date From</label>
-                                    <input type="date" name="start_date" id="start_date" class="form-control dg-input" value="{{ request('start_date', !empty($startDate) ? \Illuminate\Support\Carbon::parse($startDate)->format('Y-m-d') : '') }}">
+                                <div class="dg-filter-field dg-filter-field-date">
+                                    <label for="start_date" class="dg-filter-label">Date From</label>
+                                    <input type="date" name="start_date" id="start_date" class="form-control dg-input dg-filter-control" value="{{ request('start_date', !empty($startDate) ? \Illuminate\Support\Carbon::parse($startDate)->format('Y-m-d') : '') }}">
                                 </div>
 
-                                <div class="col-md-2 col-lg-1">
-                                    <label for="end_date" class="form-label">Date To</label>
-                                    <input type="date" name="end_date" id="end_date" class="form-control dg-input" value="{{ request('end_date', !empty($endDate) ? \Illuminate\Support\Carbon::parse($endDate)->format('Y-m-d') : '') }}">
+                                <div class="dg-filter-field dg-filter-field-date">
+                                    <label for="end_date" class="dg-filter-label">Date To</label>
+                                    <input type="date" name="end_date" id="end_date" class="form-control dg-input dg-filter-control" value="{{ request('end_date', !empty($endDate) ? \Illuminate\Support\Carbon::parse($endDate)->format('Y-m-d') : '') }}">
                                 </div>
 
-                                <div class="col-md-3 col-lg-2">
-                                    <label for="customer_id" class="form-label">Customer</label>
-                                    <select name="customer_id" id="customer_id" class="form-select dg-select">
+                                <div class="dg-filter-field dg-filter-field-customer">
+                                    <label for="customer_id" class="dg-filter-label">Customer</label>
+                                    <select name="customer_id" id="customer_id" class="form-select dg-select dg-filter-control">
                                         <option value="">All Customers</option>
                                         @foreach ($customers as $customer)
                                             <option value="{{ $customer->id }}" @selected(request('customer_id') == $customer->id)>{{ $customer->name }}</option>
@@ -100,14 +100,14 @@
                                     </select>
                                 </div>
 
-                                <div class="col-md-2 col-lg-1">
-                                    <label for="search" class="form-label">Invoice No</label>
-                                    <input type="text" name="search" id="search" class="form-control dg-input" value="{{ request('search') }}" placeholder="Invoice No">
+                                <div class="dg-filter-field dg-filter-field-invoice">
+                                    <label for="search" class="dg-filter-label">Invoice No</label>
+                                    <input type="text" name="search" id="search" class="form-control dg-input dg-filter-control" value="{{ request('search') }}" placeholder="Invoice No">
                                 </div>
 
-                                <div class="col-md-2 col-lg-2">
-                                    <label for="payment_status" class="form-label">Payment Status</label>
-                                    <select name="payment_status" id="payment_status" class="form-select dg-select">
+                                <div class="dg-filter-field dg-filter-field-status">
+                                    <label for="payment_status" class="dg-filter-label">Payment Status</label>
+                                    <select name="payment_status" id="payment_status" class="form-select dg-select dg-filter-control">
                                         <option value="">All Status</option>
                                         <option value="paid" @selected(request('payment_status') == 'paid')>Paid</option>
                                         <option value="partial" @selected(request('payment_status') == 'partial')>Partial</option>
@@ -116,9 +116,9 @@
                                     </select>
                                 </div>
 
-                                <div class="col-md-2 col-lg-1">
-                                    <label for="status" class="form-label">Status</label>
-                                    <select name="status" id="status" class="form-select dg-select">
+                                <div class="dg-filter-field dg-filter-field-status">
+                                    <label for="status" class="dg-filter-label">Status</label>
+                                    <select name="status" id="status" class="form-select dg-select dg-filter-control">
                                         <option value="" @selected(request()->has('status') && request('status') === '')>All</option>
                                         <option value="1" @selected(!request()->has('status') || request('status') === '1')>Active</option>
                                         <option value="0" @selected(request('status') === '0')>Cancelled</option>
@@ -129,9 +129,12 @@
                                     <input type="hidden" name="per_page" value="{{ request('per_page') }}">
                                 @endif
 
-                                <div class="col-md-2 col-lg-2 d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary dg-btn">Search</button>
-                                    <a href="{{ route('company.sales.index') }}" class="btn btn-outline-secondary dg-btn">Reset</a>
+                                <div class="dg-filter-field dg-filter-field-actions">
+                                    <span class="dg-filter-label-action" aria-hidden="true"></span>
+                                    <div class="dg-filter-actions">
+                                        <button type="submit" class="btn btn-primary dg-btn dg-filter-btn">Search</button>
+                                        <a href="{{ route('company.sales.index') }}" class="btn btn-outline-secondary dg-btn dg-filter-btn">Reset</a>
+                                    </div>
                                 </div>
 
                             </div>
@@ -227,7 +230,7 @@
                                         <tr class="dg-row">
                                             <td>{{ $invoices->firstItem() + $loop->index }}</td>
                                             <td>{{ $invoice->invoice_no }}</td>
-                                            <td class="dg-col-date">{{ \Illuminate\Support\Carbon::parse($invoice->sale_date)->format('d-m-Y') }}</td>
+                                            <td class="dg-col-date">{{ \Illuminate\Support\Carbon::parse($invoice->sale_date)->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $invoice->sale_date])</td>
                                             <td class="dg-col-date">{{ $invoice->due_date ? \Illuminate\Support\Carbon::parse($invoice->due_date)->format('d-m-Y') : '-' }}</td>
                                             <td>{{ $invoice->customer->name ?? '-' }}</td>
                                             <td class="dg-col-num dg-col-total">{{ number_format($invoice->grand_total, 2) }}</td>

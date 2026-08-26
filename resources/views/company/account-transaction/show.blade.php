@@ -23,7 +23,7 @@
                     Transaction Date :
                 </strong>
                 <br>
-                {{ $transaction->transaction_date }}
+                {{ $transaction->transaction_date }} @include('company.components.nepali-date-display', ['adDate' => $transaction->transaction_date])
             </div>
 
             <div class="col-md-6 mb-3">

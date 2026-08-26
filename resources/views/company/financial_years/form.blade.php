@@ -59,7 +59,9 @@ required>
 </div>
 
 
-<div class="mb-3">
+<div class="row g-3 mb-3">
+
+<div class="col-md-6">
 
 <label>Start Date</label>
 
@@ -71,6 +73,8 @@ class="form-control"
 
 name="start_date"
 
+id="start_date"
+
 value="{{ old(
 'start_date',
 $financialYear->start_date ?? ''
@@ -80,8 +84,14 @@ required>
 
 </div>
 
+@include('company.components.nepali-date-field', ['adInputId' => 'start_date', 'adDate' => old('start_date', $financialYear->start_date ?? ''), 'columnClass' => 'col-md-6'])
 
-<div class="mb-3">
+</div>
+
+
+<div class="row g-3 mb-3">
+
+<div class="col-md-6">
 
 <label>End Date</label>
 
@@ -93,12 +103,18 @@ class="form-control"
 
 name="end_date"
 
+id="end_date"
+
 value="{{ old(
 'end_date',
 $financialYear->end_date ?? ''
 ) }}"
 
 required>
+
+</div>
+
+@include('company.components.nepali-date-field', ['adInputId' => 'end_date', 'adDate' => old('end_date', $financialYear->end_date ?? ''), 'columnClass' => 'col-md-6'])
 
 </div>
 

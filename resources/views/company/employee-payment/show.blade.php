@@ -60,7 +60,7 @@
                             <table class="table dg-table">
                                 <tbody>
                                     <tr><th width="220">Voucher No</th><td>{{ $employeePayment->voucher_no }}</td></tr>
-                                    <tr><th>Payment Date</th><td>{{ $employeePayment->payment_date?->format('Y-m-d') }}</td></tr>
+                                    <tr><th>Payment Date</th><td>{{ $employeePayment->payment_date?->format('Y-m-d') }} @include('company.components.nepali-date-display', ['adDate' => $employeePayment->payment_date])</td></tr>
                                     <tr><th>Employee</th><td>{{ $employeePayment->employee->full_name ?? $employeePayment->employee->first_name }}</td></tr>
                                     <tr><th>Salary Sheet</th><td>{{ $salarySheet->salary_month ?? '-' }}</td></tr>
                                     <tr><th>Account</th><td>{{ $employeePayment->account->account_name ?? '-' }}</td></tr>

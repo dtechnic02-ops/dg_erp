@@ -71,7 +71,16 @@ class AdminInitiatedPasswordResetTest extends TestCase
         $this->assertNull($resetRequest->pending_password_hash);
 
         $token = basename(parse_url($resetMail->resetUrl, PHP_URL_PATH));
-        $this->get($resetMail->resetUrl)->assertOk();
+        $this->get($resetMail->resetUrl)
+            ->assertOk()
+            ->assertSee('Set New Password')
+            ->assertSee($target->email)
+            ->assertSee('Send Verification Code')
+            ->assertSee(route('login'), false)
+            ->assertSee(route('password-reset.password.submit', ['token' => $token]), false)
+            ->assertSee('name="password"', false)
+            ->assertSee('name="password_confirmation"', false)
+            ->assertSee('name="_token"', false);
 
         $newPassword = 'DG-Secure-Password-2026!';
         $passwordResponse = $this->post(route('password-reset.password.submit', ['token' => $token]), [

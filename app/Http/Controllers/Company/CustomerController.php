@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use Illuminate\Http\Request;
 use App\Models\Customer;
 use App\Services\ValidationService;
+use App\Services\WhatsappShareService;
 use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
@@ -713,17 +714,33 @@ public function show($id)
     )
     ->findOrFail($id);
 
+    $whatsappShareEnabled = app(WhatsappShareService::class)->isEnabled(auth()->user()->company);
+
     return view(
 
         'company.customers.show',
 
         compact(
 
-            'customer'
+            'customer',
+            'whatsappShareEnabled'
 
         )
 
     );
+}
+
+public function whatsappShare($id, WhatsappShareService $whatsappShareService)
+{
+    $this->authorizeCompanyPermission('view_customer');
+    $company = auth()->user()->company;
+    $customer = Customer::where('company_id', $company->id)->findOrFail($id);
+
+    return redirect()->away($whatsappShareService->customerShareUrl(
+        $company,
+        $customer,
+        $customer->current_balance
+    ));
 }
 
 /* =====================

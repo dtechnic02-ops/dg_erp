@@ -200,7 +200,7 @@
                                         <tr class="dg-row">
                                             <td>{{ $deliveryNotes->firstItem() + $loop->index }}</td>
                                             <td>{{ $deliveryNote->delivery_no }}</td>
-                                            <td>{{ $deliveryNote->delivery_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $deliveryNote->delivery_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $deliveryNote->delivery_date])</td>
                                             <td>{{ $deliveryNote->customer->name ?? '-' }}</td>
                                             <td>{{ $deliveryNote->salesInvoice->invoice_no ?? '-' }}</td>
                                             <td>{{ $deliveryNote->employee->full_name ?? '-' }}</td>

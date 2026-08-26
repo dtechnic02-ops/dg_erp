@@ -71,6 +71,10 @@ class GlobalAdBsRolloutTest extends TestCase
             'loan-payment/create.blade.php' => 'payment_date', 'loan-payment/edit.blade.php' => 'payment_date',
             'loan-saving-withdraw/create.blade.php' => 'date',
             'opening_balance/partials/form.blade.php' => 'business_date',
+            'contra/create.blade.php' => 'contra_date', 'contra/edit.blade.php' => 'contra_date',
+            'delivery-notes/create.blade.php' => 'delivery_date',
+            'employee-payment/create.blade.php' => 'payment_date', 'employee-payment/edit.blade.php' => 'payment_date',
+            'financial_years/form.blade.php' => 'start_date',
         ];
 
         foreach ($forms as $path => $field) {
@@ -97,6 +101,15 @@ class GlobalAdBsRolloutTest extends TestCase
             'loan-saving-ledger/show.blade.php', 'loan-saving-ledger/index.blade.php',
             'stock-ledger/index.blade.php', 'opening_balance/show.blade.php', 'opening_balance/print.blade.php',
             'customer-statement/index.blade.php', 'supplier-statement/index.blade.php',
+            'sales/index.blade.php', 'sales/print-list.blade.php',
+            'contra/index.blade.php', 'contra/show.blade.php', 'contra/print.blade.php',
+            'account-transaction/index.blade.php', 'account-transaction/show.blade.php',
+            'accounting-reports/general-ledger.blade.php', 'stock-ledger/pdf.blade.php',
+            'delivery-notes/index.blade.php', 'delivery-notes/show.blade.php', 'delivery-notes/pdf.blade.php',
+            'employee-payment/index.blade.php', 'employee-payment/show.blade.php',
+            'employee-payment/print.blade.php', 'employee-payment/print-list.blade.php',
+            'salary-sheets/show.blade.php',
+            'financial_years/index.blade.php',
         ];
 
         foreach ($views as $path) {
@@ -134,11 +147,13 @@ class GlobalAdBsRolloutTest extends TestCase
         $this->assertStringContainsString('readonly', $field);
         $this->assertStringNotContainsString('name="payment_date_bs"', $field);
 
-        $source = file_get_contents(resource_path('views/company/components/nepali-date-field.blade.php'));
-        $this->assertStringContainsString("addEventListener('change', synchronizeBsDate)", $source);
-        $this->assertStringContainsString('synchronizeBsDate();', $source);
-        $this->assertStringContainsString("route('company.calendar.ad-to-bs')", $source);
-        $this->assertStringNotContainsString('convertAdToBs', $source);
+        $component = file_get_contents(resource_path('views/company/components/nepali-date-field.blade.php'));
+        $javascript = file_get_contents(public_path('assets/company/js/dg.js'));
+        $this->assertStringContainsString("route('company.calendar.ad-to-bs')", $component);
+        $this->assertStringContainsString("addEventListener('change', synchronize)", $javascript);
+        $this->assertStringContainsString('synchronize();', $javascript);
+        $this->assertStringContainsString("url.searchParams.set('date', adInput.value)", $javascript);
+        $this->assertStringNotContainsString('convertAdToBs', $component.$javascript);
     }
 
     public function test_no_bs_schema_or_alternate_financial_date_is_introduced(): void
@@ -150,5 +165,23 @@ class GlobalAdBsRolloutTest extends TestCase
             $this->assertNotSame('', $field);
             $this->assertStringNotContainsString('_bs', $field);
         }
+    }
+
+    public function test_stock_pdf_uses_business_date_instead_of_audit_timestamp(): void
+    {
+        $source = file_get_contents(resource_path('views/company/stock-ledger/pdf.blade.php'));
+
+        $this->assertStringContainsString('$move->transaction_date', $source);
+        $this->assertStringNotContainsString('$move->created_at', $source);
+    }
+
+    public function test_financial_year_start_and_end_dates_use_readonly_live_bs_fields(): void
+    {
+        $source = file_get_contents(resource_path('views/company/financial_years/form.blade.php'));
+
+        $this->assertStringContainsString("'adInputId' => 'start_date'", $source);
+        $this->assertStringContainsString("'adInputId' => 'end_date'", $source);
+        $this->assertStringNotContainsString('name="start_date_bs"', $source);
+        $this->assertStringNotContainsString('name="end_date_bs"', $source);
     }
 }

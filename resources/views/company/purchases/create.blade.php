@@ -4,7 +4,7 @@
 
 <div class="dg-page">
 
-    <header class="dg-toolbar">
+    <header class="dg-toolbar py-2">
         <div class="container-fluid">
             <div class="row align-items-center g-2">
                 <div class="col">
@@ -71,18 +71,18 @@
             <form id="dgForm" method="POST" action="{{ route('company.purchases.store') }}">
                 @csrf
 
-                <section class="dg-section">
+                <section class="dg-section mb-2">
                     <article class="card dg-card">
-                        <header class="card-header dg-card-header">
+                        <header class="card-header dg-card-header py-2 px-3">
                             <h2 class="h6 mb-0">Invoice Information</h2>
                         </header>
 
-                        <div class="card-body dg-card-body">
-                            <div class="row g-3 align-items-start">
+                        <div class="card-body dg-card-body p-3">
+                            <div class="row g-2 align-items-start">
 
-                                <div class="col-md-2">
-                                    <label for="invoice_no" class="form-label">Invoice No</label>
-                                    <input type="text" id="invoice_no" class="form-control dg-input" value="{{ $invoiceNo }}" readonly>
+                                <div class="col-xl-2 col-md-4 col-sm-6">
+                                    <label for="invoice_no" class="form-label small fw-semibold mb-1">Invoice No</label>
+                                    <input type="text" id="invoice_no" class="form-control form-control-sm dg-input" value="{{ $invoiceNo }}" readonly>
                                 </div>
 
                                 <div class="col-md-2 d-none">
@@ -90,26 +90,26 @@
                                     <input type="text" id="financial_year" class="form-control dg-input" value="{{ $activeFy->name ?? '' }}" readonly>
                                 </div>
 
-                                <div class="col-md-2">
-                                    <label for="purchase_date" class="form-label">Purchase Date</label>
-                                    <input type="date" name="purchase_date" id="purchase_date" class="form-control dg-input" value="{{ old('purchase_date', date('Y-m-d')) }}" required>
+                                <div class="col-xl-2 col-md-4 col-sm-6">
+                                    <label for="purchase_date" class="form-label small fw-semibold mb-1">Purchase Date</label>
+                                    <input type="date" name="purchase_date" id="purchase_date" class="form-control form-control-sm dg-input" value="{{ old('purchase_date', date('Y-m-d')) }}" required>
                                 </div>
-                                @include('company.components.nepali-date-field', ['adInputId' => 'purchase_date', 'adDate' => old('purchase_date', date('Y-m-d'))])
+                                @include('company.components.nepali-date-field', ['adInputId' => 'purchase_date', 'adDate' => old('purchase_date', date('Y-m-d')), 'columnClass' => 'col-xl-2 col-md-4 col-sm-6'])
 
-                                <div class="col-md-3">
-                                    <label for="supplier_id" class="form-label">Supplier</label>
-                                    <select name="supplier_id" id="supplier_id" class="form-select dg-select" required>
+                                <div class="col-xl-3 col-md-6">
+                                    <label for="supplier_id" class="form-label small fw-semibold mb-1">Supplier</label>
+                                    <select name="supplier_id" id="supplier_id" class="form-select form-select-sm dg-select" required>
                                         <option value="">Select Supplier</option>
                                         @foreach ($suppliers as $supplier)
                                             <option value="{{ $supplier->id }}" data-balance="{{ $supplier->current_balance }}" @selected(old('supplier_id') == $supplier->id)>{{ $supplier->name }}</option>
                                         @endforeach
                                     </select>
-                                    <small class="form-text text-muted dg-note">Supplier Balance: {{ $selectedSupplierBalance }}</small>
+                                    <small class="form-text text-muted dg-note d-block mt-1 lh-sm">Supplier Balance: {{ $selectedSupplierBalance }}</small>
                                 </div>
 
-                                <div class="col-md-5">
-                                    <label for="barcode" class="form-label">Barcode</label>
-                                    <input type="text" name="barcode" id="barcode" class="form-control dg-input" placeholder="Scan or enter barcode">
+                                <div class="col-xl-3 col-md-6">
+                                    <label for="barcode" class="form-label small fw-semibold mb-1">Barcode</label>
+                                    <input type="text" name="barcode" id="barcode" class="form-control form-control-sm dg-input" placeholder="Scan or enter barcode">
                                 </div>
 
                             </div>
@@ -117,15 +117,15 @@
                     </article>
                 </section>
 
-                <section class="dg-section">
+                <section class="dg-section mb-2">
                     <article class="card dg-card">
-                        <header class="card-header dg-card-header">
+                        <header class="card-header dg-card-header py-2 px-3">
                             <h2 class="h6 mb-0">Items</h2>
                         </header>
 
-                        <div class="card-body dg-card-body">
+                        <div class="card-body dg-card-body p-2">
                             <div class="table-responsive">
-                                <table class="table dg-table">
+                                <table class="table table-sm align-middle mb-0 dg-table dg-table-compact">
                                     <thead class="dg-head">
                                         <tr>
                                             <th scope="col">#</th>
@@ -146,7 +146,7 @@
 
                                             <td>
                                                 <label class="form-label visually-hidden">Product or Service</label>
-                                                <select class="form-select dg-select dg-item-select" aria-label="Product or Service">
+                                                <select class="form-select form-select-sm dg-select dg-item-select" aria-label="Product or Service">
                                                     <option value="">Select Item</option>
                                                     <optgroup label="Products">
                                                         @foreach ($products as $product)
@@ -181,23 +181,23 @@
 
                                             <td>
                                                 <label class="form-label visually-hidden">Quantity</label>
-                                                <input type="number" name="quantity[]" class="form-control dg-input" min="1" step="1" aria-label="Quantity">
+                                                <input type="number" name="quantity[]" class="form-control form-control-sm dg-input" min="1" step="1" aria-label="Quantity">
                                             </td>
 
                                             <td>
                                                 <label class="form-label visually-hidden">Unit</label>
-                                                <input type="text" class="form-control dg-input dg-unit-display" value="-" readonly aria-label="Unit">
+                                                <input type="text" class="form-control form-control-sm dg-input dg-unit-display" value="-" readonly aria-label="Unit">
                                                 <small class="form-text text-muted dg-note dg-stock-note"></small>
                                             </td>
 
                                             <td>
                                                 <label class="form-label visually-hidden">Unit Cost</label>
-                                                <input type="number" name="unit_price[]" class="form-control dg-input" min="0" step="0.01" aria-label="Unit Cost">
+                                                <input type="number" name="unit_price[]" class="form-control form-control-sm dg-input" min="0" step="0.01" aria-label="Unit Cost">
                                             </td>
 
                                             <td>
                                                 <label class="form-label visually-hidden">VAT Rate</label>
-                                                <select name="vat_rate[]" class="form-select dg-select" aria-label="VAT Rate">
+                                                <select name="vat_rate[]" class="form-select form-select-sm dg-select" aria-label="VAT Rate">
                                                     <option value="0">No VAT</option>
                                                     @foreach ($vats as $vat)
                                                         <option value="{{ $vat->rate }}">{{ $vat->name }} ({{ $vat->rate }}%)</option>
@@ -207,12 +207,12 @@
 
                                             <td>
                                                 <label class="form-label visually-hidden">VAT Amount</label>
-                                                <input type="number" name="vat_amount[]" class="form-control dg-input" min="0" step="0.01" value="0" aria-label="VAT Amount">
+                                                <input type="number" name="vat_amount[]" class="form-control form-control-sm dg-input" min="0" step="0.01" value="0" aria-label="VAT Amount">
                                             </td>
 
                                             <td>
                                                 <label class="form-label visually-hidden">Line Total</label>
-                                                <input type="number" name="total_price[]" class="form-control dg-input" min="0" step="0.01" value="0" aria-label="Line Total">
+                                                <input type="number" name="total_price[]" class="form-control form-control-sm dg-input" min="0" step="0.01" value="0" aria-label="Line Total">
                                             </td>
 
                                             <td class="dg-action-col-compact d-print-none">
@@ -225,26 +225,26 @@
                                 </table>
                             </div>
 
-                            <button type="button" class="btn btn-outline-primary btn-sm dg-btn dg-add-item mt-2">+ Add Item</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm dg-btn dg-add-item mt-1">+ Add Item</button>
                         </div>
                     </article>
                 </section>
 
-                <section class="dg-section">
-                    <div class="row g-3">
+                <section class="dg-section mb-2">
+                    <div class="row g-2">
 
                         <div class="col-md-6">
-                            <article class="card dg-card dg-payment">
-                                <header class="card-header dg-card-header">
+                            <article class="card dg-card dg-payment h-100">
+                                <header class="card-header dg-card-header py-2 px-3">
                                     <h2 class="h6 mb-0">Payment Information</h2>
                                 </header>
 
-                                <div class="card-body dg-card-body">
-                                    <div class="row g-3">
+                                <div class="card-body dg-card-body p-3">
+                                    <div class="row g-2">
 
                                         <div class="col-md-6">
-                                            <label for="account_id" class="form-label">Payment Account</label>
-                                            <select name="account_id" id="account_id" class="form-select dg-select">
+                                            <label for="account_id" class="form-label small fw-semibold mb-1">Payment Account</label>
+                                            <select name="account_id" id="account_id" class="form-select form-select-sm dg-select">
                                                 <option value="">Select Account</option>
                                                 @forelse ($accounts as $account)
                                                     <option value="{{ $account->id }}" data-balance="{{ $account->current_balance }}" @selected(old('account_id') == $account->id)>{{ $account->account_name }}</option>
@@ -252,22 +252,22 @@
                                                     <option value="" disabled>No active accounts found</option>
                                                 @endforelse
                                             </select>
-                                            <small class="form-text text-muted dg-note">Account Balance: {{ $selectedAccountBalance }}</small>
+                                            <small class="form-text text-muted dg-note d-block mt-1 lh-sm">Account Balance: {{ $selectedAccountBalance }}</small>
                                         </div>
 
                                         <div class="col-md-3">
-                                            <label for="paid_amount" class="form-label">Paid Amount</label>
-                                            <input type="number" name="paid_amount" id="paid_amount" class="form-control dg-input" min="0" step="0.01" value="{{ old('paid_amount', 0) }}">
+                                            <label for="paid_amount" class="form-label small fw-semibold mb-1">Paid Amount</label>
+                                            <input type="number" name="paid_amount" id="paid_amount" class="form-control form-control-sm dg-input" min="0" step="0.01" value="{{ old('paid_amount', 0) }}">
                                         </div>
 
                                         <div class="col-md-3">
-                                            <label for="discount_amount" class="form-label">Discount</label>
-                                            <input type="number" name="discount_amount" id="discount_amount" class="form-control dg-input" min="0" step="0.01" value="{{ number_format(old('discount_amount', 0), 2) }}">
+                                            <label for="discount_amount" class="form-label small fw-semibold mb-1">Discount</label>
+                                            <input type="number" name="discount_amount" id="discount_amount" class="form-control form-control-sm dg-input" min="0" step="0.01" value="{{ number_format(old('discount_amount', 0), 2) }}">
                                         </div>
 
                                         <div class="col-md-12">
-                                            <label for="note" class="form-label">Note</label>
-                                            <textarea name="note" id="note" class="form-control dg-textarea" rows="3">{{ old('note') }}</textarea>
+                                            <label for="note" class="form-label small fw-semibold mb-1">Note</label>
+                                            <textarea name="note" id="note" class="form-control form-control-sm dg-textarea" rows="2">{{ old('note') }}</textarea>
                                         </div>
 
                                     </div>
@@ -276,8 +276,8 @@
                         </div>
 
                         <div class="col-md-6">
-                            <article class="card dg-card">
-                                <header class="card-header dg-card-header">
+                            <article class="card dg-card h-100">
+                                <header class="card-header dg-card-header py-2 px-3">
                                     <h2 class="h6 mb-0">Summary</h2>
                                 </header>
                                 <div class="card-body dg-card-body dg-summary py-2">
@@ -344,7 +344,7 @@
 
                     </div>
 
-                    <div class="d-flex gap-2 mt-3">
+                    <div class="d-flex gap-2 mt-2">
                         <button type="submit" class="btn btn-primary dg-btn">Save Invoice</button>
                         <a href="{{ route('company.purchases.index') }}" class="btn btn-outline-secondary dg-btn">Cancel</a>
                     </div>

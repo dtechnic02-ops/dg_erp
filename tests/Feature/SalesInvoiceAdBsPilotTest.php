@@ -123,12 +123,13 @@ class SalesInvoiceAdBsPilotTest extends TestCase
     public function test_live_sync_calls_the_central_endpoint_without_a_javascript_conversion_algorithm(): void
     {
         $component = file_get_contents(resource_path('views/company/components/nepali-date-field.blade.php'));
+        $javascript = file_get_contents(public_path('assets/company/js/dg.js'));
 
         $this->assertStringContainsString("route('company.calendar.ad-to-bs')", $component);
-        $this->assertStringContainsString("addEventListener('change', synchronizeBsDate)", $component);
-        $this->assertStringContainsString('fetch(url', $component);
-        $this->assertStringNotContainsString('convertAdToBs', $component);
-        $this->assertStringNotContainsString('NepaliDate', $component);
+        $this->assertStringContainsString("addEventListener('change', synchronize)", $javascript);
+        $this->assertStringContainsString('fetch(url', $javascript);
+        $this->assertStringNotContainsString('convertAdToBs', $component.$javascript);
+        $this->assertStringNotContainsString('NepaliDate', $component.$javascript);
     }
 
     public function test_create_edit_show_and_print_use_derived_bs_without_changing_sales_persistence(): void

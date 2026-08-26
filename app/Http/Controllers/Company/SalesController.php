@@ -33,10 +33,13 @@ use App\Models\Company;
 use App\Services\ValidationService;
 use App\Services\NepaliDateService;
 use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
+use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
+use App\Services\WhatsappShareService;
 
 class SalesController extends Controller
 {
     use HandlesTransactionDocumentationEdit;
+    use AuthorizesCompanyPermission;
 
     public function __construct(
         private readonly SalesAccountingIntegrationService $salesAccountingIntegrationService,
@@ -1416,6 +1419,23 @@ public function print($id)
     );
 }
 
+public function whatsappShare($id, WhatsappShareService $whatsappShareService)
+{
+    $this->authorizeCompanyPermission('view_sales');
+    $companyId = (int) auth()->user()->company_id;
+    $invoice = SalesInvoice::with(['customer', 'company.countryMaster'])
+        ->where('company_id', $companyId)
+        ->findOrFail($id);
+
+    return redirect()->away($whatsappShareService->salesInvoiceShareUrl(
+        $invoice->company,
+        $invoice,
+        $invoice->sale_date->format('d-m-Y'),
+        $invoice->paid_amount,
+        $invoice->due_amount
+    ));
+}
+
 
     /**
      * SHOW
@@ -1442,12 +1462,14 @@ public function print($id)
     ->findOrFail($id);
 
     $saleDateBs = $this->deriveBsDateForCompany($invoice->company, $invoice->sale_date);
+    $whatsappShareEnabled = app(WhatsappShareService::class)->isEnabled($invoice->company);
 
     return view(
         'company.sales.show',
         compact(
             'invoice',
-            'saleDateBs'
+            'saleDateBs',
+            'whatsappShareEnabled'
         )
     );
 }

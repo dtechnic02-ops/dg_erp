@@ -12,6 +12,9 @@
                 <nav class="btn-group" aria-label="Purchase invoice toolbar">
                     <a href="{{ route('company.purchases.index') }}" class="btn btn-outline-secondary dg-btn">Back</a>
                     <a href="{{ route('company.purchases.print', $invoice->id) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
+                    @if($whatsappShareEnabled ?? false)
+                        <a href="{{ route('company.purchases.whatsapp-share', $invoice->id) }}" target="_blank" rel="noopener noreferrer" class="btn btn-success dg-btn">Open WhatsApp</a>
+                    @endif
                     @if ($invoice->status == 1)
                         <a href="{{ route('company.purchases.edit', $invoice->id) }}" class="btn btn-outline-primary dg-btn">Edit</a>
                     @endif

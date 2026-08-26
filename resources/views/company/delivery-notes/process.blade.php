@@ -49,7 +49,7 @@
                             <div class="row g-3">
                                 <div class="col-md-3"><strong>Invoice:</strong> {{ $deliveryNote->salesInvoice->invoice_no ?? '-' }}</div>
                                 <div class="col-md-3"><strong>Employee:</strong> {{ $deliveryNote->employee->full_name ?? '-' }}</div>
-                                <div class="col-md-3"><strong>Date:</strong> {{ $deliveryNote->delivery_date?->format('d-m-Y') }}</div>
+                                <div class="col-md-3"><strong>Date:</strong> {{ $deliveryNote->delivery_date?->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $deliveryNote->delivery_date])</div>
                                 <div class="col-md-3"><strong>Status:</strong> @include('company.delivery-notes.partials.status-badge', ['deliveryNote' => $deliveryNote])</div>
                             </div>
                         </div>

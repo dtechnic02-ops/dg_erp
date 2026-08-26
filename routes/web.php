@@ -326,6 +326,13 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
 
     Route::post('/profile/update',[\App\Http\Controllers\Company\CompanyClientController::class, 'update'])->middleware('permission:edit_company_profile')->name('profile.update');
 
+    Route::prefix('settings/whatsapp')->name('settings.whatsapp.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Company\WhatsappSettingController::class, 'edit'])
+            ->middleware('permission:view_company_profile')->name('edit');
+        Route::put('/', [\App\Http\Controllers\Company\WhatsappSettingController::class, 'update'])
+            ->middleware('permission:edit_company_profile')->name('update');
+    });
+
     Route::get('/subscription', [\App\Http\Controllers\Company\SubscriptionController::class, 'index'])->name('subscription.index');
     Route::post('/subscription/payment', [\App\Http\Controllers\Company\PaymentController::class, 'store'])
         ->middleware('permission:manage_subscription_module')
@@ -602,6 +609,9 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
 
         Route::get('/{id}/print',[CustomerController::class, 'printProfile'])->name('printProfile');
 
+        Route::get('/{id}/whatsapp-share',[CustomerController::class, 'whatsappShare'])
+            ->middleware('permission:view_customer')->name('whatsapp-share');
+
         Route::get('/{id}',[CustomerController::class, 'show'])->name('show');
 
     });
@@ -830,6 +840,9 @@ Route::prefix('vat-reports')
             [PurchaseController::class, 'show']
         )->name('show');
 
+        Route::get('/show/{id}/whatsapp-share', [PurchaseController::class, 'whatsappShare'])
+            ->middleware('permission:view_purchase')->name('whatsapp-share');
+
         Route::get(
             '/edit/{id}',
             [PurchaseController::class, 'edit']
@@ -886,6 +899,9 @@ Route::prefix('vat-reports')
             '/show/{id}',
             [SalesController::class, 'show']
         )->name('show');
+
+        Route::get('/show/{id}/whatsapp-share', [SalesController::class, 'whatsappShare'])
+            ->middleware('permission:view_sales')->name('whatsapp-share');
 
         Route::get(
             '/edit/{id}',

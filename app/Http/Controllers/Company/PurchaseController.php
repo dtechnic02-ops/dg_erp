@@ -27,6 +27,7 @@ use App\Models\StockMovement;
 
 use App\Services\ValidationService;
 use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
+use App\Services\WhatsappShareService;
 
 class PurchaseController extends Controller
 {
@@ -1551,12 +1552,32 @@ public function print($id)
     )
     ->findOrFail($id);
 
+    $whatsappShareEnabled = app(WhatsappShareService::class)->isEnabled($invoice->company);
+
     return view(
         'company.purchases.show',
         compact(
-            'invoice'
+            'invoice',
+            'whatsappShareEnabled'
         )
     );
+}
+
+public function whatsappShare($id, WhatsappShareService $whatsappShareService)
+{
+    $this->authorizeCompanyPermission('view_purchase');
+    $companyId = (int) auth()->user()->company_id;
+    $invoice = PurchaseInvoice::with(['supplier', 'company.countryMaster'])
+        ->where('company_id', $companyId)
+        ->findOrFail($id);
+
+    return redirect()->away($whatsappShareService->purchaseInvoiceShareUrl(
+        $invoice->company,
+        $invoice,
+        $invoice->purchase_date->format('d-m-Y'),
+        $invoice->paid_amount,
+        $invoice->due_amount
+    ));
 }
 
 public function edit($id)

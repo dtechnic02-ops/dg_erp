@@ -64,12 +64,15 @@
                 <input
                     type="date"
                     name="contra_date"
+                    id="contra_date"
                     class="form-control"
                     value="{{ old('contra_date',$contra->contra_date) }}"
                     required
                 >
 
             </div>
+
+            @include('company.components.nepali-date-field', ['adInputId' => 'contra_date', 'adDate' => old('contra_date', $contra->contra_date), 'columnClass' => 'col-md-6 mb-3'])
 
             <div class="col-md-6 mb-3">
 

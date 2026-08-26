@@ -3192,3 +3192,60 @@ DG.layout = (function () {
     };
 
 })();
+
+/* =========================================================
+   MODULE : SHARED NEPAL BUSINESS DATE DISPLAY
+   ========================================================= */
+
+DG.nepaliDate = (function () {
+
+    'use strict';
+
+    function initField(field) {
+        var adInput = document.getElementById(field.getAttribute('data-ad-input-id'));
+        var bsOutput = field.querySelector('input[readonly]');
+        var endpoint = field.getAttribute('data-conversion-url');
+
+        if (!adInput || !bsOutput || !endpoint) {
+            return;
+        }
+
+        async function synchronize() {
+            bsOutput.value = '';
+
+            if (!adInput.value) {
+                return;
+            }
+
+            var url = new URL(endpoint, window.location.origin);
+            url.searchParams.set('date', adInput.value);
+
+            try {
+                var response = await fetch(url, {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin'
+                });
+                var result = await response.json();
+                bsOutput.value = response.ok && result.applicable ? result.bs_date : '';
+            } catch (error) {
+                bsOutput.value = '';
+            }
+        }
+
+        adInput.addEventListener('change', synchronize);
+        synchronize();
+    }
+
+    function init() {
+        document.querySelectorAll('[data-nepali-date-field]').forEach(initField);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    return { init: init };
+
+})();

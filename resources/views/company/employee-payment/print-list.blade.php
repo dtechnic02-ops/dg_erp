@@ -198,7 +198,7 @@
                                     <tr class="dg-row">
                                         <td class="dg-col-num">{{ $loop->iteration }}</td>
                                         <td>{{ $payment->voucher_no }}</td>
-                                        <td class="dg-col-date">{{ $payment->payment_date?->format('d-m-Y') }}</td>
+                                        <td class="dg-col-date">{{ $payment->payment_date?->format('d-m-Y') }} @include('company.components.nepali-date-display', ['adDate' => $payment->payment_date])</td>
                                         <td>{{ $payment->salarySheet->salary_month ?? '-' }}</td>
                                         <td>{{ $payment->employee->full_name ?? $payment->employee->first_name ?? '-' }}</td>
                                         <td>{{ $payment->account->account_name ?? '-' }}</td>

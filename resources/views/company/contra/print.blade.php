@@ -43,7 +43,7 @@ $total += $contra->amount;
 
 <tr>
 <td>{{ $loop->iteration }}</td>
-<td>{{ $contra->contra_date }}</td>
+<td>{{ $contra->contra_date }} @include('company.components.nepali-date-display', ['adDate' => $contra->contra_date])</td>
 <td>{{ $contra->contra_no }}</td>
 <td>{{ $contra->fromAccount->account_name ?? '' }}</td>
 <td>{{ $contra->toAccount->account_name ?? '' }}</td>

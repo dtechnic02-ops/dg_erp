@@ -18,6 +18,13 @@
                 <button type="button" onclick="window.print()" class="btn btn-primary dg-btn">Print</button>
 
                 <a href="{{ route('company.customers.index') }}" class="btn btn-outline-primary dg-btn">Customer List</a>
+
+                @if($whatsappShareEnabled ?? false)
+                    <a href="{{ route('company.customers.whatsapp-share', $customer->id) }}"
+                       class="btn btn-success dg-btn"
+                       target="_blank"
+                       rel="noopener noreferrer">Open WhatsApp</a>
+                @endif
             </div>
         </div>
     @endunless

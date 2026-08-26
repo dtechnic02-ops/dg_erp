@@ -85,13 +85,13 @@ Action
 
 <td>
 
-{{ $fy->start_date }}
+{{ $fy->start_date }} @include('company.components.nepali-date-display', ['adDate' => $fy->start_date])
 
 </td>
 
 <td>
 
-{{ $fy->end_date }}
+{{ $fy->end_date }} @include('company.components.nepali-date-display', ['adDate' => $fy->end_date])
 
 </td>
 

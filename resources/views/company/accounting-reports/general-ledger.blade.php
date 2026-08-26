@@ -106,7 +106,7 @@
                                 <tbody class="dg-body">
                                     @forelse ($report['rows'] as $row)
                                         <tr class="dg-row">
-                                            <td class="dg-col-date">{{ $row['entry_date'] }}</td>
+                                            <td class="dg-col-date">{{ $row['entry_date'] }} @include('company.components.nepali-date-display', ['adDate' => $row['entry_date']])</td>
                                             <td>{{ $row['entry_number'] }}</td>
                                             <td>{{ $row['reference'] }}</td>
                                             <td>{{ $row['source'] }}</td>

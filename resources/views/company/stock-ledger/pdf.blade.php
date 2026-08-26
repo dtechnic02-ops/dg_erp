@@ -60,7 +60,7 @@
 
         <td>
 
-            {{ $move->created_at }}
+            {{ $move->transaction_date }} @include('company.components.nepali-date-display', ['adDate' => $move->transaction_date])
 
         </td>
 

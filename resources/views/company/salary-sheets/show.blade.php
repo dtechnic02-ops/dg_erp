@@ -104,7 +104,7 @@
                                             }
                                         @endphp
                                         <tr>
-                                            <td>{{ $payment->payment_date?->format('Y-m-d') }}</td>
+                                            <td>{{ $payment->payment_date?->format('Y-m-d') }} @include('company.components.nepali-date-display', ['adDate' => $payment->payment_date])</td>
                                             <td>
                                                 @if (userCan('salary.payment.view'))
                                                     <a href="{{ route('company.employee-payment.show', $payment->id) }}">{{ $payment->voucher_no }}</a>

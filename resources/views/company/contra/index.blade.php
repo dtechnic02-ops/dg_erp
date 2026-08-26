@@ -231,7 +231,7 @@
                         </td>
 
                         <td>
-                            {{ $contra->contra_date }}
+                            {{ $contra->contra_date }} @include('company.components.nepali-date-display', ['adDate' => $contra->contra_date])
                         </td>
 
                         <td>

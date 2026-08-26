@@ -116,6 +116,7 @@
                                         <label for="delivery_date" class="form-label">Delivery Date *</label>
                                         <input type="date" name="delivery_date" id="delivery_date" class="form-control dg-input" value="{{ old('delivery_date', date('Y-m-d')) }}" required>
                                     </div>
+                                    @include('company.components.nepali-date-field', ['adInputId' => 'delivery_date', 'adDate' => old('delivery_date', date('Y-m-d')), 'columnClass' => 'col-md-4'])
 
                                     <div class="col-12">
                                         <label for="remarks" class="form-label">Remarks</label>

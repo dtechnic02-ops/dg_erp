@@ -54,4 +54,9 @@ class Company extends Model
     {
         return $this->belongsToMany(Permission::class, 'company_permission');
     }
+
+    public function whatsappSetting()
+    {
+        return $this->hasOne(CompanyWhatsappSetting::class);
+    }
 }

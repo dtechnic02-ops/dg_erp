@@ -109,6 +109,7 @@ $accountingReportsOpen = request()->routeIs('company.accounting-reports.*');
 
 $settingsOpen = request()->routeIs(
     'company.profile',
+    'company.settings.whatsapp.*',
     'company.financial-years.*',
     'company.maintenance.*'
 );
@@ -544,6 +545,11 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.profile') }}" class="dg-sidebar-child-link {{ $linkActive('company.profile') }}">Profile</a>
                             </div>
+                            @if($user->hasPermission('view_company_profile'))
+                            <div class="dg-sidebar-child">
+                                <a href="{{ route('company.settings.whatsapp.edit') }}" class="dg-sidebar-child-link {{ $linkActive('company.settings.whatsapp.*') }}">WhatsApp Share</a>
+                            </div>
+                            @endif
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.financial-years.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.financial-years.*') }}">Financial Years</a>
                             </div>
