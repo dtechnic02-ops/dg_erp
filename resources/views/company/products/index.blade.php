@@ -200,8 +200,8 @@
                                 Showing {{ $products->firstItem() ?? 0 }} to {{ $products->lastItem() ?? 0 }} of {{ $products->total() }} records
                             </p>
 
-                            <nav aria-label="Product list pagination">
-                                {{ $products->links() }}
+                            <nav class="dg-pagination" aria-label="Product list pagination">
+                                {{ $products->withQueryString()->onEachSide(1)->links('pagination::bootstrap-5') }}
                             </nav>
                         </div>
                     </div>
