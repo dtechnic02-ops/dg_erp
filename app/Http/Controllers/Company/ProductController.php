@@ -116,6 +116,14 @@ $q->where(
         );
     }
 
+    if ($request->filled('category_id'))
+    {
+        $query->where(
+            'category_id',
+            $request->category_id
+        );
+    }
+
     return $query;
 
 }
@@ -203,8 +211,11 @@ public function index(Request $request)
    ->withQueryString();
 
    $brands = $this->companyBrands();
+   $categories = ProductCategory::where('company_id', auth()->user()->company_id)
+       ->orderBy('name')
+       ->get();
 
-   return view( 'company.products.index', compact('products', 'totalProducts', 'totalStockQuantity', 'totalOutOfStock', 'brands', 'perPage') );
+   return view( 'company.products.index', compact('products', 'totalProducts', 'totalStockQuantity', 'totalOutOfStock', 'brands', 'categories', 'perPage') );
 }
 
 
@@ -958,7 +969,9 @@ throw $e;
 
             $request->stock_filter,
 
-            $request->brand_id
+            $request->brand_id,
+
+            $request->category_id
 
         ),
 

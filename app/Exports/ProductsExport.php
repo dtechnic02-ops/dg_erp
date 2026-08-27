@@ -15,11 +15,14 @@ class ProductsExport implements FromCollection
 
     protected $brandId;
 
+    protected $categoryId;
+
     public function __construct(
         $companyId,
         $search = null,
         $stockFilter = null,
-        $brandId = null
+        $brandId = null,
+        $categoryId = null
     ) {
 
         $this->companyId =
@@ -33,6 +36,9 @@ class ProductsExport implements FromCollection
 
         $this->brandId =
             $brandId;
+
+        $this->categoryId =
+            $categoryId;
     }
 
     public function collection()
@@ -113,6 +119,14 @@ $q->where(
             $query->where(
                 'brand_id',
                 $this->brandId
+            );
+        }
+
+        if ($this->categoryId)
+        {
+            $query->where(
+                'category_id',
+                $this->categoryId
             );
         }
 

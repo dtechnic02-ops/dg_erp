@@ -8,10 +8,6 @@
         <div class="container-fluid">
             <div class="d-flex flex-nowrap align-items-center gap-2">
 
-                <div class="flex-shrink-0">
-                    <h1 class="h4 mb-0">Product Management</h1>
-                </div>
-
                 <div class="flex-fill d-flex justify-content-end align-items-center gap-2 flex-nowrap">
                     <form method="GET" class="d-flex gap-2">
                         <label for="search" class="visually-hidden">Search Name / Barcode</label>
@@ -23,6 +19,14 @@
                             <option value="out" {{ request('stock_filter') == 'out' ? 'selected' : '' }}>Out</option>
                             <option value="low" {{ request('stock_filter') == 'low' ? 'selected' : '' }}>Low</option>
                             <option value="available" {{ request('stock_filter') == 'available' ? 'selected' : '' }}>Available</option>
+                        </select>
+
+                        <label for="category_id" class="visually-hidden">Product Category Filter</label>
+                        <select name="category_id" id="category_id" class="form-select dg-select">
+                            <option value="">All Categories</option>
+                            @foreach ($categories as $category)
+                                <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>{{ $category->name }}</option>
+                            @endforeach
                         </select>
 
                         <label for="brand_id" class="visually-hidden">Brand Filter</label>
@@ -54,6 +58,12 @@
 
             <section class="dg-section">
                 <div class="dg-summary d-flex flex-row flex-nowrap justify-content-center align-items-center gap-3 mb-0 w-100">
+
+                    <div class="dg-summary-item mb-0 border-0 p-0">
+                        <span class="fw-semibold">Product Management</span>
+                    </div>
+
+                    <span>|</span>
 
                     <div class="dg-summary-item mb-0 border-0 p-0">
                         <span>Total Products :</span>
@@ -88,6 +98,7 @@
                             <input type="hidden" name="search" value="{{ request('search') }}">
                             <input type="hidden" name="stock_filter" value="{{ request('stock_filter') }}">
                             <input type="hidden" name="brand_id" value="{{ request('brand_id') }}">
+                            <input type="hidden" name="category_id" value="{{ request('category_id') }}">
 
                             <label for="per_page" class="mb-0 fw-bold">Show</label>
                             <select name="per_page" id="per_page" class="form-select form-select-sm dg-select w-auto" onchange="this.form.submit()">
