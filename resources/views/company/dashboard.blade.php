@@ -72,119 +72,134 @@
         @if($canSeeDashboard('inventory'))
         <div class="col-xl-3 col-lg-4 col-md-6">
             <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">📦 Products</div>
-                <div class="dg-value">
-                    {{ number_format($data['products']) }}
+                <div class="dg-dashboard-card-pair">
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title">📦 Products</div>
+                        <div class="dg-value">{{ number_format($data['products']) }}</div>
+                    </div>
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title">📦 Stock Items</div>
+                        <div class="dg-value">{{ number_format($data['stock_items']) }}</div>
+                    </div>
                 </div>
             </div>
         </div>
         @endif
 
-        @if($canSeeDashboard('sales'))
+        @if($canSeeDashboard('sales') || $canSeeDashboard('purchase'))
         <div class="col-xl-3 col-lg-4 col-md-6">
             <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">🧾 Sales</div>
-                <div class="dg-value">
-                    {{ number_format($data['sales']) }}
+                <div class="dg-dashboard-card-pair">
+                    @if($canSeeDashboard('sales'))
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title">🧾 Sales</div>
+                        <div class="dg-value">{{ number_format($data['sales']) }}</div>
+                    </div>
+                    @endif
+                    @if($canSeeDashboard('purchase'))
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title">🛒 Purchases</div>
+                        <div class="dg-value">{{ number_format($data['purchases']) }}</div>
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>
         @endif
 
-        @if($canSeeDashboard('purchase'))
+        @if($canSeeDashboard('sales') || $canSeeDashboard('purchase'))
         <div class="col-xl-3 col-lg-4 col-md-6">
             <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">🛒 Purchases</div>
-                <div class="dg-value">
-                    {{ number_format($data['purchases']) }}
+                <div class="dg-dashboard-card-pair">
+                    @if($canSeeDashboard('sales'))
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title">👥 Customers</div>
+                        <div class="dg-value">{{ number_format($data['customers']) }}</div>
+                    </div>
+                    @endif
+                    @if($canSeeDashboard('purchase'))
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title">🚚 Suppliers</div>
+                        <div class="dg-value">{{ number_format($data['suppliers']) }}</div>
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>
         @endif
 
-        @if($canSeeDashboard('sales'))
+        @if($canSeeDashboard('cash_accounts') || $canSeeDashboard('accounts'))
         <div class="col-xl-3 col-lg-4 col-md-6">
             <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">👥 Customers</div>
-                <div class="dg-value">
-                    {{ number_format($data['customers']) }}
+                <div class="dg-dashboard-card-pair">
+                    @if($canSeeDashboard('cash_accounts'))
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title"><i class="bi bi-cash-stack dg-dashboard-metric-icon" aria-hidden="true"></i> Cash Wallet</div>
+                        <div class="dg-value">{{ number_format($data['cash'],2) }}</div>
+                    </div>
+                    @endif
+                    @if($canSeeDashboard('accounts'))
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title"><i class="bi bi-bank dg-dashboard-metric-icon" aria-hidden="true"></i> Bank Wallet</div>
+                        <div class="dg-value">{{ number_format($data['bank'],2) }}</div>
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>
         @endif
 
-        @if($canSeeDashboard('cash_accounts'))
+        @if($canSeeDashboard('expense') || $canSeeDashboard('income'))
         <div class="col-xl-3 col-lg-4 col-md-6">
             <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">💵 Cash Wallet</div>
-                <div class="dg-value">
-                    {{ number_format($data['cash'],2) }}
+                <div class="dg-dashboard-card-pair">
+                    @if($canSeeDashboard('expense'))
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title">📉 Active Expense</div>
+                        <div class="dg-value">{{ number_format($data['expense_total'],2) }}</div>
+                    </div>
+                    @endif
+                    @if($canSeeDashboard('income'))
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title">📈 Active Income</div>
+                        <div class="dg-value">{{ number_format($data['income_total'],2) }}</div>
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>
         @endif
 
-        @if($canSeeDashboard('accounts'))
+        @if($canSeeDashboard('sales') || $canSeeDashboard('purchase'))
         <div class="col-xl-3 col-lg-4 col-md-6">
             <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">🏦 Bank Wallet</div>
-                <div class="dg-value">
-                    {{ number_format($data['bank'],2) }}
+                <div class="dg-dashboard-card-pair">
+                    @if($canSeeDashboard('sales'))
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title"><i class="bi bi-person-vcard dg-dashboard-metric-icon" aria-hidden="true"></i> Customer Due</div>
+                        <div class="dg-value">{{ number_format($data['customer_due'],2) }}</div>
+                    </div>
+                    @endif
+                    @if($canSeeDashboard('purchase'))
+                    <div class="dg-dashboard-card-metric">
+                        <div class="dg-title"><i class="bi bi-receipt-cutoff dg-dashboard-metric-icon" aria-hidden="true"></i> Supplier Due</div>
+                        <div class="dg-value">{{ number_format($data['supplier_due'],2) }}</div>
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>
         @endif
 
-        @if($canSeeDashboard('income'))
+        @if($canSeeDashboard('income') || $canSeeDashboard('expense'))
         <div class="col-xl-3 col-lg-4 col-md-6">
-            <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">📈 Active Income</div>
-                <div class="dg-value">
-                    {{ number_format($data['income_total'],2) }}
+            <div class="dg-card dg-dashboard-card dg-dashboard-mini-chart-card">
+                <div class="dg-title">
+                    <i class="bi bi-bar-chart-line dg-dashboard-metric-icon" aria-hidden="true"></i>
+                    Income / Expense
                 </div>
-            </div>
-        </div>
-        @endif
-
-        @if($canSeeDashboard('expense'))
-        <div class="col-xl-3 col-lg-4 col-md-6">
-            <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">📉 Active Expense</div>
-                <div class="dg-value">
-                    {{ number_format($data['expense_total'],2) }}
-                </div>
-            </div>
-        </div>
-        @endif
-
-        @if($canSeeDashboard('inventory'))
-        <div class="col-xl-3 col-lg-4 col-md-6">
-            <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">📦 Stock Items</div>
-                <div class="dg-value">
-                    {{ number_format($data['stock_items']) }}
-                </div>
-            </div>
-        </div>
-        @endif
-
-        @if($canSeeDashboard('sales'))
-        <div class="col-xl-3 col-lg-4 col-md-6">
-            <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">💳 Customer Due</div>
-                <div class="dg-value">
-                    {{ number_format($data['customer_due'],2) }}
-                </div>
-            </div>
-        </div>
-        @endif
-
-        @if($canSeeDashboard('purchase'))
-        <div class="col-xl-3 col-lg-4 col-md-6">
-            <div class="dg-card dg-dashboard-card">
-                <div class="dg-title">📄 Supplier Due</div>
-                <div class="dg-value">
-                    {{ number_format($data['supplier_due'],2) }}
+                <div class="dg-dashboard-mini-chart">
+                    <canvas id="incomeExpenseChart" aria-label="Income and expense comparison chart"></canvas>
                 </div>
             </div>
         </div>
@@ -824,6 +839,58 @@ if (purchaseCtx && window.Chart) {
                 label:'Purchase',
                 data:@json($purchaseChart->pluck('total')->values())
             }]
+        }
+    });
+
+}
+
+const incomeExpenseCtx = document.getElementById('incomeExpenseChart');
+
+if (incomeExpenseCtx && window.Chart) {
+
+    new Chart(incomeExpenseCtx, {
+        type:'bar',
+        data:{
+            labels:[
+                @if($canSeeDashboard('income')) 'Income', @endif
+                @if($canSeeDashboard('expense')) 'Expense', @endif
+            ],
+            datasets:[{
+                data:[
+                    @if($canSeeDashboard('income')) @json((float) $data['income_total']), @endif
+                    @if($canSeeDashboard('expense')) @json((float) $data['expense_total']), @endif
+                ],
+                backgroundColor:[
+                    @if($canSeeDashboard('income')) 'rgba(25,167,90,.78)', @endif
+                    @if($canSeeDashboard('expense')) 'rgba(239,68,68,.76)', @endif
+                ],
+                borderColor:[
+                    @if($canSeeDashboard('income')) '#14924d', @endif
+                    @if($canSeeDashboard('expense')) '#dc3545', @endif
+                ],
+                borderWidth:1,
+                borderRadius:5,
+                maxBarThickness:34
+            }]
+        },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{
+                legend:{display:false},
+                tooltip:{
+                    callbacks:{
+                        label:(context) => Number(context.raw ?? 0).toLocaleString(undefined, {
+                            minimumFractionDigits:2,
+                            maximumFractionDigits:2
+                        })
+                    }
+                }
+            },
+            scales:{
+                x:{grid:{display:false},ticks:{font:{size:10},color:'#36547c'}},
+                y:{beginAtZero:true,grid:{color:'rgba(148,163,184,.18)'},ticks:{display:false},border:{display:false}}
+            }
         }
     });
 
