@@ -24,6 +24,7 @@ $canViewCrmOpportunity = $canSeeMenu('crm');
 $canViewCrmFollowUp = $canSeeMenu('crm');
 $canViewCrmMeeting = $canSeeMenu('crm');
 $canViewCrmTask = $canSeeMenu('crm');
+$canViewOpeningBalance = $user?->hasPermission('opening-balance.view') ?? false;
 
 $subscriptionService = $company ? app(\App\Services\SubscriptionService::class) : null;
 $subscriptionAllowsCrm = $company && $subscriptionService?->canAccessModule($company, 'crm');
@@ -78,6 +79,7 @@ $accountsOpen = request()->routeIs(
     'company.expense.*',
     'company.expense-category.*',
     'company.journal.*',
+    'company.opening-balances.*',
     'company.contra.*',
     'company.vats.*'
 );
@@ -344,7 +346,7 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
 
                 <div class="dg-sidebar-divider" role="separator" aria-hidden="true"></div>
 
-                @if($canSeeMenu('accounts') || $canSeeMenu('cash_accounts'))
+                @if($canSeeMenu('accounts') || $canSeeMenu('cash_accounts') || $canViewOpeningBalance)
                 <div class="dg-sidebar-section">
                     <div class="dg-sidebar-group {{ $groupOpen($accountsOpen) }}">
                         <input type="checkbox" class="dg-sidebar-toggle" id="dg-nav-accounts" @if ($accountsOpen) checked @endif>
@@ -380,6 +382,11 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                             @if($canSeeMenu('journal'))
                                 <div class="dg-sidebar-child">
                                     <a href="{{ route('company.journal.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.journal.*') }}">Journal</a>
+                                </div>
+                            @endif
+                            @if($canViewOpeningBalance)
+                                <div class="dg-sidebar-child">
+                                    <a href="{{ route('company.opening-balances.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.opening-balances.*') }}">Opening Balance</a>
                                 </div>
                             @endif
                             @if($canSeeMenu('contra'))

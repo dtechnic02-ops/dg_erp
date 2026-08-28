@@ -215,7 +215,7 @@
                                     <div class="col-md-6">
                                         <div class="dg-row">
                                             <span class="dg-label d-inline mb-0">Opening Balance :</span>
-                                            {{ number_format($account->opening_balance, 2) }}
+                                            {{ number_format($account->official_opening_balance ?? 0, 2) }}
                                         </div>
                                     </div>
 

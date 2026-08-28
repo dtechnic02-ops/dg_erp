@@ -95,6 +95,39 @@ class OpeningBalanceModuleTest extends TestCase
         $this->expectException(RuntimeException::class);$this->service()->approve($approved,1,2);
     }
 
+    public function test_creator_cannot_see_approve_action_but_different_authorized_user_can(): void
+    {
+        $this->seedApprovalPermissions();
+        Schema::create('company_subscriptions', function (Blueprint $table) {$table->id();$table->unsignedBigInteger('company_id');$table->string('status');$table->json('hidden_modules')->nullable();$table->boolean('is_all_modules_enabled')->default(true);$table->timestamps();});
+        DB::table('company_subscriptions')->insert(['company_id'=>1,'status'=>'active','is_all_modules_enabled'=>1]);
+        $opening=$this->service()->submit($this->service()->create(1,1,$this->payload($this->basicLines())),1,1);
+        $this->withoutMiddleware([\App\Http\Middleware\EnsureCompanyUser::class,\App\Http\Middleware\CheckSubscription::class,\App\Http\Middleware\UpdateLastSeen::class]);
+        $approveUrl=route('company.opening-balances.approve',$opening);
+
+        $this->actingAs(User::findOrFail(1))->get(route('company.opening-balances.show',$opening))->assertOk()->assertDontSee($approveUrl,false);
+        $this->get(route('company.opening-balances.index'))->assertOk()->assertDontSee($approveUrl,false);
+
+        $this->actingAs(User::findOrFail(2))->get(route('company.opening-balances.show',$opening))->assertOk()->assertSee($approveUrl,false);
+        $this->get(route('company.opening-balances.index'))->assertOk()->assertSee($approveUrl,false);
+    }
+
+    public function test_forged_self_approval_and_invalid_approval_workflow_redirect_with_normal_error(): void
+    {
+        $this->seedApprovalPermissions();
+        $opening=$this->service()->submit($this->service()->create(1,1,$this->payload($this->basicLines())),1,1);
+        $this->withoutMiddleware([\App\Http\Middleware\EnsureCompanyUser::class,\App\Http\Middleware\CheckSubscription::class,\App\Http\Middleware\UpdateLastSeen::class]);
+        $showUrl=route('company.opening-balances.show',$opening);
+
+        $this->actingAs(User::findOrFail(1))->from($showUrl)->post(route('company.opening-balances.approve',$opening))
+            ->assertRedirect($showUrl)->assertSessionHas('error','The maker cannot approve their own Opening Balance.');
+        $this->assertSame(OpeningBalance::STATUS_SUBMITTED,$opening->fresh()->status);
+
+        $opening->update(['status'=>OpeningBalance::STATUS_DRAFT]);
+        $this->actingAs(User::findOrFail(2))->from($showUrl)->post(route('company.opening-balances.approve',$opening))
+            ->assertRedirect($showUrl)->assertSessionHas('error','Only a submitted Opening Balance may be approved.');
+        $this->assertSame(OpeningBalance::STATUS_DRAFT,$opening->fresh()->status);
+    }
+
     public function test_customer_and_supplier_openings_create_correct_subledgers(): void
     {
         $lines=[['chart_account_id'=>1,'debit'=>'75.0000','credit'=>'0','subledger_type'=>'customer','subledger_id'=>1],['chart_account_id'=>3,'debit'=>'0','credit'=>'75.0000'],['chart_account_id'=>3,'debit'=>'25.0000','credit'=>'0'],['chart_account_id'=>2,'debit'=>'0','credit'=>'25.0000','subledger_type'=>'supplier','subledger_id'=>1]];
@@ -146,6 +179,24 @@ class OpeningBalanceModuleTest extends TestCase
         foreach($expected as $action=>$permission){$route=app('router')->getRoutes()->getByName('company.opening-balances.'.$action);$this->assertNotNull($route);$this->assertContains('permission:opening-balance.'.$permission,$route->gatherMiddleware());}
     }
 
+    public function test_company_sidebar_shows_permission_guarded_opening_balance_link_and_active_state(): void
+    {
+        $this->seedApprovalPermissions();
+        Schema::create('company_subscriptions', function (Blueprint $table) {$table->id();$table->unsignedBigInteger('company_id');$table->string('status');$table->json('hidden_modules')->nullable();$table->boolean('is_all_modules_enabled')->default(true);$table->timestamps();});
+        DB::table('company_subscriptions')->insert(['company_id'=>1,'status'=>'active','is_all_modules_enabled'=>1]);
+        $opening=$this->service()->create(1,1,$this->payload($this->basicLines()));
+        $this->withoutMiddleware([\App\Http\Middleware\EnsureCompanyUser::class,\App\Http\Middleware\CheckSubscription::class,\App\Http\Middleware\UpdateLastSeen::class]);
+        $indexUrl=route('company.opening-balances.index');
+
+        $show=$this->actingAs(User::findOrFail(1))->get(route('company.opening-balances.show',$opening));
+        $show->assertOk()->assertSee($indexUrl,false)->assertSee('dg-sidebar-active">Opening Balance',false);
+        $this->get($indexUrl)->assertOk()->assertSee($indexUrl,false)->assertSee('dg-sidebar-active">Opening Balance',false);
+
+        $this->actingAs(User::findOrFail(3));
+        $sidebar=view('company.partials.sidebar')->render();
+        $this->assertStringNotContainsString($indexUrl,$sidebar);
+    }
+
     public function test_unauthorized_staff_is_rejected_by_every_opening_balance_http_action(): void
     {
         $staff=User::findOrFail(3);
@@ -165,9 +216,226 @@ class OpeningBalanceModuleTest extends TestCase
         foreach(['company.journal.show','company.journal.voucher-print'] as $view){$html=view($view,['journal'=>$journal,'errors'=>new \Illuminate\Support\ViewErrorBag])->render();$this->assertStringContainsString('<td>1130 — AR/Cash</td>', $html);$this->assertStringContainsString('100.1234', $html);}
     }
 
+    public function test_main_opening_stays_single_while_different_new_account_openings_share_the_financial_year(): void
+    {
+        $this->service()->create(1,1,$this->payload($this->basicLines()));
+        $cash=$this->service()->create(1,1,$this->newAccountPayload(3,'10.0000','cash'));
+        $bank=$this->service()->create(1,1,$this->newAccountPayload(1,'20.0000','bank'));
+
+        $this->assertSame('active',OpeningBalance::where('type','initial')->value('active_key'));
+        $this->assertSame('na:0000000000000003',$cash->active_key);
+        $this->assertSame('na:0000000000000001',$bank->active_key);
+        $this->assertSame(3,OpeningBalance::count());
+
+        $duplicateMain=$this->payload($this->basicLines());
+        $duplicateMain['request_key']='99999999-9999-4999-8999-999999999999';
+        $duplicateMain['reference_number']='OB-002';
+        $this->expectException(ValidationException::class);
+        $this->service()->create(1,1,$duplicateMain);
+    }
+
+    public function test_duplicate_new_account_identity_and_foreign_or_other_accounts_are_rejected(): void
+    {
+        $this->service()->create(1,1,$this->newAccountPayload(1,'25.0000','first'));
+
+        foreach ([
+            $this->newAccountPayload(1,'30.0000','duplicate'),
+            $this->newAccountPayload(2,'30.0000','foreign'),
+            $this->newAccountPayload(6,'30.0000','other'),
+        ] as $payload) {
+            try {
+                $this->service()->create(1,1,$payload);
+                $this->fail('Invalid new-account Opening Balance was accepted.');
+            } catch (ValidationException) {
+                $this->assertSame(1,OpeningBalance::count());
+            }
+        }
+    }
+
+    public function test_cash_bank_atm_and_wallet_use_the_approved_automatic_chart_mappings(): void
+    {
+        foreach ([3=>'CASH_IN_HAND',1=>'BANK_ACCOUNTS',4=>'BANK_ACCOUNTS',5=>'BANK_ACCOUNTS'] as $accountId=>$systemCode) {
+            $opening=$this->service()->create(1,1,$this->newAccountPayload($accountId,'12.3400','map-'.$accountId));
+            $operational=$opening->lines->firstWhere('operational_account_id',$accountId);
+            $equity=$opening->lines->firstWhere('operational_account_id',null);
+            $this->assertSame($systemCode,ChartAccount::findOrFail($operational->chart_account_id)->system_code);
+            $this->assertSame('12.3400',$operational->debit);
+            $this->assertSame('0.0000',$operational->credit);
+            $this->assertSame('OPENING_BALANCE_EQUITY',ChartAccount::findOrFail($equity->chart_account_id)->system_code);
+            $this->assertSame('12.3400',$equity->credit);
+        }
+    }
+
+    public function test_new_account_posting_is_exactly_once_recalculates_balance_and_reversal_restores_it(): void
+    {
+        $opening=$this->service()->create(1,1,$this->newAccountPayload(1,'45.6700','post'));
+        $opening=$this->service()->submit($opening,1,1);
+        try {$this->service()->approve($opening,1,1);$this->fail('Maker approved own new-account opening.');} catch (RuntimeException) {$this->assertSame('submitted',$opening->fresh()->status);}
+        $opening=$this->service()->approve($opening,1,2);
+        $opening=$this->service()->post($opening,1,2);
+
+        $this->assertSame(1,DB::table('journals')->where('source_id',$opening->id)->where('source_type','opening_balance')->count());
+        $this->assertSame(1,DB::table('accounting_entries')->where('source_id',$opening->id)->where('source_event','posted')->count());
+        $this->assertSame(1,DB::table('account_transactions')->where('reference_id',$opening->id)->where('reference_type','opening_balance')->count());
+        $this->assertSame('45.6700',number_format((float)Account::find(1)->current_balance,4,'.',''));
+        $this->assertSame('0.0000',number_format((float)Account::find(1)->opening_balance,4,'.',''));
+        $this->assertSame('45.6700',$this->service()->postedOperationalBalances(1,[1])->get(1));
+
+        try {$this->service()->update($opening,1,2,$this->newAccountPayload(1,'50.0000','edit'));$this->fail('Posted opening was edited.');} catch (RuntimeException) {$this->assertSame('posted',$opening->fresh()->status);}
+
+        $opening=$this->service()->reverse($opening,1,2,'Approved correction');
+        $this->assertSame('0.0000',number_format((float)Account::find(1)->current_balance,4,'.',''));
+        $this->assertSame(2,DB::table('account_transactions')->where('reference_id',$opening->id)->count());
+        $this->assertFalse($this->service()->postedOperationalBalances(1,[1])->has(1));
+    }
+
+    public function test_new_account_credit_line_tampering_is_rejected_before_submit(): void
+    {
+        $opening=$this->service()->create(1,1,$this->newAccountPayload(1,'15.0000','credit'));
+        $operational=$opening->lines->firstWhere('operational_account_id',1);
+        $equity=$opening->lines->firstWhere('operational_account_id',null);
+        $operational->update(['debit'=>0,'credit'=>15]);
+        $equity->update(['debit'=>15,'credit'=>0]);
+
+        $this->expectException(ValidationException::class);
+        $this->service()->submit($opening->fresh(),1,1);
+    }
+
+    public function test_new_account_ignores_forged_client_lines_and_rejects_non_positive_amounts(): void
+    {
+        $payload=$this->newAccountPayload(1,'19.2500','forged');
+        $payload['lines']=[
+            ['chart_account_id'=>7,'debit'=>'999.0000','credit'=>'0.0000'],
+            ['chart_account_id'=>3,'debit'=>'0.0000','credit'=>'1.0000'],
+        ];
+        $opening=$this->service()->create(1,1,$payload);
+        $operational=$opening->lines->firstWhere('operational_account_id',1);
+        $equity=$opening->lines->firstWhere('operational_account_id',null);
+
+        $this->assertCount(2,$opening->lines);
+        $this->assertSame('BANK_ACCOUNTS',ChartAccount::findOrFail($operational->chart_account_id)->system_code);
+        $this->assertSame('19.2500',$operational->debit);
+        $this->assertSame('19.2500',$equity->credit);
+        $this->assertSame('New account opening',$operational->description);
+
+        foreach (['0','-1'] as $amount) {
+            try {
+                $this->service()->create(1,1,$this->newAccountPayload(3,$amount,'invalid-'.$amount));
+                $this->fail('A non-positive new-account opening amount was accepted.');
+            } catch (ValidationException) {
+                $this->assertSame(1,OpeningBalance::count());
+            }
+        }
+    }
+
+    public function test_draft_new_account_edit_regenerates_lines_from_operational_account_and_amount(): void
+    {
+        $opening=$this->service()->create(1,1,$this->newAccountPayload(1,'10.0000','draft'));
+        $updated=$this->service()->update($opening,1,1,$this->newAccountPayload(3,'27.5000','changed'));
+        $operational=$updated->lines->firstWhere('operational_account_id',3);
+        $equity=$updated->lines->firstWhere('operational_account_id',null);
+
+        $this->assertSame('na:0000000000000003',$updated->active_key);
+        $this->assertSame('CASH_IN_HAND',ChartAccount::findOrFail($operational->chart_account_id)->system_code);
+        $this->assertSame('27.5000',$operational->debit);
+        $this->assertSame('27.5000',$equity->credit);
+        $this->assertSame('New account opening',$updated->remarks);
+    }
+
+    public function test_new_account_request_and_form_use_the_simplified_operational_inputs(): void
+    {
+        $payload=$this->newAccountPayload(1,'125.5000','request');
+        $request=\App\Http\Requests\OpeningBalanceRequest::create('/opening-balances','POST',$payload);
+        $validator=\Illuminate\Support\Facades\Validator::make($payload,$request->rules());
+        $this->assertFalse($validator->fails(),json_encode($validator->errors()->toArray()));
+
+        $this->withSession(['_old_input'=>['type'=>'new_account','new_account_id'=>1,'new_account_amount'=>'125.5000']]);
+        $html=view('company.opening_balance.partials.form',[
+            'financialYears'=>FinancialYear::where('company_id',1)->get(),
+            'chartAccounts'=>ChartAccount::where('company_id',1)->get(),
+            'customers'=>Customer::where('company_id',1)->get(),
+            'suppliers'=>Supplier::where('company_id',1)->get(),
+            'operationalAccounts'=>Account::where('company_id',1)->get(),
+            'newAccountOperationalAccounts'=>Account::where('company_id',1)->whereIn('account_type',['Cash','Bank','ATM','Wallet'])->get(),
+            'openingBalanceAccountPicker'=>[
+                'CASH / BANK'=>collect([['value'=>'operational:1','label'=>'Bank — Bank']]),
+                'CUSTOMERS'=>collect([['value'=>'customer:1','label'=>'C1']]),
+                'SUPPLIERS'=>collect([['value'=>'supplier:1','label'=>'S1']]),
+                'LEDGER / CHART ACCOUNTS'=>collect([['value'=>'chart:3','label'=>'3140 — OB Equity']]),
+            ],
+            'errors'=>new \Illuminate\Support\ViewErrorBag,
+        ])->render();
+
+        $this->assertStringContainsString('id="dg-ob-new-account-section"',$html);
+        $this->assertStringContainsString('id="dg-ob-lines-section"',$html);
+        $this->assertStringContainsString('id="new_account_id" name="new_account_id"',$html);
+        $this->assertStringContainsString('id="new_account_amount" name="new_account_amount"',$html);
+        $this->assertStringContainsString('Posting Preview',$html);
+        $this->assertStringNotContainsString('Other — Other',$html);
+        $this->assertStringContainsString('name="lines[0][account_picker]"',$html);
+        $this->assertStringContainsString('Opening Balance Voucher',$html);
+        $this->assertStringNotContainsString('name="lines[0][chart_account_id]"',$html);
+        $this->assertStringNotContainsString('name="lines[0][subledger_id]"',$html);
+        $this->assertStringNotContainsString('name="lines[0][operational_account_id]"',$html);
+    }
+
+    public function test_main_opening_account_picker_resolves_operational_party_and_chart_accounts(): void
+    {
+        $cases=[
+            ['operational:3','chart:3','CASH_IN_HAND',3,null,null],
+            ['operational:1','chart:3','BANK_ACCOUNTS',1,null,null],
+            ['customer:1','chart:3','ACCOUNTS_RECEIVABLE',null,'customer',1],
+            ['chart:3','supplier:1','OPENING_BALANCE_EQUITY',null,null,null],
+            ['chart:8','chart:3','CASH_IN_HAND',null,null,null],
+        ];
+
+        foreach ($cases as $index=>[$debitPicker,$creditPicker,$expectedCode,$operationalId,$partyType,$partyId]) {
+            $payload=$this->pickerPayload($debitPicker,$creditPicker,'picker-'.$index);
+            $opening=$this->service()->create(1,1,$payload);
+            $debit=$opening->lines->firstWhere('debit','40.0000');
+            $this->assertSame($expectedCode,ChartAccount::findOrFail($debit->chart_account_id)->system_code);
+            $this->assertSame($operationalId,$debit->operational_account_id);
+            $this->assertSame($partyType,$debit->subledger_type);
+            $this->assertSame($partyId,$debit->subledger_id);
+
+            if ($creditPicker==='supplier:1') {
+                $credit=$opening->lines->firstWhere('credit','40.0000');
+                $this->assertSame('ACCOUNTS_PAYABLE',ChartAccount::findOrFail($credit->chart_account_id)->system_code);
+                $this->assertSame('supplier',$credit->subledger_type);
+                $this->assertSame(1,$credit->subledger_id);
+            }
+            $opening->update(['status'=>OpeningBalance::STATUS_CANCELLED,'active_key'=>null]);
+        }
+    }
+
+    public function test_main_opening_picker_rejects_foreign_inactive_and_forged_entity_data(): void
+    {
+        Customer::create(['company_id'=>1,'name'=>'Inactive Customer','status'=>'inactive']);
+        foreach (['operational:2','customer:'.Customer::where('name','Inactive Customer')->value('id'),'operational:6','chart:6'] as $picker) {
+            $payload=$this->pickerPayload($picker,'chart:3','invalid-'.str_replace(':','-',$picker));
+            try {
+                $this->service()->create(1,1,$payload);
+                $this->fail('A foreign or ineligible Account Picker entity was accepted.');
+            } catch (ValidationException) {
+                $this->assertSame(0,OpeningBalance::whereNotIn('status',[OpeningBalance::STATUS_CANCELLED])->count());
+            }
+        }
+
+        $payload=$this->pickerPayload('operational:1','chart:3','forged');
+        $payload['lines'][0]['chart_account_id']=7;
+        $payload['lines'][0]['operational_account_id']=6;
+        $opening=$this->service()->create(1,1,$payload);
+        $debit=$opening->lines->firstWhere('debit','40.0000');
+        $this->assertSame('BANK_ACCOUNTS',ChartAccount::findOrFail($debit->chart_account_id)->system_code);
+        $this->assertSame(1,$debit->operational_account_id);
+    }
+
     private function approved(array $lines): OpeningBalance {$o=$this->service()->create(1,1,$this->payload($lines));$o=$this->service()->submit($o,1,1);return $this->service()->approve($o,1,2);}
     private function service(): OpeningBalanceService {return app(OpeningBalanceService::class);}
     private function payload(array $lines): array {return ['financial_year_id'=>1,'business_date'=>'2026-01-01','type'=>'initial','reference_number'=>'OB-001','remarks'=>'Opening','request_key'=>'11111111-1111-4111-8111-111111111111','lines'=>$lines];}
+    private function newAccountPayload(int $accountId,string $amount,string $suffix): array {return ['financial_year_id'=>1,'business_date'=>'2026-01-01','type'=>'new_account','reference_number'=>'NA-'.strtoupper($suffix),'remarks'=>'New account opening','request_key'=>(string)\Illuminate\Support\Str::uuid(),'new_account_id'=>$accountId,'new_account_amount'=>$amount];}
+    private function pickerPayload(string $debitPicker,string $creditPicker,string $suffix): array {return ['financial_year_id'=>1,'business_date'=>'2026-01-01','type'=>'initial','reference_number'=>'PK-'.strtoupper($suffix),'remarks'=>'Picker opening','request_key'=>(string)\Illuminate\Support\Str::uuid(),'lines'=>[['account_picker'=>$debitPicker,'debit'=>'40.0000','credit'=>'0','description'=>'Debit'],['account_picker'=>$creditPicker,'debit'=>'0','credit'=>'40.0000','description'=>'Credit']]];}
+    private function seedApprovalPermissions(): void {DB::table('permissions')->insert([['id'=>1,'name'=>'module_opening_balance','scope'=>'company'],['id'=>2,'name'=>'opening-balance.approve','scope'=>'company'],['id'=>3,'name'=>'opening-balance.view','scope'=>'company']]);}
     private function basicLines(): array {return [['chart_account_id'=>1,'debit'=>'100.1234','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'100.1234']];}
 
     private function seedContext(): void
@@ -176,7 +444,7 @@ class OpeningBalanceModuleTest extends TestCase
         DB::table('roles')->insert([['id'=>2,'name'=>'Company Admin'],['id'=>3,'name'=>'Staff']]);
         User::insert([['id'=>1,'name'=>'Maker','company_id'=>1,'role_id'=>2],['id'=>2,'name'=>'Checker','company_id'=>1,'role_id'=>2],['id'=>3,'name'=>'Unauthorized Staff','company_id'=>1,'role_id'=>3]]);
         FinancialYear::insert([['id'=>1,'company_id'=>1,'name'=>'FY26','start_date'=>'2026-01-01','end_date'=>'2026-12-31','is_active'=>1],['id'=>2,'company_id'=>1,'name'=>'FY25','start_date'=>'2025-01-01','end_date'=>'2025-12-31','is_active'=>0]]);
-        foreach ([['id'=>1,'company_id'=>1,'code'=>'1130','name'=>'AR/Cash','account_class'=>'asset','normal_balance'=>'debit','system_code'=>'ACCOUNTS_RECEIVABLE','level'=>3,'is_control'=>0,'status'=>'active'],['id'=>2,'company_id'=>1,'code'=>'2110','name'=>'AP','account_class'=>'liability','normal_balance'=>'credit','system_code'=>'ACCOUNTS_PAYABLE','level'=>3,'is_control'=>1,'status'=>'active'],['id'=>3,'company_id'=>1,'code'=>'3140','name'=>'OB Equity','account_class'=>'equity','normal_balance'=>'credit','system_code'=>'OPENING_BALANCE_EQUITY','level'=>3,'is_control'=>0,'status'=>'active'],['id'=>4,'company_id'=>1,'code'=>'1000','name'=>'Root','account_class'=>'asset','normal_balance'=>'debit','level'=>1,'is_control'=>0,'status'=>'active'],['id'=>5,'company_id'=>1,'code'=>'1190','name'=>'Inactive','account_class'=>'asset','normal_balance'=>'debit','level'=>3,'is_control'=>0,'status'=>'inactive'],['id'=>6,'company_id'=>2,'code'=>'1191','name'=>'Foreign','account_class'=>'asset','normal_balance'=>'debit','level'=>3,'is_control'=>0,'status'=>'active'],['id'=>7,'company_id'=>1,'code'=>'4000','name'=>'Income','account_class'=>'income','normal_balance'=>'credit','level'=>3,'is_control'=>0,'status'=>'active']] as $row) ChartAccount::create($row);
-        Customer::insert([['id'=>1,'company_id'=>1,'name'=>'C1','status'=>'active'],['id'=>2,'company_id'=>2,'name'=>'C2','status'=>'active']]);Supplier::insert([['id'=>1,'company_id'=>1,'name'=>'S1','status'=>'active']]);Account::insert([['id'=>1,'company_id'=>1,'account_name'=>'Bank','status'=>'active'],['id'=>2,'company_id'=>2,'account_name'=>'Foreign Bank','status'=>'active']]);
+        foreach ([['id'=>1,'company_id'=>1,'code'=>'1130','name'=>'AR/Cash','account_class'=>'asset','normal_balance'=>'debit','system_code'=>'ACCOUNTS_RECEIVABLE','level'=>3,'is_control'=>0,'status'=>'active'],['id'=>2,'company_id'=>1,'code'=>'2110','name'=>'AP','account_class'=>'liability','normal_balance'=>'credit','system_code'=>'ACCOUNTS_PAYABLE','level'=>3,'is_control'=>1,'status'=>'active'],['id'=>3,'company_id'=>1,'code'=>'3140','name'=>'OB Equity','account_class'=>'equity','normal_balance'=>'credit','system_code'=>'OPENING_BALANCE_EQUITY','level'=>3,'is_control'=>0,'allow_manual_entry'=>0,'status'=>'active'],['id'=>4,'company_id'=>1,'code'=>'1000','name'=>'Root','account_class'=>'asset','normal_balance'=>'debit','level'=>1,'is_control'=>0,'status'=>'active'],['id'=>5,'company_id'=>1,'code'=>'1190','name'=>'Inactive','account_class'=>'asset','normal_balance'=>'debit','level'=>3,'is_control'=>0,'status'=>'inactive'],['id'=>6,'company_id'=>2,'code'=>'1191','name'=>'Foreign','account_class'=>'asset','normal_balance'=>'debit','level'=>3,'is_control'=>0,'status'=>'active'],['id'=>7,'company_id'=>1,'code'=>'4000','name'=>'Income','account_class'=>'income','normal_balance'=>'credit','level'=>3,'is_control'=>0,'status'=>'active'],['id'=>8,'company_id'=>1,'code'=>'1110','name'=>'Cash in Hand','account_class'=>'asset','normal_balance'=>'debit','system_code'=>'CASH_IN_HAND','level'=>3,'is_control'=>0,'allow_manual_entry'=>1,'status'=>'active'],['id'=>9,'company_id'=>1,'code'=>'1120','name'=>'Bank Accounts','account_class'=>'asset','normal_balance'=>'debit','system_code'=>'BANK_ACCOUNTS','level'=>3,'is_control'=>0,'allow_manual_entry'=>1,'status'=>'active']] as $row) ChartAccount::create($row);
+        Customer::insert([['id'=>1,'company_id'=>1,'name'=>'C1','status'=>'active'],['id'=>2,'company_id'=>2,'name'=>'C2','status'=>'active']]);Supplier::insert([['id'=>1,'company_id'=>1,'name'=>'S1','status'=>'active']]);Account::insert([['id'=>1,'company_id'=>1,'account_name'=>'Bank','account_type'=>'Bank','status'=>'active'],['id'=>2,'company_id'=>2,'account_name'=>'Foreign Bank','account_type'=>'Bank','status'=>'active'],['id'=>3,'company_id'=>1,'account_name'=>'Cash','account_type'=>'Cash','status'=>'active'],['id'=>4,'company_id'=>1,'account_name'=>'ATM','account_type'=>'ATM','status'=>'active'],['id'=>5,'company_id'=>1,'account_name'=>'Wallet','account_type'=>'Wallet','status'=>'active'],['id'=>6,'company_id'=>1,'account_name'=>'Other','account_type'=>'Other','status'=>'active']]);
     }
 }

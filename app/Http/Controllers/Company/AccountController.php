@@ -9,6 +9,7 @@ use Illuminate\Validation\Rule;
 use App\Models\Account;
 use Illuminate\Support\Facades\DB;
 use App\Services\FileUploadService;
+use App\Services\OpeningBalanceService;
 use App\Services\ValidationService;
 
 class AccountController extends Controller
@@ -534,6 +535,12 @@ public function show($id)
     )
     ->findOrFail($id);
 
+    $officialOpeningBalances = app(OpeningBalanceService::class)->postedOperationalBalances(
+        auth()->user()->company_id,
+        [$account->id]
+    );
+    $account->setAttribute('official_opening_balance', $officialOpeningBalances->get($account->id, '0.0000'));
+
     return view(
         'company.accounts.show',
         compact(
@@ -561,13 +568,24 @@ public function print(Request $request)
 {
     $this->authorizeCompanyPermission('print_accounts');
 
+    $companyId = auth()->user()->company_id;
+
     $accounts = $this->filteredAccountQuery($request)
         ->latest()
         ->get();
 
     $totalAccounts = $accounts->count();
 
-    $totalOpeningBalance = $accounts->sum('opening_balance');
+    $officialOpeningBalances = app(OpeningBalanceService::class)->postedOperationalBalances(
+        $companyId,
+        $accounts->pluck('id')
+    );
+
+    foreach ($accounts as $account) {
+        $account->setAttribute('official_opening_balance', $officialOpeningBalances->get($account->id, '0.0000'));
+    }
+
+    $totalOpeningBalance = $accounts->sum(fn (Account $account) => (float) $account->official_opening_balance);
 
     $totalCurrentBalance = $accounts->sum('current_balance');
 
@@ -601,6 +619,9 @@ public function printProfile($id)
 
     $account = Account::where('company_id', $companyId)
         ->findOrFail($id);
+
+    $officialOpeningBalances = app(OpeningBalanceService::class)->postedOperationalBalances($companyId, [$account->id]);
+    $account->setAttribute('official_opening_balance', $officialOpeningBalances->get($account->id, '0.0000'));
 
     $print = true;
 
