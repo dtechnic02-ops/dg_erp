@@ -11,7 +11,7 @@ class PurchaseCreateLargeItemsAndSearchTest extends TestCase
         $view = file_get_contents(resource_path('views/company/purchases/create.blade.php'));
         $script = file_get_contents(public_path('assets/company/js/dg.js'));
 
-        $this->assertStringContainsString('class="form-control form-control-sm dg-input dg-item-combobox-input"', $view);
+        $this->assertStringContainsString('dg-item-combobox-input @error', $view);
         $this->assertStringContainsString('class="dg-item-select d-none"', $view);
         $this->assertStringNotContainsString('dg-item-search', $view);
         $this->assertStringContainsString('<optgroup label="Products">', $view);
@@ -21,6 +21,8 @@ class PurchaseCreateLargeItemsAndSearchTest extends TestCase
         $this->assertStringContainsString('function moveItemComboboxHighlight(row, direction)', $script);
         $this->assertStringContainsString('function selectItemComboboxOption(row, optionIndex)', $script);
         $this->assertStringContainsString("event.key === 'Escape'", $script);
+        $this->assertStringContainsString('$purchaseRowCount = $oldItemRowCount > 0 ? $oldItemRowCount : 1;', $view);
+        $this->assertStringContainsString('@for ($rowIndex = 0; $rowIndex < $purchaseRowCount; $rowIndex++)', $view);
     }
 
     public function test_one_hundred_purchase_rows_fit_the_documented_php_input_capacity(): void

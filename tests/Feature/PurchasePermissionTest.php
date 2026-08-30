@@ -142,6 +142,55 @@ class PurchasePermissionTest extends TestCase
             ->assertSessionHas('error');
     }
 
+    public function test_fifty_purchase_rows_survive_a_late_row_validation_failure(): void
+    {
+        $rows = 50;
+        $payload = [
+            'supplier_id' => 1,
+            'purchase_date' => '2026-06-15',
+            'item_type' => array_fill(0, $rows, 'product'),
+            'product_id' => array_fill(0, $rows, '1'),
+            'service_id' => array_fill(0, $rows, ''),
+            'quantity' => array_fill(0, $rows, '2'),
+            'unit_price' => array_fill(0, $rows, '10.50'),
+            'vat_rate' => array_fill(0, $rows, '13'),
+            'vat_amount' => array_fill(0, $rows, '2.73'),
+            'total_price' => array_fill(0, $rows, '23.73'),
+            'paid_amount' => '0',
+            'discount_amount' => '5.00',
+            'subtotal' => '1050.00',
+            'total_vat' => '136.50',
+            'grand_total' => '1181.50',
+            'note' => 'Preserve every entered purchase line.',
+        ];
+        $payload['quantity'][49] = '';
+
+        $response = $this->actingAs(User::findOrFail(1))
+            ->from(route('company.purchases.create'))
+            ->post(route('company.purchases.store'), $payload);
+
+        $response->assertRedirect(route('company.purchases.create'))
+            ->assertSessionHasErrors(['quantity.49'])
+            ->assertSessionHasInput('item_type', $payload['item_type'])
+            ->assertSessionHasInput('product_id', $payload['product_id'])
+            ->assertSessionHasInput('service_id', $payload['service_id'])
+            ->assertSessionHasInput('quantity', $payload['quantity'])
+            ->assertSessionHasInput('unit_price', $payload['unit_price'])
+            ->assertSessionHasInput('vat_rate', $payload['vat_rate'])
+            ->assertSessionHasInput('vat_amount', $payload['vat_amount'])
+            ->assertSessionHasInput('total_price', $payload['total_price'])
+            ->assertSessionHasInput('supplier_id', 1)
+            ->assertSessionHasInput('note', $payload['note']);
+
+        $this->assertSame(
+            'Row 50: Quantity is required.',
+            session('errors')->get('quantity.49')[0]
+        );
+        $this->assertCount(50, session()->getOldInput('item_type'));
+        $this->assertSame('2', session()->getOldInput('quantity')[0]);
+        $this->assertNull(session()->getOldInput('quantity')[49]);
+    }
+
     private function routes(PurchaseInvoice $invoice): array
     {
         return [

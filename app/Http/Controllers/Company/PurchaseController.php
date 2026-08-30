@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use App\Models\FinancialYear;
 use App\Models\Product;
 use App\Models\Service;
@@ -585,7 +586,7 @@ public function store(Request $request)
 $companyId =
 auth()->user()->company_id;
 
-$request->validate([
+$validator = Validator::make($request->all(), [
 
     'supplier_id' =>
         'required|exists:suppliers,id,company_id,' .
@@ -599,6 +600,12 @@ $request->validate([
 
     'item_type.*' =>
         'required|in:product,service',
+
+    'product_id' =>
+        'required|array',
+
+    'service_id' =>
+        'required|array',
 
     'quantity' =>
         'required|array',
@@ -619,7 +626,30 @@ $request->validate([
         'nullable|exists:accounts,id,company_id,' .
         $companyId,
 
+], [
+    'item_type.*.required' => 'Row :position: Product/Service is required.',
+    'item_type.*.in' => 'Row :position: Product/Service is invalid.',
+    'quantity.*.required' => 'Row :position: Quantity is required.',
+    'quantity.*.numeric' => 'Row :position: Quantity must be a number.',
+    'quantity.*.min' => 'Row :position: Quantity must be at least 1.',
+    'unit_price.*.required' => 'Row :position: Unit Cost is required.',
+    'unit_price.*.numeric' => 'Row :position: Unit Cost must be a number.',
+    'unit_price.*.min' => 'Row :position: Unit Cost cannot be negative.',
 ]);
+
+$validator->after(function ($validator) use ($request): void {
+    foreach ((array) $request->input('item_type', []) as $index => $type) {
+        if ($type === 'product' && ! $request->input("product_id.$index")) {
+            $validator->errors()->add("product_id.$index", 'Row '.($index + 1).': Product/Service is required.');
+        }
+
+        if ($type === 'service' && ! $request->input("service_id.$index")) {
+            $validator->errors()->add("service_id.$index", 'Row '.($index + 1).': Product/Service is required.');
+        }
+    }
+});
+
+$validator->validate();
 
 if (
     $request->paid_amount > 0
