@@ -58,6 +58,85 @@ DG.invoiceSummary = (function () {
 
 })();
 
+DG.itemCombobox = (function () {
+    'use strict';
+
+    function input(row) { return row.querySelector('.dg-item-combobox-input'); }
+    function menu(row) { return row.querySelector('.dg-item-combobox-menu'); }
+
+    function close(row) {
+        var field = input(row);
+        var list = menu(row);
+        if (list) { list.hidden = true; list.innerHTML = ''; }
+        if (field) { field.setAttribute('aria-expanded', 'false'); }
+    }
+
+    function render(row, select, searchTerm, headingText) {
+        var field = input(row);
+        var list = menu(row);
+        if (!field || !list || !select) { return; }
+        var term = (searchTerm || '').trim().toLowerCase();
+        var groups = select.querySelectorAll('optgroup');
+        list.innerHTML = '';
+        var count = 0;
+
+        (groups.length ? Array.from(groups) : [select]).forEach(function (group) {
+            var matches = Array.from(group.querySelectorAll('option')).filter(function (option) {
+                return option.value && option.textContent.toLowerCase().indexOf(term) !== -1;
+            });
+            if (!matches.length) { return; }
+            var heading = document.createElement('div');
+            heading.className = 'dg-item-combobox-heading';
+            heading.textContent = (headingText || group.label || 'ITEMS').toUpperCase();
+            list.appendChild(heading);
+            matches.forEach(function (option) {
+                var result = document.createElement('button');
+                result.type = 'button';
+                result.className = 'dg-item-combobox-option';
+                result.setAttribute('role', 'option');
+                result.setAttribute('data-option-index', option.index);
+                result.textContent = option.textContent;
+                list.appendChild(result);
+                count++;
+            });
+        });
+        if (!count) {
+            var empty = document.createElement('div');
+            empty.className = 'dg-item-combobox-empty';
+            empty.textContent = 'No matching items';
+            list.appendChild(empty);
+        }
+        list.hidden = false;
+        field.setAttribute('aria-expanded', 'true');
+    }
+
+    function choose(row, select, optionIndex) {
+        var field = input(row);
+        if (!field || !select || !select.options[optionIndex]) { return false; }
+        select.selectedIndex = optionIndex;
+        field.value = select.options[optionIndex].textContent.trim();
+        field.classList.remove('is-invalid');
+        close(row);
+        return true;
+    }
+
+    function move(row, direction) {
+        var list = menu(row);
+        var options = list ? Array.from(list.querySelectorAll('.dg-item-combobox-option')) : [];
+        if (!options.length) { return; }
+        var current = options.findIndex(function (option) { return option.classList.contains('is-highlighted'); });
+        var next = current + direction;
+        if (next < 0) { next = options.length - 1; }
+        if (next >= options.length) { next = 0; }
+        options.forEach(function (option) { option.classList.remove('is-highlighted'); option.setAttribute('aria-selected', 'false'); });
+        options[next].classList.add('is-highlighted');
+        options[next].setAttribute('aria-selected', 'true');
+        options[next].scrollIntoView({ block: 'nearest' });
+    }
+
+    return { input: input, menu: menu, close: close, render: render, choose: choose, move: move };
+})();
+
 /* =========================================================
    MODULE : SALES BILLING (Create Sales Invoice)
    Screen : resources/views/company/sales/create.blade.php
@@ -159,6 +238,13 @@ DG.salesBilling = (function () {
                 input.value = '-';
             }
         });
+
+        var comboboxInput = getSalesItemInput(clone);
+        if (comboboxInput) {
+            comboboxInput.value = '';
+            comboboxInput.setAttribute('aria-expanded', 'false');
+        }
+        DG.itemCombobox.close(clone);
     }
 
     function addRow() {
@@ -204,6 +290,31 @@ DG.salesBilling = (function () {
 
     function getServiceSelect(row) {
         return qs('select.dg-service-select', row);
+    }
+
+    function getSalesItemInput(row) {
+        return DG.itemCombobox.input(row);
+    }
+
+    function getCombinedItemSelect(row) {
+        return qs('select.dg-sales-item-select', row);
+    }
+
+    function applyCombinedItemSelection(row) {
+        var combinedSelect = getCombinedItemSelect(row);
+        var option = combinedSelect && combinedSelect.value ? combinedSelect.options[combinedSelect.selectedIndex] : null;
+        var typeSelect = qs('select[name="item_type[]"]', row);
+        var productSelect = getProductSelect(row);
+        var serviceSelect = getServiceSelect(row);
+
+        if (!option || !typeSelect) { return; }
+        var type = option.getAttribute('data-item-type') || '';
+        var itemId = option.getAttribute('data-item-id') || '';
+        typeSelect.value = type;
+        if (productSelect) { productSelect.value = type === 'product' ? itemId : ''; }
+        if (serviceSelect) { serviceSelect.value = type === 'service' ? itemId : ''; }
+        updateItemSelectsByType(row);
+        recalcRow(row);
     }
 
     function getActiveItemSelect(row) {
@@ -260,6 +371,12 @@ DG.salesBilling = (function () {
         var productSelect = getProductSelect(row);
         var serviceSelect = getServiceSelect(row);
         var type = typeSelect ? typeSelect.value : '';
+        var comboboxInput = getSalesItemInput(row);
+
+        if (comboboxInput) {
+            comboboxInput.value = '';
+        }
+        DG.itemCombobox.close(row);
 
         if (productPicker) {
             productPicker.hidden = (type !== 'product');
@@ -293,6 +410,18 @@ DG.salesBilling = (function () {
 
         applySelectedItemData(row);
         syncItemIdFields(row);
+
+        var activeItemSelect = getActiveItemSelect(row);
+        if (comboboxInput && activeItemSelect && activeItemSelect.value) {
+            comboboxInput.value = activeItemSelect.options[activeItemSelect.selectedIndex].textContent.trim();
+        }
+
+        var combinedSelect = getCombinedItemSelect(row);
+        if (combinedSelect && activeItemSelect && activeItemSelect.value) {
+            combinedSelect.value = type + ':' + activeItemSelect.value;
+        } else if (combinedSelect) {
+            combinedSelect.selectedIndex = 0;
+        }
     }
 
     /* ---------------------------------------------------
@@ -900,8 +1029,9 @@ DG.salesBilling = (function () {
             }
 
             if (!hasItem) {
-                markInvalid(itemSelect);
-                firstInvalid = firstInvalid || itemSelect;
+                var comboboxInput = getSalesItemInput(row);
+                markInvalid(comboboxInput);
+                firstInvalid = firstInvalid || comboboxInput;
             }
 
             if (!hasQuantity) {
@@ -957,19 +1087,50 @@ DG.salesBilling = (function () {
        table for continuous, spreadsheet-style entry.
     --------------------------------------------------- */
 
-    var FOCUSABLE_SELECTOR = 'input:not([readonly]):not([type="hidden"]), select';
+    var FOCUSABLE_SELECTOR = 'input:not([readonly]):not([type="hidden"]), select:not(.dg-product-select):not(.dg-service-select):not(.dg-sales-item-select):not(.dg-sales-item-type)';
 
     function focusableInRow(row) {
         return qsa(FOCUSABLE_SELECTOR, row);
     }
 
     function handleRowKeydown(event) {
+        var target = event.target;
+        var row = target.closest('tr.dg-row');
+
+        if (row && target.matches('input.dg-item-combobox-input')) {
+            var activeSelect = getCombinedItemSelect(row);
+            var menu = DG.itemCombobox.menu(row);
+
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (activeSelect && (!menu || menu.hidden)) {
+                    DG.itemCombobox.render(row, activeSelect, target.value);
+                }
+                DG.itemCombobox.move(row, event.key === 'ArrowDown' ? 1 : -1);
+                return;
+            }
+
+            if (event.key === 'Enter' && menu && !menu.hidden) {
+                var highlighted = qs('.dg-item-combobox-option.is-highlighted', menu) || qs('.dg-item-combobox-option', menu);
+                if (highlighted && activeSelect) {
+                    event.preventDefault();
+                    if (DG.itemCombobox.choose(row, activeSelect, parseInt(highlighted.getAttribute('data-option-index'), 10))) {
+                        applyCombinedItemSelection(row);
+                    }
+                }
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                DG.itemCombobox.close(row);
+                return;
+            }
+        }
+
         if (event.key !== 'Enter') {
             return;
         }
-
-        var target = event.target;
-        var row = target.closest('tr.dg-row');
 
         if (!row) {
             return;
@@ -1049,6 +1210,20 @@ DG.salesBilling = (function () {
         var row = event.target.closest('tr.dg-row');
 
         if (!row) {
+            return;
+        }
+
+        if (event.target.matches('input.dg-item-combobox-input')) {
+            var combinedSelect = getCombinedItemSelect(row);
+            var typeSelect = qs('select[name="item_type[]"]', row);
+            if (combinedSelect) {
+                combinedSelect.selectedIndex = 0;
+                if (typeSelect) { typeSelect.selectedIndex = 0; }
+                getProductSelect(row).selectedIndex = 0;
+                getServiceSelect(row).selectedIndex = 0;
+                syncItemIdFields(row);
+                DG.itemCombobox.render(row, combinedSelect, event.target.value);
+            }
             return;
         }
 
@@ -1178,6 +1353,30 @@ DG.salesBilling = (function () {
         itemsBody.addEventListener('input', onItemsBodyInput);
         itemsBody.addEventListener('focusout', onItemsBodyFocusOut);
         itemsBody.addEventListener('keydown', handleRowKeydown);
+        itemsBody.addEventListener('focusin', function (event) {
+            if (!event.target.matches('input.dg-item-combobox-input')) { return; }
+            var row = event.target.closest('tr.dg-row');
+            var activeSelect = getCombinedItemSelect(row);
+            event.target.select();
+            if (activeSelect) {
+                DG.itemCombobox.render(row, activeSelect, '');
+            }
+        });
+        document.addEventListener('click', function (event) {
+            var option = event.target.closest('.dg-item-combobox-option');
+            if (option && option.closest('.dg-sales-items-table')) {
+                var row = option.closest('tr.dg-row');
+                var activeSelect = getCombinedItemSelect(row);
+                if (activeSelect && DG.itemCombobox.choose(row, activeSelect, parseInt(option.getAttribute('data-option-index'), 10))) {
+                    applyCombinedItemSelection(row);
+                }
+                return;
+            }
+            qsa('tr.dg-row', itemsBody).forEach(function (row) {
+                var combobox = qs('.dg-item-combobox', row);
+                if (combobox && !combobox.contains(event.target)) { DG.itemCombobox.close(row); }
+            });
+        });
     }
 
     function bindFormSubmit() {
@@ -1391,118 +1590,31 @@ DG.purchaseBilling = (function () {
     }
 
     function getItemComboboxInput(row) {
-        return qs('input.dg-item-combobox-input', row);
+        return DG.itemCombobox.input(row);
     }
 
     function getItemComboboxMenu(row) {
-        return qs('.dg-item-combobox-menu', row);
+        return DG.itemCombobox.menu(row);
     }
 
     function closeItemCombobox(row) {
-        var input = getItemComboboxInput(row);
-        var menu = getItemComboboxMenu(row);
-
-        if (menu) {
-            menu.hidden = true;
-            menu.innerHTML = '';
-        }
-
-        if (input) {
-            input.setAttribute('aria-expanded', 'false');
-        }
+        DG.itemCombobox.close(row);
     }
 
     function renderItemCombobox(row, searchTerm) {
         var itemSelect = getItemSelect(row);
-        var input = getItemComboboxInput(row);
-        var menu = getItemComboboxMenu(row);
-
-        if (!itemSelect || !input || !menu) {
-            return;
-        }
-
-        var normalizedTerm = (searchTerm || '').trim().toLowerCase();
-        var resultCount = 0;
-        menu.innerHTML = '';
-
-        qsa('optgroup', itemSelect).forEach(function (group) {
-            var matches = qsa('option', group).filter(function (option) {
-                return option.value && option.textContent.toLowerCase().indexOf(normalizedTerm) !== -1;
-            });
-
-            if (!matches.length) {
-                return;
-            }
-
-            var heading = document.createElement('div');
-            heading.className = 'dg-item-combobox-heading';
-            heading.textContent = group.label.toUpperCase();
-            menu.appendChild(heading);
-
-            matches.forEach(function (option) {
-                var result = document.createElement('button');
-                result.type = 'button';
-                result.className = 'dg-item-combobox-option';
-                result.setAttribute('role', 'option');
-                result.setAttribute('data-option-index', option.index);
-                result.textContent = option.textContent;
-                menu.appendChild(result);
-                resultCount++;
-            });
-        });
-
-        if (!resultCount) {
-            var empty = document.createElement('div');
-            empty.className = 'dg-item-combobox-empty';
-            empty.textContent = 'No matching items';
-            menu.appendChild(empty);
-        }
-
-        menu.hidden = false;
-        input.setAttribute('aria-expanded', 'true');
+        DG.itemCombobox.render(row, itemSelect, searchTerm);
     }
 
     function selectItemComboboxOption(row, optionIndex) {
         var itemSelect = getItemSelect(row);
-        var input = getItemComboboxInput(row);
-
-        if (!itemSelect || !input || !itemSelect.options[optionIndex]) {
-            return;
+        if (DG.itemCombobox.choose(row, itemSelect, optionIndex)) {
+            itemSelect.dispatchEvent(new Event('change', { bubbles: true }));
         }
-
-        itemSelect.selectedIndex = optionIndex;
-        input.value = itemSelect.options[optionIndex].textContent.trim();
-        clearInvalid(input);
-        closeItemCombobox(row);
-        itemSelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     function moveItemComboboxHighlight(row, direction) {
-        var menu = getItemComboboxMenu(row);
-        var options = menu ? qsa('.dg-item-combobox-option', menu) : [];
-
-        if (!options.length) {
-            return;
-        }
-
-        var currentIndex = options.findIndex(function (option) {
-            return option.classList.contains('is-highlighted');
-        });
-        var nextIndex = currentIndex + direction;
-
-        if (nextIndex < 0) {
-            nextIndex = options.length - 1;
-        } else if (nextIndex >= options.length) {
-            nextIndex = 0;
-        }
-
-        options.forEach(function (option) {
-            option.classList.remove('is-highlighted');
-            option.setAttribute('aria-selected', 'false');
-        });
-        options[nextIndex].classList.add('is-highlighted');
-        options[nextIndex].setAttribute('aria-selected', 'true');
-        options[nextIndex].scrollIntoView({ block: 'nearest' });
+        DG.itemCombobox.move(row, direction);
     }
 
     function syncItemIdFields(row) {

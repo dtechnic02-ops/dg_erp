@@ -5636,16 +5636,20 @@ body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-parent
     position: relative;
 }
 
-.dg-purchase-items-table {
+.dg-purchase-items-table,
+.dg-sales-items-table {
     overflow: visible;
 }
 
 .dg-card:has(.dg-purchase-items-table),
-.dg-card:has(.dg-purchase-items-table) .dg-card-body {
+.dg-card:has(.dg-purchase-items-table) .dg-card-body,
+.dg-card:has(.dg-sales-items-table),
+.dg-card:has(.dg-sales-items-table) .dg-card-body {
     overflow: visible;
 }
 
-.dg-purchase-items-table .dg-row:has(.dg-item-combobox-input:focus) {
+.dg-purchase-items-table .dg-row:has(.dg-item-combobox-input:focus),
+.dg-sales-items-table .dg-row:has(.dg-item-combobox-input:focus) {
     position: relative;
     z-index: 1050;
 }

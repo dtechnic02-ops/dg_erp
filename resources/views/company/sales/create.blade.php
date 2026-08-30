@@ -67,6 +67,15 @@
                         $selectedAccountBalance = number_format($selectedAccount->current_balance, 2);
                     }
                 }
+
+                $oldItemFields = [
+                    'item_type', 'product_id', 'service_id', 'quantity', 'unit_price',
+                    'vat_rate', 'vat_amount', 'total_price',
+                ];
+                $oldItemRowCount = collect($oldItemFields)
+                    ->map(fn ($field) => count((array) old($field, [])))
+                    ->max() ?: 0;
+                $salesRowCount = $oldItemRowCount > 0 ? $oldItemRowCount : 1;
             @endphp
 
             <form id="dgForm" method="POST" action="{{ route('company.sales.store') }}">
@@ -119,7 +128,7 @@
 
                                 <div class="col-xl-2 col-md-4 col-sm-6">
                                     <label for="barcode" class="form-label small fw-semibold mb-1">Barcode</label>
-                                    <input type="text" name="barcode" id="barcode" class="form-control form-control-sm dg-input" placeholder="Scan or enter barcode">
+                                    <input type="text" name="barcode" id="barcode" class="form-control form-control-sm dg-input" value="{{ old('barcode') }}" placeholder="Scan or enter barcode">
                                 </div>
 
                             </div>
@@ -134,12 +143,11 @@
                         </header>
 
                         <div class="card-body dg-card-body p-2">
-                            <div class="table-responsive">
+                            <div class="table-responsive dg-sales-items-table">
                                 <table class="table table-sm align-middle mb-0 dg-table dg-table-compact">
                                     <thead class="dg-head">
                                         <tr>
                                             <th scope="col">#</th>
-                                            <th scope="col">Type</th>
                                             <th scope="col" width="25%">Product / Service</th>
                                             <th scope="col" width="8%">Quantity</th>
                                             <th scope="col" width="8%">Unit</th>
@@ -152,76 +160,100 @@
                                     </thead>
 
                                     <tbody class="dg-body">
+                                        @for ($rowIndex = 0; $rowIndex < $salesRowCount; $rowIndex++)
+                                        @php
+                                            $rowType = old("item_type.$rowIndex", '');
+                                            $rowProductId = old("product_id.$rowIndex");
+                                            $rowServiceId = old("service_id.$rowIndex");
+                                            $rowProduct = $rowProductId ? $products->firstWhere('id', (int) $rowProductId) : null;
+                                            $rowService = $rowServiceId ? $services->firstWhere('id', (int) $rowServiceId) : null;
+                                            $rowSelectedName = $rowType === 'service' ? ($rowService?->name ?? '') : ($rowProduct?->name ?? '');
+                                            $rowUnit = $rowType === 'service'
+                                                ? ($rowService ? 'Service' : '-')
+                                                : ($rowProduct?->unit?->short_name ?? $rowProduct?->unit?->name ?? '-');
+                                        @endphp
                                         <tr class="dg-row">
-                                            <td>1</td>
+                                            <td>{{ $rowIndex + 1 }}</td>
 
                                             <td>
-                                                <label class="form-label visually-hidden">Item Type</label>
-                                                <select name="item_type[]" class="form-select form-select-sm dg-select" aria-label="Item Type">
-                                                    <option value="">Select Type</option>
-                                                    <option value="product">Product</option>
-                                                    <option value="service">Service</option>
+                                                <label class="form-label visually-hidden">Product or Service</label>
+                                                <div class="dg-item-combobox">
+                                                    <input type="search" class="form-control form-control-sm dg-input dg-item-combobox-input @error("product_id.$rowIndex") is-invalid @enderror @error("service_id.$rowIndex") is-invalid @enderror" value="{{ $rowSelectedName }}" placeholder="Select Product / Service" aria-label="Product or Service" aria-autocomplete="list" aria-expanded="false" autocomplete="off">
+                                                    <div class="dg-item-combobox-menu" role="listbox" hidden></div>
+                                                </div>
+                                                <select class="dg-sales-item-select d-none" aria-hidden="true" tabindex="-1">
+                                                    <option value="">Select Item</option>
+                                                    <optgroup label="Products">
+                                                        @foreach ($products as $product)
+                                                            <option value="product:{{ $product->id }}" data-item-type="product" data-item-id="{{ $product->id }}" @selected($rowType === 'product' && (int) $rowProductId === (int) $product->id)>{{ $product->name }}</option>
+                                                        @endforeach
+                                                    </optgroup>
+                                                    <optgroup label="Services">
+                                                        @foreach ($services as $service)
+                                                            <option value="service:{{ $service->id }}" data-item-type="service" data-item-id="{{ $service->id }}" @selected($rowType === 'service' && (int) $rowServiceId === (int) $service->id)>{{ $service->name }}</option>
+                                                        @endforeach
+                                                    </optgroup>
                                                 </select>
-                                            </td>
-
-                                            <td>
-                                                <div class="dg-product-picker" hidden>
-                                                    <label class="form-label visually-hidden">Product</label>
-                                                    <select class="form-select form-select-sm dg-select dg-product-select" aria-label="Product">
+                                                <select name="item_type[]" class="d-none dg-sales-item-type" aria-hidden="true" tabindex="-1">
+                                                    <option value="">Select Type</option>
+                                                    <option value="product" @selected($rowType === 'product')>Product</option>
+                                                    <option value="service" @selected($rowType === 'service')>Service</option>
+                                                </select>
+                                                <div class="dg-product-picker d-none">
+                                                    <select class="dg-product-select" aria-hidden="true" tabindex="-1">
                                                         <option value="">Select Product</option>
                                                         @foreach ($products as $product)
-                                                            <option value="{{ $product->id }}" data-unit="{{ $product->unit?->short_name ?? $product->unit?->name }}" data-retail-price="{{ $product->retail_price }}" data-wholesale-price="{{ $product->wholesale_price }}" data-stock="{{ $product->current_stock }}" data-barcode="{{ $product->barcode }}" data-vat-rate="{{ $product->vat?->rate }}">{{ $product->name }}</option>
+                                                            <option value="{{ $product->id }}" data-unit="{{ $product->unit?->short_name ?? $product->unit?->name }}" data-retail-price="{{ $product->retail_price }}" data-wholesale-price="{{ $product->wholesale_price }}" data-stock="{{ $product->current_stock }}" data-barcode="{{ $product->barcode }}" data-vat-rate="{{ $product->vat?->rate }}" @selected($rowType === 'product' && (int) $rowProductId === (int) $product->id)>{{ $product->name }}</option>
                                                         @endforeach
                                                     </select>
                                                 </div>
-                                                <div class="dg-service-picker" hidden>
-                                                    <label class="form-label visually-hidden">Service</label>
-                                                    <select class="form-select form-select-sm dg-select dg-service-select" aria-label="Service">
+                                                <div class="dg-service-picker d-none">
+                                                    <select class="dg-service-select" aria-hidden="true" tabindex="-1">
                                                         <option value="">Select Service</option>
                                                         @foreach ($services as $service)
-                                                            <option value="{{ $service->id }}" data-price="{{ $service->price }}" data-vat-rate="{{ $service->vat?->rate }}">{{ $service->name }}</option>
+                                                            <option value="{{ $service->id }}" data-price="{{ $service->price }}" data-vat-rate="{{ $service->vat?->rate }}" @selected($rowType === 'service' && (int) $rowServiceId === (int) $service->id)>{{ $service->name }}</option>
                                                         @endforeach
                                                     </select>
                                                 </div>
-                                                <input type="hidden" name="product_id[]" class="dg-product-id" value="">
-                                                <input type="hidden" name="service_id[]" class="dg-service-id" value="">
+                                                <input type="hidden" name="product_id[]" class="dg-product-id" value="{{ $rowProductId }}">
+                                                <input type="hidden" name="service_id[]" class="dg-service-id" value="{{ $rowServiceId }}">
                                             </td>
 
                                             <td>
                                                 <label class="form-label visually-hidden">Quantity</label>
-                                                <input type="number" name="quantity[]" class="form-control form-control-sm dg-input" min="1" step="1" aria-label="Quantity">
+                                                <input type="number" name="quantity[]" class="form-control form-control-sm dg-input @error("quantity.$rowIndex") is-invalid @enderror" min="1" step="1" value="{{ old("quantity.$rowIndex") }}" aria-label="Quantity">
                                                 <div class="invalid-feedback">Quantity exceeds available stock.</div>
                                             </td>
 
                                             <td>
                                                 <label class="form-label visually-hidden">Unit</label>
-                                                <input type="text" class="form-control form-control-sm dg-input dg-unit-display" value="-" readonly aria-label="Unit">
-                                                <small class="form-text text-muted dg-note dg-stock-note"></small>
+                                                <input type="text" class="form-control form-control-sm dg-input dg-unit-display" value="{{ $rowUnit }}" readonly aria-label="Unit">
+                                                <small class="form-text text-muted dg-note dg-stock-note">{{ $rowProduct ? 'Stock: '.$rowProduct->current_stock : '' }}</small>
                                             </td>
 
                                             <td>
                                                 <label class="form-label visually-hidden">Unit Price</label>
-                                                <input type="number" name="unit_price[]" class="form-control form-control-sm dg-input" min="0" step="0.01" aria-label="Unit Price">
+                                                <input type="number" name="unit_price[]" class="form-control form-control-sm dg-input @error("unit_price.$rowIndex") is-invalid @enderror" min="0" step="0.01" value="{{ old("unit_price.$rowIndex") }}" aria-label="Unit Price">
                                             </td>
 
                                             <td>
                                                 <label class="form-label visually-hidden">VAT Rate</label>
                                                 <select name="vat_rate[]" class="form-select form-select-sm dg-select" aria-label="VAT Rate">
-                                                    <option value="0">No VAT</option>
+                                                    <option value="0" @selected((string) old("vat_rate.$rowIndex", '0') === '0')>No VAT</option>
                                                     @foreach ($vats as $vat)
-                                                        <option value="{{ $vat->rate }}">{{ $vat->name }} ({{ $vat->rate }}%)</option>
+                                                        <option value="{{ $vat->rate }}" @selected((float) old("vat_rate.$rowIndex", 0) === (float) $vat->rate)>{{ $vat->name }} ({{ $vat->rate }}%)</option>
                                                     @endforeach
                                                 </select>
                                             </td>
 
                                             <td>
                                                 <label class="form-label visually-hidden">VAT Amount</label>
-                                                <input type="number" name="vat_amount[]" class="form-control form-control-sm dg-input" min="0" step="0.01" value="0" aria-label="VAT Amount">
+                                                <input type="number" name="vat_amount[]" class="form-control form-control-sm dg-input" min="0" step="0.01" value="{{ old("vat_amount.$rowIndex", 0) }}" aria-label="VAT Amount">
                                             </td>
 
                                             <td>
                                                 <label class="form-label visually-hidden">Total Price</label>
-                                                <input type="number" name="total_price[]" class="form-control form-control-sm dg-input" min="0" step="0.01" value="0" aria-label="Total Price">
+                                                <input type="number" name="total_price[]" class="form-control form-control-sm dg-input" min="0" step="0.01" value="{{ old("total_price.$rowIndex", 0) }}" aria-label="Total Price">
                                             </td>
 
                                             <td class="dg-action-col-compact d-print-none">
@@ -230,6 +262,7 @@
                                                 </div>
                                             </td>
                                         </tr>
+                                        @endfor
                                     </tbody>
                                 </table>
                             </div>
