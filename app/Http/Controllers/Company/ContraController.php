@@ -7,10 +7,13 @@ use Illuminate\Http\Request;
 use App\Models\Contra;
 use App\Models\Account;
 use App\Models\FinancialYear;
+use App\Services\ContraPostingService;
 use Illuminate\Support\Facades\DB;
 
 class ContraController extends Controller
 {
+    public function __construct(private readonly ContraPostingService $contraPostingService) {}
+
     public function index(Request $request)
 {
 
@@ -418,9 +421,9 @@ public function store(Request $request)
 
 $request->validate([
 
-    'from_account_id' => 'required',
+    'from_account_id' => 'required|integer|different:to_account_id',
 
-    'to_account_id' => 'required',
+    'to_account_id' => 'required|integer|different:from_account_id',
 
     'contra_date' => 'required|date',
 
@@ -738,11 +741,11 @@ if($request->hasFile('attachment')){
 
 
 
-$transferType = 'bank_to_bank';
+$transferType = $this->contraPostingService->deriveTransferType($fromAccount, $toAccount);
 
 
 
-Contra::create([
+$contra = Contra::create([
 
     'company_id' => $companyId,
 
@@ -772,26 +775,7 @@ Contra::create([
 
 ]);
 
-
-$fromAccount->decrement(
-
-    'current_balance',
-
-    (float)
-
-    $request->amount
-
-);
-
-$toAccount->increment(
-
-    'current_balance',
-
-    (float)
-
-    $request->amount
-
-);
+$this->contraPostingService->post($contra, $companyId, auth()->id());
 
 });
 
@@ -859,6 +843,8 @@ $companyId
 
 )
 
+->where('status', 1)
+
 ->findOrFail($id);
 
 $accounts = Account::where(
@@ -908,9 +894,9 @@ public function update(Request $request,$id)
 
 $request->validate([
 
-'from_account_id' => 'required',
+'from_account_id' => 'required|integer|different:to_account_id',
 
-'to_account_id' => 'required',
+'to_account_id' => 'required|integer|different:from_account_id',
 
 'contra_date' => 'required|date',
 
@@ -1024,139 +1010,6 @@ throw new \Exception(
 
 }
 
-$oldFrom = Account::where(
-
-
-'company_id',
-
-$companyId
-
-
-)
-
-->findOrFail(
-
-
-$contra->from_account_id
-
-
-);
-
-$oldTo = Account::where(
-
-
-'company_id',
-
-$companyId
-
-
-)
-
-->findOrFail(
-
-
-$contra->to_account_id
-
-
-);
-
-$oldFrom->increment(
-
-
-'current_balance',
-
-(float)$contra->amount
-
-
-);
-
-$oldTo->decrement(
-
-
-'current_balance',
-
-(float)$contra->amount
-
-
-);
-
-
-$newFrom = Account::where(
-
-
-'company_id',
-
-$companyId
-
-
-)
-
-->findOrFail(
-
-
-$request->from_account_id
-
-
-);
-
-$newTo = Account::where(
-
-'company_id',
-
-$companyId
-
-
-)
-
-->findOrFail(
-
-$request->to_account_id
-
-
-);
-
-if(
-
-
-$newFrom->current_balance
-
-<
-
-$request->amount
-
-
-){
-
-
-throw new \Exception(
-
-    'Insufficient account balance.'
-
-);
-
-
-}
-
-$newFrom->decrement(
-
-
-'current_balance',
-
-(float)$request->amount
-
-
-);
-
-$newTo->increment(
-
-'current_balance',
-
-(float)$request->amount
-
-
-);
-
-
 $file = $contra->attachment;
 
 if($request->hasFile('attachment')){
@@ -1255,24 +1108,14 @@ if(
 
 
 
-$contra->update([
-
-
-'contra_date' => $request->contra_date,
-
-'from_account_id' => $request->from_account_id,
-
-'to_account_id' => $request->to_account_id,
-
-'amount' => $request->amount,
-
-'reference_no' => $request->reference_no,
-
-'note' => $request->note,
-
-'attachment' => $file
-
-
+$this->contraPostingService->updatePosting($contra, $companyId, auth()->id(), [
+    'contra_date' => $request->contra_date,
+    'from_account_id' => $request->from_account_id,
+    'to_account_id' => $request->to_account_id,
+    'amount' => $request->amount,
+    'reference_no' => $request->reference_no,
+    'note' => $request->note,
+    'attachment' => $file,
 ]);
 
 });
@@ -1312,169 +1155,21 @@ $e->getMessage()
 }
 public function destroy($id)
 {
-
-try{
-
-$companyId = auth()->user()->company_id;
-
-$contra = Contra::where(
-
-
-'company_id',
-
-$companyId
-
-
-)
-
-->findOrFail($id);
-
-DB::transaction(function()
-
-use(
-
-
-$contra,
-$companyId
-
-
-){
-
-
-$fromAccount = Account::where(
-
-'company_id',
-
-$companyId
-
-
-)
-
-->findOrFail(
-
-
-$contra->from_account_id
-
-
-);
-
-$toAccount = Account::where(
-
-'company_id',
-
-$companyId
-
-
-)
-
-->findOrFail(
-
-
-$contra->to_account_id
-
-
-);
-
-$fromAccount->increment(
-
-
-'current_balance',
-
-(float)$contra->amount
-
-
-);
-
-$toAccount->decrement(
-
-
-'current_balance',
-
-(float)$contra->amount
-
-
-);
-
-
-if(
-
-
-$contra->attachment
-
-&&
-
-file_exists(
-
-    public_path(
-
-        $contra->attachment
-
-    )
-
-)
-
-
-){
-
-unlink(
-
-    public_path(
-
-        $contra->attachment
-
-    )
-
-);
-
-
+    try {
+        $companyId = auth()->user()->company_id;
+        $contra = Contra::where('company_id', $companyId)->findOrFail($id);
+
+        DB::transaction(function () use ($contra, $companyId) {
+            $this->contraPostingService->reverse($contra, $companyId, auth()->id());
+        });
+
+        return redirect()
+            ->route('company.contra.index')
+            ->with('success', 'Contra cancelled successfully.');
+    } catch (\Exception $e) {
+        return back()->with('error', $e->getMessage());
+    }
 }
-
-
-
-$contra->delete();
-
-});
-
-return redirect()
-
-->route(
-
-'company.contra.index'
-
-
-)
-
-->with(
-
-
-'success',
-
-'Contra deleted successfully.'
-
-
-);
-
-}
-catch(\Exception $e){
-
-return back()
-
-->with(
-
-
-'error',
-
-$e->getMessage()
-
-
-);
-
-}
-
-}
-
-
-
 public function show($id)
 {
 

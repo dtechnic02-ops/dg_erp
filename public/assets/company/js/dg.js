@@ -1345,6 +1345,13 @@ DG.purchaseBilling = (function () {
             }
         });
 
+        var comboboxInput = getItemComboboxInput(clone);
+        if (comboboxInput) {
+            comboboxInput.value = '';
+            comboboxInput.setAttribute('aria-expanded', 'false');
+        }
+        closeItemCombobox(clone);
+
         var stockNote = qs('.dg-stock-note', clone);
 
         if (stockNote) {
@@ -1381,6 +1388,121 @@ DG.purchaseBilling = (function () {
 
     function getItemSelect(row) {
         return qs('select.dg-item-select', row);
+    }
+
+    function getItemComboboxInput(row) {
+        return qs('input.dg-item-combobox-input', row);
+    }
+
+    function getItemComboboxMenu(row) {
+        return qs('.dg-item-combobox-menu', row);
+    }
+
+    function closeItemCombobox(row) {
+        var input = getItemComboboxInput(row);
+        var menu = getItemComboboxMenu(row);
+
+        if (menu) {
+            menu.hidden = true;
+            menu.innerHTML = '';
+        }
+
+        if (input) {
+            input.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function renderItemCombobox(row, searchTerm) {
+        var itemSelect = getItemSelect(row);
+        var input = getItemComboboxInput(row);
+        var menu = getItemComboboxMenu(row);
+
+        if (!itemSelect || !input || !menu) {
+            return;
+        }
+
+        var normalizedTerm = (searchTerm || '').trim().toLowerCase();
+        var resultCount = 0;
+        menu.innerHTML = '';
+
+        qsa('optgroup', itemSelect).forEach(function (group) {
+            var matches = qsa('option', group).filter(function (option) {
+                return option.value && option.textContent.toLowerCase().indexOf(normalizedTerm) !== -1;
+            });
+
+            if (!matches.length) {
+                return;
+            }
+
+            var heading = document.createElement('div');
+            heading.className = 'dg-item-combobox-heading';
+            heading.textContent = group.label.toUpperCase();
+            menu.appendChild(heading);
+
+            matches.forEach(function (option) {
+                var result = document.createElement('button');
+                result.type = 'button';
+                result.className = 'dg-item-combobox-option';
+                result.setAttribute('role', 'option');
+                result.setAttribute('data-option-index', option.index);
+                result.textContent = option.textContent;
+                menu.appendChild(result);
+                resultCount++;
+            });
+        });
+
+        if (!resultCount) {
+            var empty = document.createElement('div');
+            empty.className = 'dg-item-combobox-empty';
+            empty.textContent = 'No matching items';
+            menu.appendChild(empty);
+        }
+
+        menu.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+    }
+
+    function selectItemComboboxOption(row, optionIndex) {
+        var itemSelect = getItemSelect(row);
+        var input = getItemComboboxInput(row);
+
+        if (!itemSelect || !input || !itemSelect.options[optionIndex]) {
+            return;
+        }
+
+        itemSelect.selectedIndex = optionIndex;
+        input.value = itemSelect.options[optionIndex].textContent.trim();
+        clearInvalid(input);
+        closeItemCombobox(row);
+        itemSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function moveItemComboboxHighlight(row, direction) {
+        var menu = getItemComboboxMenu(row);
+        var options = menu ? qsa('.dg-item-combobox-option', menu) : [];
+
+        if (!options.length) {
+            return;
+        }
+
+        var currentIndex = options.findIndex(function (option) {
+            return option.classList.contains('is-highlighted');
+        });
+        var nextIndex = currentIndex + direction;
+
+        if (nextIndex < 0) {
+            nextIndex = options.length - 1;
+        } else if (nextIndex >= options.length) {
+            nextIndex = 0;
+        }
+
+        options.forEach(function (option) {
+            option.classList.remove('is-highlighted');
+            option.setAttribute('aria-selected', 'false');
+        });
+        options[nextIndex].classList.add('is-highlighted');
+        options[nextIndex].setAttribute('aria-selected', 'true');
+        options[nextIndex].scrollIntoView({ block: 'nearest' });
     }
 
     function syncItemIdFields(row) {
@@ -1835,8 +1957,9 @@ DG.purchaseBilling = (function () {
             }
 
             if (!hasItem) {
-                markInvalid(itemSelect);
-                firstInvalid = firstInvalid || itemSelect;
+                var comboboxInput = getItemComboboxInput(row);
+                markInvalid(comboboxInput);
+                firstInvalid = firstInvalid || comboboxInput;
             }
 
             if (!hasQuantity) {
@@ -1881,21 +2004,50 @@ DG.purchaseBilling = (function () {
         return true;
     }
 
-    var FOCUSABLE_SELECTOR = 'input:not([readonly]):not([type="hidden"]), select';
+    var FOCUSABLE_SELECTOR = 'input:not([readonly]):not([type="hidden"]), select:not(.dg-item-select)';
 
     function focusableInRow(row) {
         return qsa(FOCUSABLE_SELECTOR, row);
     }
 
     function handleRowKeydown(event) {
-        if (event.key !== 'Enter') {
-            return;
-        }
-
         var target = event.target;
         var row = target.closest('tr.dg-row');
 
         if (!row) {
+            return;
+        }
+
+        if (target.matches('input.dg-item-combobox-input')) {
+            var menu = getItemComboboxMenu(row);
+
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (!menu || menu.hidden) {
+                    renderItemCombobox(row, target.value);
+                }
+                moveItemComboboxHighlight(row, event.key === 'ArrowDown' ? 1 : -1);
+                return;
+            }
+
+            if (event.key === 'Enter' && menu && !menu.hidden) {
+                var highlighted = qs('.dg-item-combobox-option.is-highlighted', menu)
+                    || qs('.dg-item-combobox-option', menu);
+                if (highlighted) {
+                    event.preventDefault();
+                    selectItemComboboxOption(row, parseInt(highlighted.getAttribute('data-option-index'), 10));
+                }
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeItemCombobox(row);
+                return;
+            }
+        }
+
+        if (event.key !== 'Enter') {
             return;
         }
 
@@ -1963,6 +2115,16 @@ DG.purchaseBilling = (function () {
         var row = event.target.closest('tr.dg-row');
 
         if (!row) {
+            return;
+        }
+
+        if (event.target.matches('input.dg-item-combobox-input')) {
+            var itemSelect = getItemSelect(row);
+            if (itemSelect) {
+                itemSelect.selectedIndex = 0;
+                syncItemIdFields(row);
+            }
+            renderItemCombobox(row, event.target.value);
             return;
         }
 
@@ -2084,6 +2246,34 @@ DG.purchaseBilling = (function () {
         itemsBody.addEventListener('input', onItemsBodyInput);
         itemsBody.addEventListener('focusout', onItemsBodyFocusOut);
         itemsBody.addEventListener('keydown', handleRowKeydown);
+        itemsBody.addEventListener('focusin', function (event) {
+            if (event.target.matches('input.dg-item-combobox-input')) {
+                event.target.select();
+                renderItemCombobox(event.target.closest('tr.dg-row'), '');
+            }
+        });
+        document.addEventListener('click', function (event) {
+            var itemOption = event.target.closest('.dg-item-combobox-option');
+            if (itemOption) {
+                selectItemComboboxOption(
+                    itemOption.closest('tr.dg-row'),
+                    parseInt(itemOption.getAttribute('data-option-index'), 10)
+                );
+                return;
+            }
+
+            if (event.target.matches('input.dg-item-combobox-input')) {
+                renderItemCombobox(event.target.closest('tr.dg-row'), '');
+                return;
+            }
+
+            qsa('tr.dg-row', itemsBody).forEach(function (row) {
+                var combobox = qs('.dg-item-combobox', row);
+                if (combobox && !combobox.contains(event.target)) {
+                    closeItemCombobox(row);
+                }
+            });
+        });
     }
 
     function bindFormSubmit() {

@@ -259,6 +259,7 @@
                                 View
                             </a>
 
+                            @if((int)$contra->status === 1)
                             <a
                                 href="{{ route('company.contra.edit',$contra->id) }}"
                                 class="btn btn-warning btn-sm"
@@ -277,12 +278,13 @@
                                 <button
                                     type="submit"
                                     class="btn btn-danger btn-sm"
-                                    onclick="return confirm('Delete this record?')"
+                                    onclick="return confirm('Cancel this Contra and create reversal entries?')"
                                 >
-                                    Delete
+                                    Cancel
                                 </button>
 
                             </form>
+                            @endif
 
                         </td>
 

@@ -124,7 +124,7 @@
                         </header>
 
                         <div class="card-body dg-card-body p-2">
-                            <div class="table-responsive">
+                            <div class="table-responsive dg-purchase-items-table">
                                 <table class="table table-sm align-middle mb-0 dg-table dg-table-compact">
                                     <thead class="dg-head">
                                         <tr>
@@ -146,7 +146,11 @@
 
                                             <td>
                                                 <label class="form-label visually-hidden">Product or Service</label>
-                                                <select class="form-select form-select-sm dg-select dg-item-select" aria-label="Product or Service">
+                                                <div class="dg-item-combobox">
+                                                    <input type="search" class="form-control form-control-sm dg-input dg-item-combobox-input" placeholder="Select Product / Service" aria-label="Product or Service" aria-autocomplete="list" aria-expanded="false" autocomplete="off">
+                                                    <div class="dg-item-combobox-menu" role="listbox" hidden></div>
+                                                </div>
+                                                <select class="dg-item-select d-none" aria-hidden="true" tabindex="-1">
                                                     <option value="">Select Item</option>
                                                     <optgroup label="Products">
                                                         @foreach ($products as $product)

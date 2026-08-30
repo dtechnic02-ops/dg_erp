@@ -5632,3 +5632,67 @@ body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-parent
         display:inline-flex;
     }
 }
+.dg-item-combobox {
+    position: relative;
+}
+
+.dg-purchase-items-table {
+    overflow: visible;
+}
+
+.dg-card:has(.dg-purchase-items-table),
+.dg-card:has(.dg-purchase-items-table) .dg-card-body {
+    overflow: visible;
+}
+
+.dg-purchase-items-table .dg-row:has(.dg-item-combobox-input:focus) {
+    position: relative;
+    z-index: 1050;
+}
+
+.dg-item-combobox-menu {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    max-height: 280px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: .375rem;
+    box-shadow: 0 .35rem .8rem rgba(15, 23, 42, .14);
+}
+
+.dg-item-combobox-heading {
+    padding: .35rem .55rem;
+    color: #64748b;
+    background: #f8fafc;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+
+.dg-item-combobox-option {
+    display: block;
+    width: 100%;
+    padding: .4rem .55rem;
+    border: 0;
+    background: #fff;
+    color: #0f172a;
+    text-align: left;
+    font-size: .82rem;
+}
+
+.dg-item-combobox-option:hover,
+.dg-item-combobox-option.is-highlighted {
+    background: #eaf2ff;
+    color: #0b5ed7;
+}
+
+.dg-item-combobox-empty {
+    padding: .55rem;
+    color: #64748b;
+    font-size: .8rem;
+}

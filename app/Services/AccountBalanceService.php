@@ -26,15 +26,26 @@ class AccountBalanceService
             ->lockForUpdate()
             ->findOrFail($data['account_id']);
 
-        if (! empty($data['reference_type']) && ! empty($data['reference_id']) && AccountTransaction::where('company_id', $companyId)
-            ->where('reference_type', $data['reference_type'])
-            ->where('reference_id', $data['reference_id'])
-            ->where('account_id', $account->id)
-            ->when(array_key_exists('journal_item_id', $data), fn ($query) => $query->where('journal_item_id', $data['journal_item_id']))
-            ->where('status', 1)
-            ->lockForUpdate()
-            ->exists()) {
-            throw new \RuntimeException('An active account transaction already exists for this source.');
+        if (! empty($data['reference_type']) && ! empty($data['reference_id'])) {
+            $duplicateQuery = AccountTransaction::where('company_id', $companyId)
+                ->where('reference_type', $data['reference_type'])
+                ->where('reference_id', $data['reference_id'])
+                ->where('account_id', $account->id)
+                ->when(array_key_exists('journal_item_id', $data), fn ($query) => $query->where('journal_item_id', $data['journal_item_id']))
+                ->where('status', 1);
+
+            if (! empty($data['allow_repost_after_reversal'])) {
+                $duplicateQuery->whereNotExists(function ($query) {
+                    $query->selectRaw('1')
+                        ->from('account_transactions as reversal_rows')
+                        ->whereColumn('reversal_rows.reversed_transaction_id', 'account_transactions.id')
+                        ->where('reversal_rows.status', 1);
+                });
+            }
+
+            if ($duplicateQuery->lockForUpdate()->exists()) {
+                throw new \RuntimeException('An active account transaction already exists for this source.');
+            }
         }
  
 if ($checkBalance)
