@@ -23,6 +23,7 @@ use App\Services\StockService;
 use App\Services\AccountBalanceService;
 use App\Services\SupplierTransactionService;
 use App\Services\Accounting\PurchaseAccountingIntegrationService;
+use App\Services\PurchaseCancellationInventoryValuationService;
 use App\Models\SupplierTransaction;
 use App\Models\StockMovement;
 
@@ -36,7 +37,8 @@ class PurchaseController extends Controller
     use AuthorizesCompanyPermission;
 
     public function __construct(
-        private readonly PurchaseAccountingIntegrationService $purchaseAccountingIntegrationService
+        private readonly PurchaseAccountingIntegrationService $purchaseAccountingIntegrationService,
+        private readonly PurchaseCancellationInventoryValuationService $purchaseCancellationInventoryValuationService
     ) {
     }
 
@@ -1385,24 +1387,12 @@ public function cancel(Request $request, $id)
                 }
             }
 
-            foreach ($invoice->items as $item)
-            {
-                if (!$item->product_id)
-                {
-                    continue;
-                }
-
-                StockService::decrease(
-                    $item->product,
-                    $item->quantity,
-                    'purchase_cancel',
-                    $invoice->invoice_no,
-                    $activeFy->id,
-                    $cancelBusinessDate,
-                    $item->unit_price,
-                    'Purchase Cancel: ' . $cancelReason
-                );
-            }
+            $this->purchaseCancellationInventoryValuationService->reversePurchase(
+                $invoice,
+                $cancelBusinessDate,
+                $activeFy->id,
+                $cancelReason
+            );
 
             $transactions = SupplierTransaction::where(
                 'company_id',
