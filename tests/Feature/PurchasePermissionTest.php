@@ -23,7 +23,7 @@ class PurchasePermissionTest extends TestCase
         parent::setUp();
 
         foreach ([
-            'purchase_payments', 'purchase_items', 'purchase_invoices', 'accounts', 'vats', 'services', 'products', 'units',
+            'purchase_return_refunds', 'purchase_returns', 'purchase_payments', 'purchase_items', 'purchase_invoices', 'accounts', 'vats', 'services', 'products', 'units',
             'suppliers', 'user_permissions', 'permissions', 'users', 'roles',
             'companies', 'company_subscriptions', 'financial_years',
         ] as $table) {
@@ -60,6 +60,8 @@ class PurchasePermissionTest extends TestCase
         });
         Schema::create('purchase_items', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->unsignedBigInteger('financial_year_id'), $t->unsignedBigInteger('purchase_invoice_id'), $t->string('item_type'), $t->unsignedBigInteger('product_id')->nullable(), $t->unsignedBigInteger('service_id')->nullable(), $t->decimal('quantity', 20, 4)->default(1), $t->decimal('unit_price', 20, 4)->default(0), $t->decimal('total_price', 20, 4)->default(0), $t->decimal('vat_amount', 20, 4)->default(0), $t->integer('status')->default(1), $t->timestamps()]);
         Schema::create('purchase_payments', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('purchase_invoice_id'), $t->integer('status')->default(1), $t->timestamps()]);
+        Schema::create('purchase_returns', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->unsignedBigInteger('purchase_invoice_id'), $t->integer('status')->default(1), $t->timestamps()]);
+        Schema::create('purchase_return_refunds', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->unsignedBigInteger('purchase_return_id'), $t->string('status')->default('active'), $t->timestamps()]);
 
         DB::table('companies')->insert([['id' => 1, 'company_name' => 'One'], ['id' => 2, 'company_name' => 'Two']]);
         DB::table('roles')->insert([['id' => 2, 'name' => 'company_admin'], ['id' => 3, 'name' => 'staff']]);
@@ -129,6 +131,36 @@ class PurchasePermissionTest extends TestCase
             ->assertSessionHas('error');
 
         $this->assertSame(1, PurchaseInvoice::find($foreign->id)->status);
+    }
+
+    public function test_index_searches_invoice_and_supplier_without_losing_company_isolation(): void
+    {
+        $ownSupplier = Supplier::create(['company_id' => 1, 'name' => 'Acme Search Supplier', 'status' => 'active']);
+        $foreignSupplier = Supplier::create(['company_id' => 2, 'name' => 'Acme Search Supplier', 'status' => 'active']);
+        $ownInvoice = PurchaseInvoice::create([
+            'company_id' => 1, 'financial_year_id' => 1, 'supplier_id' => $ownSupplier->id,
+            'invoice_no' => 'PU-OWN-NEEDLE', 'purchase_date' => '2026-06-01', 'status' => 1,
+        ]);
+        $foreignInvoice = PurchaseInvoice::create([
+            'company_id' => 2, 'financial_year_id' => 1, 'supplier_id' => $foreignSupplier->id,
+            'invoice_no' => 'PU-FOREIGN-NEEDLE', 'purchase_date' => '2026-06-01', 'status' => 1,
+        ]);
+
+        $invoiceResponse = $this->actingAs(User::findOrFail(1))
+            ->get(route('company.purchases.index', ['search' => 'NEEDLE']));
+
+        $invoiceResponse->assertOk()->assertViewHas('invoices', function ($invoices) use ($ownInvoice, $foreignInvoice): bool {
+            return $invoices->pluck('id')->contains($ownInvoice->id)
+                && ! $invoices->pluck('id')->contains($foreignInvoice->id);
+        });
+
+        $supplierResponse = $this->actingAs(User::findOrFail(1))
+            ->get(route('company.purchases.index', ['search' => 'Acme Search']));
+
+        $supplierResponse->assertOk()->assertViewHas('invoices', function ($invoices) use ($ownInvoice, $foreignInvoice): bool {
+            return $invoices->pluck('id')->contains($ownInvoice->id)
+                && ! $invoices->pluck('id')->contains($foreignInvoice->id);
+        });
     }
 
     public function test_cancelled_purchase_cannot_be_edited(): void

@@ -95,7 +95,7 @@ public function index(Request $request)
     {
         $search = $request->search;
 
-        $query->where(function ($q) use ($search) {
+        $query->where(function ($q) use ($search, $companyId) {
 
             $q->where(
                 'invoice_no',
