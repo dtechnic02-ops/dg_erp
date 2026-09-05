@@ -14,4 +14,9 @@ class DefaultChartAccountBootstrapService
     {
         $this->seeder->seedForCompany($companyId);
     }
+
+    public function requiredSystemCodes(): array
+    {
+        return $this->seeder->requiredSystemCodes();
+    }
 }

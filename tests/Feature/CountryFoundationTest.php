@@ -8,6 +8,7 @@ use App\Models\CompanyRegistration;
 use App\Models\Country;
 use App\Models\User;
 use App\Services\SubscriptionService;
+use App\Services\DefaultChartAccountBootstrapService;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -109,6 +110,7 @@ class CountryFoundationTest extends TestCase
         $registration=CompanyRegistration::create(['company_name'=>'Approved Co','full_name'=>'Approved Owner','email'=>'approved@example.test','username'=>'approved','password'=>Hash::make('secret'),'mobile_no'=>'600','country_id'=>$nepal->id,'status'=>'pending']);
         $this->actingAs(User::findOrFail(99));File::shouldReceive('exists')->once()->andReturnFalse();File::shouldReceive('makeDirectory')->once();
         $subscription=$this->mock(SubscriptionService::class);$subscription->shouldReceive('startRegisterTrial')->once();
+        $bootstrap=$this->mock(DefaultChartAccountBootstrapService::class);$bootstrap->shouldReceive('seedForCompany')->once();
         app(CompanyApprovalController::class)->approve($registration->id);
         $this->assertDatabaseHas('companies',['email'=>'approved@example.test','country_id'=>$nepal->id]);
         $inactive=Country::create(['name'=>'Inactive','iso_code'=>'ZZ','is_active'=>0]);$bad=CompanyRegistration::create(['company_name'=>'Bad Co','full_name'=>'Bad Owner','email'=>'bad-approval@example.test','username'=>'bad-approval','password'=>'x','mobile_no'=>'601','country_id'=>$inactive->id,'status'=>'pending']);

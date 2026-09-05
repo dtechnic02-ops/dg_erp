@@ -25,6 +25,7 @@ use App\Mail\CompanyRegistrationApprovedMail;
 use App\Services\SubscriptionService;
 use App\Services\PlatformAuthorizationService;
 use App\Services\PlatformMailService;
+use App\Services\DefaultChartAccountBootstrapService;
 
 use Illuminate\Support\Facades\DB;
 
@@ -48,6 +49,7 @@ class CompanyApprovalController extends Controller
         private SubscriptionService $subscriptionService,
         private PlatformAuthorizationService $platformAuthorization,
         private PlatformMailService $platformMail,
+        private DefaultChartAccountBootstrapService $defaultChartAccountBootstrap,
     )
 
     {
@@ -137,6 +139,8 @@ class CompanyApprovalController extends Controller
                     ]
 
                 );
+
+                $this->defaultChartAccountBootstrap->seedForCompany($company->id);
 
                 $trialPlan = SubscriptionPlan::active()
                     ->where('code', 'trial')

@@ -12,6 +12,8 @@ use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\PlatformMailService;
 use App\Services\SubscriptionService;
+use App\Services\DefaultChartAccountBootstrapService;
+use App\Models\ChartAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
@@ -91,6 +93,20 @@ class CompanyRegistrationApprovalTest extends TestCase
 
         $company = Company::query()->where('email', $registration->email)->sole();
         $companyAdmin = User::query()->where('email', $registration->email)->sole();
+
+        $requiredSystemCodes = app(DefaultChartAccountBootstrapService::class)->requiredSystemCodes();
+        $seededAccounts = ChartAccount::query()
+            ->where('company_id', $company->id)
+            ->where('is_system', true)
+            ->whereIn('system_code', $requiredSystemCodes)
+            ->get();
+        $this->assertContains('INVENTORY', $seededAccounts->pluck('system_code')->all());
+        $this->assertEqualsCanonicalizing($requiredSystemCodes, $seededAccounts->pluck('system_code')->all());
+
+        $accountSnapshot = $seededAccounts->map->getAttributes()->all();
+        app(DefaultChartAccountBootstrapService::class)->seedForCompany($company->id);
+        $this->assertSame($seededAccounts->count(), ChartAccount::query()->where('company_id', $company->id)->count());
+        $this->assertSame($accountSnapshot, ChartAccount::query()->where('company_id', $company->id)->orderBy('id')->get()->map->getAttributes()->all());
 
         $this->assertSame('approved', $registration->fresh()->status);
         $this->assertSame('active', $company->status);

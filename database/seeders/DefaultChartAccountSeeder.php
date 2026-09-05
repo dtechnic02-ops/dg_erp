@@ -42,6 +42,11 @@ class DefaultChartAccountSeeder extends Seeder
         });
     }
 
+    public function requiredSystemCodes(): array
+    {
+        return array_column($this->definitions(), 'system_code');
+    }
+
     private function upsertSystemAccount(int $companyId, array $definition, ?int $parentId): ?ChartAccount
     {
         $attributes = [
@@ -70,9 +75,6 @@ class DefaultChartAccountSeeder extends Seeder
         $account = ChartAccount::query()->where($attributes)->first();
 
         if ($account) {
-            $account->fill($values);
-            $account->save();
-
             return $account;
         }
 
