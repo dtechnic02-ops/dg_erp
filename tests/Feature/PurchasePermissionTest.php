@@ -163,6 +163,18 @@ class PurchasePermissionTest extends TestCase
         });
     }
 
+    public function test_index_renders_the_shared_session_error_only_once(): void
+    {
+        $message = 'Purchase test error.';
+
+        $response = $this->withSession(['error' => $message])
+            ->actingAs(User::findOrFail(1))
+            ->get(route('company.purchases.index'));
+
+        $response->assertOk();
+        $this->assertSame(1, substr_count($response->getContent(), $message));
+    }
+
     public function test_cancelled_purchase_cannot_be_edited(): void
     {
         $invoice = $this->invoice(1);

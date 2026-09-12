@@ -98,6 +98,26 @@ class AuthenticationSessionErrorSecurityTest extends TestCase
         $this->assertSame(0, RateLimiter::attempts($this->loginKey('user1@example.test', '10.20.30.40')));
     }
 
+    public function test_invalid_credentials_flash_displays_once_then_expires(): void
+    {
+        $this->withServerVariables(['REMOTE_ADDR' => '10.20.30.40'])
+            ->from(route('login'))
+            ->post(route('login.post'), [
+                'email' => 'missing@example.test',
+                'password' => 'wrong',
+            ])
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('error', 'Invalid Credentials');
+
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('Invalid Credentials');
+
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertDontSee('Invalid Credentials');
+    }
+
     public function test_blocking_revokes_database_sessions_and_remember_token_without_affecting_other_users(): void
     {
         config(['session.driver' => 'database', 'session.table' => 'sessions']);

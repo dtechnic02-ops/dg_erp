@@ -17,10 +17,12 @@ class SanitizeUserFacingErrors
         $response = $next($request);
 
         if ($request->hasSession() && $request->session()->has('error')) {
-            $request->session()->flash(
-                'error',
-                $this->sanitizer->sanitize($request->session()->get('error'), 'redirect_flash')
-            );
+            $error = $request->session()->get('error');
+            $sanitized = $this->sanitizer->sanitize($error, 'redirect_flash');
+
+            if ($sanitized !== $error) {
+                $request->session()->put('error', $sanitized);
+            }
         }
 
         if ($response instanceof JsonResponse) {

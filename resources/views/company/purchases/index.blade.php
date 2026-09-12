@@ -50,12 +50,6 @@
                 </div>
             @endif
 
-            @if (session('error'))
-                <div class="alert alert-danger dg-alert d-print-none" role="alert">
-                    {{ session('error') }}
-                </div>
-            @endif
-
             <section class="dg-section dg-filter @if (request('print')) d-print-none @endif">
                 <article class="card dg-card">
                     <header class="card-header dg-card-header">

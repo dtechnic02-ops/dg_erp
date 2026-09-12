@@ -597,7 +597,7 @@
                         <tr>
 
                             <td>
-                                {{ $item->product_name }}
+                                {{ $item->name }}
                             </td>
 
                             <td class="text-end text-danger fw-bold">
