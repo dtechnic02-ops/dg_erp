@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AccountingEntry;
+use App\Models\ChartAccount;
 use App\Models\Journal;
 use App\Models\JournalAuditEvent;
 use App\Models\User;
@@ -32,15 +33,12 @@ class JournalPhaseTwoTest extends OpeningBalanceModuleTest
         Schema::table('journal_items', function (Blueprint $t) {$t->decimal('debit',20,4)->default(0);$t->decimal('credit',20,4)->default(0);$t->text('description')->nullable();$t->string('reference')->nullable();$t->unsignedInteger('line_number')->nullable();});
         Schema::create('journal_number_sequences', fn (Blueprint $t) => [$t->unsignedBigInteger('company_id'),$t->unsignedBigInteger('financial_year_id'),$t->unsignedBigInteger('next_number'),$t->timestamps(),$t->primary(['company_id','financial_year_id'])]);
         Schema::create('journal_audit_events', function (Blueprint $t) {$t->id();$t->unsignedBigInteger('company_id');$t->unsignedBigInteger('financial_year_id');$t->unsignedBigInteger('journal_id');$t->string('event');$t->string('previous_status')->nullable();$t->string('new_status')->nullable();$t->unsignedBigInteger('actor_id');$t->timestamp('event_at');$t->text('reason')->nullable();$t->json('metadata')->nullable();});
-        DB::table('chart_accounts')->insert([
-            ['id'=>8,'company_id'=>1,'code'=>'1120','name'=>'Bank','account_class'=>'asset','normal_balance'=>'debit','system_code'=>'BANK_ACCOUNTS','level'=>3,'is_control'=>0,'allow_manual_entry'=>1,'status'=>'active','created_at'=>now(),'updated_at'=>now()],
-            ['id'=>9,'company_id'=>1,'code'=>'1110','name'=>'Cash','account_class'=>'asset','normal_balance'=>'debit','system_code'=>'CASH_IN_HAND','level'=>3,'is_control'=>0,'allow_manual_entry'=>1,'status'=>'active','created_at'=>now(),'updated_at'=>now()],
-        ]);
+        ChartAccount::create(['id'=>10,'company_id'=>1,'code'=>'1195','name'=>'Journal Phase Two Test Account','account_class'=>'asset','normal_balance'=>'debit','level'=>3,'is_control'=>0,'allow_manual_entry'=>1,'status'=>'active']);
         foreach ([
             'module_journal', 'journal.submit', 'journal.approve', 'journal.reject',
             'journal.post', 'journal.cancel', 'journal.reverse', 'journal.lock', 'journal.unlock',
-        ] as $permission) {
-            DB::table('permissions')->insert(['name' => $permission, 'scope' => 'company', 'created_at' => now(), 'updated_at' => now()]);
+        ] as $index => $permission) {
+            DB::table('permissions')->insert(['id' => 10 + $index, 'name' => $permission, 'scope' => 'company', 'created_at' => now(), 'updated_at' => now()]);
         }
     }
 
@@ -68,29 +66,29 @@ class JournalPhaseTwoTest extends OpeningBalanceModuleTest
 
     public function test_posting_failure_rolls_back_accounting_journal_status_auxiliary_and_audit(): void
     {
-        $journal=$this->approved([['chart_account_id'=>1,'debit'=>'10','credit'=>'0','subledger_type'=>'supplier','subledger_id'=>1],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]);
+        $journal=$this->approved([['chart_account_id'=>1,'debit'=>'10','credit'=>'0','subledger_type'=>'supplier','subledger_id'=>1],['chart_account_id'=>10,'debit'=>'0','credit'=>'10']]);
         $before=$this->counts();
         try{$this->service()->post($journal,3);$this->fail('Invalid control account accepted.');}catch(RuntimeException){$this->assertSame(Journal::STATUS_APPROVED,$journal->fresh()->status);$this->assertSame($before,$this->counts());}
     }
 
     public function test_cash_customer_and_supplier_auxiliaries_are_exactly_once_and_company_scoped(): void
     {
-        $cash=$this->service()->post($this->approved([['chart_account_id'=>8,'account_id'=>1,'debit'=>'50.5555','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'50.5555']]),3);
+        $cash=$this->service()->post($this->approved([['chart_account_id'=>9,'account_id'=>1,'debit'=>'50.5555','credit'=>'0'],['chart_account_id'=>10,'debit'=>'0','credit'=>'50.5555']]),3);
         $this->assertSame(1,DB::table('account_transactions')->where('reference_type','ManualJournal')->where('reference_id',$cash->id)->count());
         $this->assertSame('50.5555',$this->decimal(DB::table('accounts')->where('id',1)->value('current_balance')));
-        $customer=$this->service()->post($this->approved([['chart_account_id'=>1,'debit'=>'20','credit'=>'0','subledger_type'=>'customer','subledger_id'=>1],['chart_account_id'=>3,'debit'=>'0','credit'=>'20']]),3);
-        $supplier=$this->service()->post($this->approved([['chart_account_id'=>3,'debit'=>'30','credit'=>'0'],['chart_account_id'=>2,'debit'=>'0','credit'=>'30','subledger_type'=>'supplier','subledger_id'=>1]]),3);
+        $customer=$this->service()->post($this->approved([['chart_account_id'=>1,'debit'=>'20','credit'=>'0','subledger_type'=>'customer','subledger_id'=>1],['chart_account_id'=>10,'debit'=>'0','credit'=>'20']]),3);
+        $supplier=$this->service()->post($this->approved([['chart_account_id'=>10,'debit'=>'30','credit'=>'0'],['chart_account_id'=>2,'debit'=>'0','credit'=>'30','subledger_type'=>'supplier','subledger_id'=>1]]),3);
         $this->assertSame(1,DB::table('customer_transactions')->where('reference_id',$customer->id)->count());
         $this->assertSame(1,DB::table('supplier_transactions')->where('reference_id',$supplier->id)->count());
         foreach([[2,'account_id'],[2,'customer']] as [$foreign,$kind]){
-            $lines=$kind==='account_id'?[['chart_account_id'=>1,'account_id'=>$foreign,'debit'=>'1','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'1']]:[['chart_account_id'=>1,'debit'=>'1','credit'=>'0','subledger_type'=>'customer','subledger_id'=>$foreign],['chart_account_id'=>3,'debit'=>'0','credit'=>'1']];
+            $lines=$kind==='account_id'?[['chart_account_id'=>1,'account_id'=>$foreign,'debit'=>'1','credit'=>'0'],['chart_account_id'=>10,'debit'=>'0','credit'=>'1']]:[['chart_account_id'=>1,'debit'=>'1','credit'=>'0','subledger_type'=>'customer','subledger_id'=>$foreign],['chart_account_id'=>10,'debit'=>'0','credit'=>'1']];
             try{$this->service()->createDraft($this->payload($lines),1,1);$this->fail('Cross-company reference accepted.');}catch(ValidationException|RuntimeException){$this->assertTrue(true);}
         }
     }
 
     public function test_complete_reversal_is_exactly_once_and_restores_all_effects(): void
     {
-        $posted=$this->service()->post($this->approved([['chart_account_id'=>8,'account_id'=>1,'debit'=>'60','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'100'],['chart_account_id'=>1,'debit'=>'40','credit'=>'0','subledger_type'=>'customer','subledger_id'=>1]]),3);
+        $posted=$this->service()->post($this->approved([['chart_account_id'=>9,'account_id'=>1,'debit'=>'60','credit'=>'0'],['chart_account_id'=>10,'debit'=>'0','credit'=>'100'],['chart_account_id'=>1,'debit'=>'40','credit'=>'0','subledger_type'=>'customer','subledger_id'=>1]]),3);
         $reversal=$this->service()->reverse($posted,2,'Correction approved');
         $this->assertSame(Journal::STATUS_REVERSED,$posted->fresh()->status);
         $this->assertSame(1,Journal::where('reversal_of_journal_id',$posted->id)->count());
@@ -106,7 +104,7 @@ class JournalPhaseTwoTest extends OpeningBalanceModuleTest
     public function test_missing_or_duplicate_original_accounting_and_auxiliary_fail_reversal_atomically(): void
     {
         foreach(['missing_entry','duplicate_entry','missing_auxiliary'] as $case){
-            $posted=$this->service()->post($this->approved([['chart_account_id'=>8,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]),3);
+            $posted=$this->service()->post($this->approved([['chart_account_id'=>9,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>10,'debit'=>'0','credit'=>'10']]),3);
             if($case==='missing_entry'){DB::table('accounting_entry_lines')->delete();DB::table('accounting_entries')->delete();}
             if($case==='duplicate_entry'){ $e=AccountingEntry::where('source_id',$posted->id)->first()->replicate();$e->source_key='duplicate:'.Str::uuid();$e->save(); }
             if($case==='missing_auxiliary')DB::table('account_transactions')->where('reference_id',$posted->id)->delete();
@@ -149,18 +147,18 @@ class JournalPhaseTwoTest extends OpeningBalanceModuleTest
     public function test_journal_request_hardening_and_operational_account_mappings_are_enforced(): void
     {
         foreach ([
-            [['chart_account_id'=>1,'debit'=>'10','credit'=>'0','subledger_type'=>'customer'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']],
-            [['chart_account_id'=>1,'debit'=>'10','credit'=>'0','subledger_id'=>1],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']],
-            [['chart_account_id'=>1,'debit'=>'10','credit'=>'0','subledger_type'=>'employee','subledger_id'=>1],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']],
+            [['chart_account_id'=>1,'debit'=>'10','credit'=>'0','subledger_type'=>'customer'],['chart_account_id'=>10,'debit'=>'0','credit'=>'10']],
+            [['chart_account_id'=>1,'debit'=>'10','credit'=>'0','subledger_id'=>1],['chart_account_id'=>10,'debit'=>'0','credit'=>'10']],
+            [['chart_account_id'=>1,'debit'=>'10','credit'=>'0','subledger_type'=>'employee','subledger_id'=>1],['chart_account_id'=>10,'debit'=>'0','credit'=>'10']],
         ] as $lines) {
             $request=\App\Http\Requests\JournalRequest::create('/', 'POST', $this->payload($lines));$request->setUserResolver(fn()=>User::findOrFail(1));$validator=Validator::make($request->all(),$request->rules());$request->withValidator($validator);$this->assertTrue($validator->fails());
         }
-        $this->assertSame('posted',$this->service()->post($this->approved([['chart_account_id'=>8,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]),3)->status);
-        foreach ([['Cash',9],['ATM',8],['Wallet',8]] as [$type,$chart]) {DB::table('accounts')->where('id',1)->update(['account_type'=>$type]);$this->assertSame('posted',$this->service()->post($this->approved([['chart_account_id'=>$chart,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]),3)->status);}
+        $this->assertSame('posted',$this->service()->post($this->approved([['chart_account_id'=>9,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>10,'debit'=>'0','credit'=>'10']]),3)->status);
+        foreach ([['Cash',8],['ATM',9],['Wallet',9]] as [$type,$chart]) {DB::table('accounts')->where('id',1)->update(['account_type'=>$type]);$this->assertSame('posted',$this->service()->post($this->approved([['chart_account_id'=>$chart,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>10,'debit'=>'0','credit'=>'10']]),3)->status);}
         DB::table('accounts')->where('id',1)->update(['account_type'=>'Bank']);
-        try{$this->service()->post($this->approved([['chart_account_id'=>8,'debit'=>'10','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]),3);$this->fail('Bank Chart Account without operational account accepted.');}catch(ValidationException){$this->assertTrue(true);}
+        try{$this->service()->post($this->approved([['chart_account_id'=>9,'debit'=>'10','credit'=>'0'],['chart_account_id'=>10,'debit'=>'0','credit'=>'10']]),3);$this->fail('Bank Chart Account without operational account accepted.');}catch(ValidationException){$this->assertTrue(true);}
         DB::table('accounts')->where('id',1)->update(['account_type'=>'Cash']);
-        try{$this->service()->post($this->approved([['chart_account_id'=>8,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>'10']]),3);$this->fail('Mismatched operational Account accepted.');}catch(ValidationException){$this->assertTrue(true);}
+        try{$this->service()->post($this->approved([['chart_account_id'=>9,'account_id'=>1,'debit'=>'10','credit'=>'0'],['chart_account_id'=>10,'debit'=>'0','credit'=>'10']]),3);$this->fail('Mismatched operational Account accepted.');}catch(ValidationException){$this->assertTrue(true);}
         DB::table('accounts')->where('id',1)->update(['account_type'=>'Bank']);
     }
 
@@ -175,7 +173,7 @@ class JournalPhaseTwoTest extends OpeningBalanceModuleTest
     private function approved(array $lines):Journal{$j=$this->service()->createDraft($this->payload($lines),1,1);$j=$this->service()->submit($j,1);return $this->service()->approve($j,2);}
     private function approvedForHttp():Journal{$j=$this->service()->createDraft($this->payload($this->lines()),1,2);$j=$this->service()->submit($j,2);return $this->service()->approve($j,3);}
     private function payload(array $lines):array{return ['financial_year_id'=>1,'journal_date'=>'2026-06-15','journal_type'=>'general','reference_no'=>'REF','description'=>'Manual Journal','remarks'=>'Test','request_key'=>(string)Str::uuid(),'lines'=>$lines];}
-    private function lines(string $amount='10.0000'):array{return [['chart_account_id'=>1,'debit'=>$amount,'credit'=>'0'],['chart_account_id'=>3,'debit'=>'0','credit'=>$amount]];}
+    private function lines(string $amount='10.0000'):array{return [['chart_account_id'=>1,'debit'=>$amount,'credit'=>'0'],['chart_account_id'=>10,'debit'=>'0','credit'=>$amount]];}
     private function decimal(mixed $v):string{return number_format((float)$v,4,'.','');}
     private function sum(string $column):string{return $this->decimal(DB::table('accounting_entry_lines')->sum($column));}
     private function counts():array{return [Journal::count(),DB::table('journal_items')->count(),AccountingEntry::count(),DB::table('accounting_entry_lines')->count(),DB::table('account_transactions')->count(),DB::table('customer_transactions')->count(),DB::table('supplier_transactions')->count(),JournalAuditEvent::count()];}

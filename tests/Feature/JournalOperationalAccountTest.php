@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ChartAccount;
 use App\Models\Journal;
 use App\Services\JournalService;
 use Illuminate\Database\Schema\Blueprint;
@@ -61,11 +62,19 @@ class JournalOperationalAccountTest extends OpeningBalanceModuleTest
             $t->text('reason')->nullable();
             $t->json('metadata')->nullable();
         });
-        DB::table('chart_accounts')->insert([
-            ['id' => 8, 'company_id' => 1, 'code' => '1120', 'name' => 'Bank', 'account_class' => 'asset', 'normal_balance' => 'debit', 'system_code' => 'BANK_ACCOUNTS', 'level' => 3, 'is_control' => 0, 'allow_manual_entry' => 1, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 9, 'company_id' => 1, 'code' => '1110', 'name' => 'Cash', 'account_class' => 'asset', 'normal_balance' => 'debit', 'system_code' => 'CASH_IN_HAND', 'level' => 3, 'is_control' => 0, 'allow_manual_entry' => 1, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+        ChartAccount::create([
+            'id' => 10,
+            'company_id' => 1,
+            'code' => '1195',
+            'name' => 'Journal Operational Test Account',
+            'account_class' => 'asset',
+            'normal_balance' => 'debit',
+            'level' => 3,
+            'is_control' => false,
+            'allow_manual_entry' => true,
+            'status' => 'active',
         ]);
-        DB::table('accounts')->updateOrInsert(['id' => 5], [
+        DB::table('accounts')->updateOrInsert(['id' => 7], [
             'company_id' => 1,
             'account_name' => 'Petty Cash',
             'account_type' => 'Cash',
@@ -82,8 +91,8 @@ class JournalOperationalAccountTest extends OpeningBalanceModuleTest
         $service = app(JournalService::class);
 
         foreach ([
-            [['chart_account_id' => 8, 'debit' => '10', 'credit' => '0'], ['chart_account_id' => 3, 'debit' => '0', 'credit' => '10']],
-            [['chart_account_id' => 9, 'debit' => '10', 'credit' => '0'], ['chart_account_id' => 3, 'debit' => '0', 'credit' => '10']],
+            [['chart_account_id' => 8, 'debit' => '10', 'credit' => '0'], ['chart_account_id' => 10, 'debit' => '0', 'credit' => '10']],
+            [['chart_account_id' => 9, 'debit' => '10', 'credit' => '0'], ['chart_account_id' => 10, 'debit' => '0', 'credit' => '10']],
         ] as $lines) {
             try {
                 $service->createDraft($this->payload($lines), 1, 1);
@@ -94,7 +103,7 @@ class JournalOperationalAccountTest extends OpeningBalanceModuleTest
         }
 
         $journal = $service->createDraft($this->payload([
-            ['chart_account_id' => 3, 'debit' => '10', 'credit' => '0'],
+            ['chart_account_id' => 10, 'debit' => '10', 'credit' => '0'],
             ['chart_account_id' => 1, 'debit' => '0', 'credit' => '10'],
         ]), 1, 1);
 
@@ -105,20 +114,20 @@ class JournalOperationalAccountTest extends OpeningBalanceModuleTest
     {
         $service = app(JournalService::class);
         DB::table('accounts')->where('id', 1)->update(['account_type' => 'Bank']);
-        DB::table('accounts')->where('id', 5)->update(['account_type' => 'Cash']);
+        DB::table('accounts')->where('id', 7)->update(['account_type' => 'Cash']);
 
         $posted = $service->post($this->approved($service, [
-            ['chart_account_id' => 9, 'account_id' => 5, 'debit' => '500', 'credit' => '0'],
-            ['chart_account_id' => 8, 'account_id' => 1, 'debit' => '0', 'credit' => '500'],
+            ['chart_account_id' => 8, 'account_id' => 7, 'debit' => '500', 'credit' => '0'],
+            ['chart_account_id' => 9, 'account_id' => 1, 'debit' => '0', 'credit' => '500'],
         ]), 3);
 
         $posted->load('items');
 
         $this->assertSame(Journal::STATUS_POSTED, $posted->status);
-        $this->assertSame(5, (int) $posted->items->firstWhere('chart_account_id', 9)?->account_id);
-        $this->assertSame(1, (int) $posted->items->firstWhere('chart_account_id', 8)?->account_id);
+        $this->assertSame(7, (int) $posted->items->firstWhere('chart_account_id', 8)?->account_id);
+        $this->assertSame(1, (int) $posted->items->firstWhere('chart_account_id', 9)?->account_id);
         $this->assertSame(1, DB::table('account_transactions')->where('reference_id', $posted->id)->where('account_id', 1)->count());
-        $this->assertSame(1, DB::table('account_transactions')->where('reference_id', $posted->id)->where('account_id', 5)->count());
+        $this->assertSame(1, DB::table('account_transactions')->where('reference_id', $posted->id)->where('account_id', 7)->count());
     }
 
     private function approved(JournalService $service, array $lines): Journal

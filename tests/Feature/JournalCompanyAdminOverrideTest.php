@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AccountingEntry;
 use App\Models\Journal;
+use App\Models\ChartAccount;
 use App\Models\JournalAuditEvent;
 use App\Models\User;
 use App\Services\JournalService;
@@ -65,11 +66,21 @@ class JournalCompanyAdminOverrideTest extends OpeningBalanceModuleTest
             $t->text('reason')->nullable();
             $t->json('metadata')->nullable();
         });
-        DB::table('chart_accounts')->insert([
-            ['id' => 8, 'company_id' => 1, 'code' => '1120', 'name' => 'Bank', 'account_class' => 'asset', 'normal_balance' => 'debit', 'system_code' => 'BANK_ACCOUNTS', 'level' => 3, 'is_control' => 0, 'allow_manual_entry' => 1, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 9, 'company_id' => 1, 'code' => '1110', 'name' => 'Cash', 'account_class' => 'asset', 'normal_balance' => 'debit', 'system_code' => 'CASH_IN_HAND', 'level' => 3, 'is_control' => 0, 'allow_manual_entry' => 1, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
-        ]);
+        ChartAccount::create([
+    'id' => 10,
+    'company_id' => 1,
+    'code' => '1195',
+    'name' => 'Journal Test Account',
+    'account_class' => 'asset',
+    'normal_balance' => 'debit',
+    'level' => 3,
+    'is_control' => 0,
+    'allow_manual_entry' => 1,
+    'status' => 'active',
+]);
+       
     }
+    
 
     public function test_company_staff_cannot_self_approve_submitted_journal(): void
     {
@@ -194,7 +205,7 @@ class JournalCompanyAdminOverrideTest extends OpeningBalanceModuleTest
         try {
             $service->createDraft($this->journalPayload([
                 ['chart_account_id' => 1, 'debit' => '10.0000', 'credit' => '0.0000'],
-                ['chart_account_id' => 3, 'debit' => '0.0000', 'credit' => '9.0000'],
+                ['chart_account_id' => 10, 'debit' => '0.0000', 'credit' => '9.0000'],
             ]), 1, $adminId);
             $this->fail('Unbalanced journal create was accepted.');
         } catch (ValidationException) {
@@ -288,7 +299,7 @@ class JournalCompanyAdminOverrideTest extends OpeningBalanceModuleTest
     {
         return [
             ['chart_account_id' => 1, 'debit' => $amount, 'credit' => '0.0000'],
-            ['chart_account_id' => 3, 'debit' => '0.0000', 'credit' => $amount],
+            ['chart_account_id' => 10, 'debit' => '0.0000', 'credit' => $amount],
         ];
     }
 }
