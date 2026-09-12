@@ -13,4 +13,3 @@ Only official Nepal IRD material is treated as an authority in this register. Re
 | IRD Electronic Billing Software Listing | _Exact official current URL to be verified_ | Listing status and submission evidence | Required; DG ERP is not claimed listed |
 
 External portal visibility is conceptually separate from local acknowledgement. Until a documented reconciliation API is confirmed, DG ERP must not claim external portal verification from local state alone.
-

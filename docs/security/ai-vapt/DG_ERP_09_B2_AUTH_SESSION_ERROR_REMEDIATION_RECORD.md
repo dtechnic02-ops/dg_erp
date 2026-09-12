@@ -1,6 +1,6 @@
 # DG ERP ⑨-B2 — Authentication, Session & Error-Exposure Remediation Record
 
-Date: 2026-09-10  
+Date: 2026-09-10
 Scope: VAPT-004, VAPT-005, and VAPT-006 only
 
 ## Findings and root causes

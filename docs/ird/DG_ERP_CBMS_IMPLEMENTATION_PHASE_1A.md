@@ -1,6 +1,6 @@
 # DG ERP CBMS Phase 1A — Core Foundation
 
-Date: 2026-09-11  
+Date: 2026-09-11
 Status: Internal implementation foundation; no live IRD submission
 
 ## Implemented

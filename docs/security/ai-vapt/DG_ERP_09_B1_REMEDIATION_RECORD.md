@@ -1,6 +1,6 @@
 # DG ERP ⑨-B1 — Critical File & Public Exposure Remediation Record
 
-Date: 2026-09-10  
+Date: 2026-09-10
 Scope: VAPT-001, VAPT-002, VAPT-003 only
 
 ## Implementation

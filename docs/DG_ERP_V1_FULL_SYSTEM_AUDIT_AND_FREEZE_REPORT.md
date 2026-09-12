@@ -1,8 +1,8 @@
 # DG ERP V1 Full System Audit and Freeze Report
 
-Audit date: 2026-08-15  
-Audit type: repository-only, read-only implementation audit  
-Decision basis: source, routes, controllers, models, services, middleware, migrations, seeders, views, sidebar, JavaScript, relevant configuration, tests, and all existing `docs/` files  
+Audit date: 2026-08-15
+Audit type: repository-only, read-only implementation audit
+Decision basis: source, routes, controllers, models, services, middleware, migrations, seeders, views, sidebar, JavaScript, relevant configuration, tests, and all existing `docs/` files
 Excluded: `vendor/`, `node_modules/`, runtime storage/cache, live database data, migrations, seed execution, and authenticated browser testing
 
 ## Classification legend
