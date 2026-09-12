@@ -16,6 +16,7 @@ use App\Models\SalesReturn;
 use App\Models\User;
 use App\Services\Cbms\CbmsHttpTransport;
 use App\Services\Cbms\CbmsQueueService;
+use App\Services\Cbms\CbmsReadinessService;
 use App\Services\Cbms\CbmsReconciliationResult;
 use App\Services\Cbms\CbmsResponseCodeExtractor;
 use App\Services\Cbms\CbmsReconciliationService;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use LogicException;
 use RuntimeException;
 use Tests\Fakes\FakeCbmsReconciliationVerifier;
@@ -75,6 +77,185 @@ class CbmsPhaseOneOperationalTest extends TestCase
         Queue::assertPushed(TransmitCbmsDocumentJob::class, 1);
     }
 
+    public function test_transmission_captures_provenance_and_configuration_change_creates_a_separate_identity(): void
+    {
+        Queue::fake();
+        $invoice = $this->invoice('SI-PROVENANCE');
+        $first = app(CbmsQueueService::class)->queue($invoice);
+        $this->assertSame(CbmsTransmission::ENVIRONMENT_TEST, $first->environment);
+        $this->assertSame(CbmsTransmission::TRANSPORT_DISABLED, $first->transport_kind);
+
+        CompanyCbmsApiConfiguration::where('company_id', $this->company->id)->update(['environment' => CbmsTransmission::ENVIRONMENT_PRODUCTION]);
+        $second = app(CbmsQueueService::class)->queue($invoice);
+
+        $this->assertNotSame($first->id, $second->id);
+        $this->assertSame(CbmsTransmission::ENVIRONMENT_PRODUCTION, $second->environment);
+        $this->assertSame(CbmsTransmission::ENVIRONMENT_TEST, $first->fresh()->environment);
+        $this->assertSame(2, CbmsTransmission::count());
+    }
+
+    public function test_retry_preserves_original_provenance_after_configuration_changes(): void
+    {
+        Queue::fake();
+        $transmission = $this->transmission(
+            CbmsTransmission::STATUS_RETRYABLE_FAILURE,
+            CbmsTransmission::ENVIRONMENT_TEST,
+            CbmsTransmission::TRANSPORT_DISABLED,
+        );
+        CompanyCbmsApiConfiguration::where('company_id', $this->company->id)->update(['environment' => CbmsTransmission::ENVIRONMENT_PRODUCTION]);
+
+        $retried = app(CbmsQueueService::class)->retry($transmission);
+
+        $this->assertSame($transmission->id, $retried->id);
+        $this->assertSame(CbmsTransmission::ENVIRONMENT_TEST, $retried->environment);
+        $this->assertSame(CbmsTransmission::TRANSPORT_DISABLED, $retried->transport_kind);
+        $this->assertSame(1, CbmsTransmission::count());
+
+        $processed = app(CbmsTransmissionProcessor::class)->process($retried->id)->transmission;
+        $this->assertSame(CbmsTransmission::STATUS_NOT_READY, $processed->status);
+        $this->assertSame('transmission_provenance_mismatch', $processed->response_category);
+        $this->assertSame(0, $processed->attempt_count);
+    }
+
+    public function test_only_submitted_production_ird_evidence_is_official_and_provenance_is_immutable(): void
+    {
+        $legacy = $this->transmission(CbmsTransmission::STATUS_SUBMITTED);
+        $simulator = $this->transmission(CbmsTransmission::STATUS_SUBMITTED, CbmsTransmission::ENVIRONMENT_TEST, CbmsTransmission::TRANSPORT_SIMULATOR);
+        $notSubmitted = $this->transmission(CbmsTransmission::STATUS_PENDING, CbmsTransmission::ENVIRONMENT_PRODUCTION, CbmsTransmission::TRANSPORT_IRD);
+        $official = $this->transmission(CbmsTransmission::STATUS_SUBMITTED, CbmsTransmission::ENVIRONMENT_PRODUCTION, CbmsTransmission::TRANSPORT_IRD);
+
+        $this->assertFalse($legacy->isOfficialIrdProductionSubmission());
+        $this->assertFalse($simulator->isOfficialIrdProductionSubmission());
+        $this->assertFalse($notSubmitted->isOfficialIrdProductionSubmission());
+        $this->assertTrue($official->isOfficialIrdProductionSubmission());
+        $this->assertSame([$official->id], CbmsTransmission::officialIrdProductionSubmission()->pluck('id')->all());
+
+        $this->expectException(LogicException::class);
+        $official->update(['environment' => CbmsTransmission::ENVIRONMENT_TEST]);
+    }
+
+    public function test_legacy_defaults_never_classify_historical_transmission_as_official(): void
+    {
+        $invoice = $this->invoice('SI-HISTORICAL');
+        $transmission = CbmsTransmission::create([
+            'company_id' => $this->company->id,
+            'transmittable_type' => $invoice->getMorphClass(),
+            'transmittable_id' => $invoice->id,
+            'endpoint_type' => CbmsTransmission::ENDPOINT_BILL,
+            'status' => CbmsTransmission::STATUS_SUBMITTED,
+        ])->refresh();
+
+        $this->assertSame(CbmsTransmission::ENVIRONMENT_LEGACY, $transmission->environment);
+        $this->assertSame(CbmsTransmission::TRANSPORT_LEGACY, $transmission->transport_kind);
+        $this->assertFalse($transmission->isOfficialIrdProductionSubmission());
+    }
+
+    public function test_migration_backfills_pre_provenance_rows_as_legacy_evidence(): void
+    {
+        $migration = require database_path('migrations/2026_09_12_000018_add_provenance_to_cbms_transmissions.php');
+        $migration->down();
+        $this->assertFalse(Schema::hasColumn('cbms_transmissions', 'environment'));
+        $this->assertFalse(Schema::hasColumn('cbms_transmissions', 'transport_kind'));
+        $this->assertFalse(Schema::hasColumn('cbms_transmission_attempts', 'environment'));
+        $this->assertFalse(Schema::hasColumn('cbms_transmission_attempts', 'transport_kind'));
+
+        $invoice = $this->invoice('SI-PRE-PROVENANCE');
+        $id = DB::table('cbms_transmissions')->insertGetId([
+            'company_id' => $this->company->id,
+            'transmittable_type' => $invoice->getMorphClass(),
+            'transmittable_id' => $invoice->id,
+            'endpoint_type' => CbmsTransmission::ENDPOINT_BILL,
+            'status' => CbmsTransmission::STATUS_SUBMITTED,
+        ]);
+
+        $migration->up();
+        $this->assertTrue(Schema::hasColumn('cbms_transmissions', 'environment'));
+        $this->assertTrue(Schema::hasColumn('cbms_transmissions', 'transport_kind'));
+        $this->assertTrue(Schema::hasColumn('cbms_transmission_attempts', 'environment'));
+        $this->assertTrue(Schema::hasColumn('cbms_transmission_attempts', 'transport_kind'));
+
+        $transmission = CbmsTransmission::findOrFail($id);
+
+        $this->assertSame(CbmsTransmission::ENVIRONMENT_LEGACY, $transmission->environment);
+        $this->assertSame(CbmsTransmission::TRANSPORT_LEGACY, $transmission->transport_kind);
+        $this->assertFalse($transmission->isOfficialIrdProductionSubmission());
+    }
+
+    public function test_migration_down_fails_before_schema_mutation_when_legacy_identity_would_collide(): void
+    {
+        $invoice = $this->invoice('SI-ROLLBACK-COLLISION');
+        $identity = [
+            'company_id' => $this->company->id,
+            'transmittable_type' => $invoice->getMorphClass(),
+            'transmittable_id' => $invoice->id,
+            'endpoint_type' => CbmsTransmission::ENDPOINT_BILL,
+            'status' => CbmsTransmission::STATUS_SUBMITTED,
+            'payload_hash' => str_repeat('a', 64),
+        ];
+        $simulator = CbmsTransmission::create($identity + [
+            'environment' => CbmsTransmission::ENVIRONMENT_TEST,
+            'transport_kind' => CbmsTransmission::TRANSPORT_SIMULATOR,
+        ]);
+        $official = CbmsTransmission::create($identity + [
+            'environment' => CbmsTransmission::ENVIRONMENT_PRODUCTION,
+            'transport_kind' => CbmsTransmission::TRANSPORT_IRD,
+        ]);
+        DB::table('cbms_transmission_attempts')->insert([
+            'company_id' => $this->company->id,
+            'cbms_transmission_id' => $simulator->id,
+            'attempt_number' => 1,
+            'environment' => CbmsTransmission::ENVIRONMENT_TEST,
+            'transport_kind' => CbmsTransmission::TRANSPORT_SIMULATOR,
+            'attempted_at' => now(),
+            'finished_at' => now(),
+            'transport_classification' => 'response',
+            'http_status' => 200,
+            'response_code' => '200',
+            'parser_classification' => 'submitted',
+            'response_excerpt_redacted' => '200',
+            'payload_hash' => str_repeat('b', 64),
+            'is_realtime' => true,
+            'result_status' => CbmsTransmission::STATUS_SUBMITTED,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $transmissionIds = [$simulator->id, $official->id];
+        $before = DB::table('cbms_transmissions')
+            ->whereIn('id', $transmissionIds)
+            ->orderBy('id')
+            ->get(['id', 'environment', 'transport_kind'])
+            ->map(fn ($row): array => (array) $row)
+            ->all();
+        $migration = require database_path('migrations/2026_09_12_000018_add_provenance_to_cbms_transmissions.php');
+
+        try {
+            $migration->down();
+            $this->fail('Rollback should fail when provenance-specific rows share the legacy identity.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString(
+                'multiple provenance-specific transmission records would collapse into the legacy document endpoint identity',
+                $exception->getMessage()
+            );
+        }
+
+        $this->assertTrue(Schema::hasColumn('cbms_transmissions', 'environment'));
+        $this->assertTrue(Schema::hasColumn('cbms_transmissions', 'transport_kind'));
+        $this->assertTrue(Schema::hasColumn('cbms_transmission_attempts', 'environment'));
+        $this->assertTrue(Schema::hasColumn('cbms_transmission_attempts', 'transport_kind'));
+        $this->assertSame(2, DB::table('cbms_transmissions')->whereIn('id', $transmissionIds)->count());
+        $this->assertSame($before, DB::table('cbms_transmissions')
+            ->whereIn('id', $transmissionIds)
+            ->orderBy('id')
+            ->get(['id', 'environment', 'transport_kind'])
+            ->map(fn ($row): array => (array) $row)
+            ->all());
+        $this->assertDatabaseHas('cbms_transmission_attempts', [
+            'cbms_transmission_id' => $simulator->id,
+            'environment' => CbmsTransmission::ENVIRONMENT_TEST,
+            'transport_kind' => CbmsTransmission::TRANSPORT_SIMULATOR,
+        ]);
+    }
+
     public function test_after_commit_dispatches_and_rollback_does_not(): void
     {
         Queue::fake();
@@ -93,9 +274,9 @@ class CbmsPhaseOneOperationalTest extends TestCase
     public function test_endpoint_response_and_network_matrix(int $http, ?string $code, string $classification, string $expected): void
     {
         Queue::fake();
-        $transmission = app(CbmsQueueService::class)->queue($this->invoice('SI-'.uniqid()));
         $fake = (new FakeCbmsTransport)->push(new CbmsTransportResult($classification, now(), $http, $code, $code === null ? '<html>bad</html>' : $code));
         $this->app->instance(CbmsHttpTransport::class, $fake);
+        $transmission = app(CbmsQueueService::class)->queue($this->invoice('SI-'.uniqid()));
         $result = app(CbmsTransmissionProcessor::class)->process($transmission->id);
         $this->assertSame($expected, $result->transmission->status);
         $this->assertSame(1, $result->transmission->attempt_count);
@@ -195,17 +376,19 @@ class CbmsPhaseOneOperationalTest extends TestCase
     {
         Queue::fake();
         config(['cbms.max_response_excerpt_bytes' => 80]);
-        $transmission = app(CbmsQueueService::class)->queue($this->invoice('SI-EVIDENCE'));
         $body = 'password=hidden token=hidden '.str_repeat('x', 500);
         $fake = (new FakeCbmsTransport)->push(CbmsTransportResult::response(now(), 200, '102', $body));
         $this->app->instance(CbmsHttpTransport::class, $fake);
+        $transmission = app(CbmsQueueService::class)->queue($this->invoice('SI-EVIDENCE'));
         app(CbmsTransmissionProcessor::class)->process($transmission->id);
         $attempt = $transmission->attempts()->firstOrFail();
+        $this->assertSame($transmission->environment, $attempt->environment);
+        $this->assertSame($transmission->transport_kind, $attempt->transport_kind);
         $this->assertLessThanOrEqual(80, strlen($attempt->response_excerpt_redacted));
         $this->assertStringNotContainsString('hidden', $attempt->response_excerpt_redacted);
         $this->assertStringNotContainsString('top-secret', json_encode($attempt->toArray()));
         $this->expectException(LogicException::class);
-        $attempt->update(['result_status' => 'submitted']);
+        $attempt->update(['environment' => CbmsTransmission::ENVIRONMENT_PRODUCTION]);
     }
 
     public function test_admin_can_operate_auditor_is_get_only_staff_and_other_company_are_denied(): void
@@ -229,7 +412,11 @@ class CbmsPhaseOneOperationalTest extends TestCase
         $invoice = $transmission->transmittable;
         $evidence = ['seller_pan' => $invoice->seller_pan_snapshot, 'fiscal_year' => '2081.082', 'document_number' => $invoice->invoice_no, 'document_type' => 'bill', 'total_amount' => 113, 'payload_hash' => $transmission->payload_hash];
         $this->app->instance(CbmsReconciliationVerifier::class, new FakeCbmsReconciliationVerifier(new CbmsReconciliationResult(true, $evidence, 'fake_exact_match')));
-        $this->assertSame(CbmsTransmission::STATUS_SUBMITTED, app(CbmsReconciliationService::class)->reconcile($transmission->fresh())->status);
+        $reconciled = app(CbmsReconciliationService::class)->reconcile($transmission->fresh());
+        $this->assertSame(CbmsTransmission::STATUS_SUBMITTED, $reconciled->status);
+        $this->assertSame(CbmsTransmission::ENVIRONMENT_LEGACY, $reconciled->environment);
+        $this->assertSame(CbmsTransmission::TRANSPORT_LEGACY, $reconciled->transport_kind);
+        $this->assertFalse($reconciled->isOfficialIrdProductionSubmission());
     }
 
     #[DataProvider('returnResponseCases')]
@@ -237,11 +424,11 @@ class CbmsPhaseOneOperationalTest extends TestCase
     {
         Queue::fake();
         $invoice = $this->invoice('SI-RETURN-'.uniqid());
-        CbmsTransmission::create(['company_id' => $this->company->id, 'transmittable_type' => $invoice->getMorphClass(), 'transmittable_id' => $invoice->id, 'endpoint_type' => CbmsTransmission::ENDPOINT_BILL, 'status' => CbmsTransmission::STATUS_SUBMITTED, 'attempt_count' => 1, 'payload_hash' => str_repeat('b', 64), 'submitted_at' => now()]);
-        $return = $this->salesReturn($invoice);
-        $transmission = app(CbmsQueueService::class)->queue($return);
         $fake = (new FakeCbmsTransport)->push(CbmsTransportResult::response(now(), 200, $code, $code));
         $this->app->instance(CbmsHttpTransport::class, $fake);
+        CbmsTransmission::create(['company_id' => $this->company->id, 'transmittable_type' => $invoice->getMorphClass(), 'transmittable_id' => $invoice->id, 'endpoint_type' => CbmsTransmission::ENDPOINT_BILL, 'environment' => CbmsTransmission::ENVIRONMENT_TEST, 'transport_kind' => CbmsTransmission::TRANSPORT_SIMULATOR, 'status' => CbmsTransmission::STATUS_SUBMITTED, 'attempt_count' => 1, 'payload_hash' => str_repeat('b', 64), 'submitted_at' => now()]);
+        $return = $this->salesReturn($invoice);
+        $transmission = app(CbmsQueueService::class)->queue($return);
         $processed = app(CbmsTransmissionProcessor::class)->process($transmission->id)->transmission;
         $this->assertSame($expected, $processed->status);
         $this->assertSame($category, $processed->response_category);
@@ -265,7 +452,47 @@ class CbmsPhaseOneOperationalTest extends TestCase
         $blocked = app(CbmsQueueService::class)->queue($return);
         $this->assertSame(CbmsTransmission::STATUS_NOT_READY, $blocked->status);
         $this->assertContains('ORIGINAL_BILL_NOT_CONFIRMED', $blocked->response_body_redacted['reason_codes']);
-        CbmsTransmission::create(['company_id' => $this->company->id, 'transmittable_type' => $invoice->getMorphClass(), 'transmittable_id' => $invoice->id, 'endpoint_type' => CbmsTransmission::ENDPOINT_BILL, 'status' => CbmsTransmission::STATUS_SUBMITTED, 'payload_hash' => str_repeat('c', 64), 'submitted_at' => now()]);
+        CbmsTransmission::create(['company_id' => $this->company->id, 'transmittable_type' => $invoice->getMorphClass(), 'transmittable_id' => $invoice->id, 'endpoint_type' => CbmsTransmission::ENDPOINT_BILL, 'environment' => CbmsTransmission::ENVIRONMENT_TEST, 'transport_kind' => CbmsTransmission::TRANSPORT_DISABLED, 'status' => CbmsTransmission::STATUS_SUBMITTED, 'payload_hash' => str_repeat('c', 64), 'submitted_at' => now()]);
+        $this->assertSame(CbmsTransmission::STATUS_QUEUED, app(CbmsQueueService::class)->queue($return)->status);
+    }
+
+    public function test_production_ird_credit_note_rejects_legacy_and_simulator_originals(): void
+    {
+        Queue::fake();
+        CompanyCbmsApiConfiguration::where('company_id', $this->company->id)->update(['environment' => CbmsTransmission::ENVIRONMENT_PRODUCTION]);
+        $this->app->instance(CbmsHttpTransport::class, new FakeCbmsTransport(CbmsTransmission::TRANSPORT_IRD));
+        $invoice = $this->invoice('SI-OFFICIAL-ORIGINAL');
+        $return = $this->salesReturn($invoice);
+
+        foreach ([
+            [CbmsTransmission::ENVIRONMENT_LEGACY, CbmsTransmission::TRANSPORT_LEGACY],
+            [CbmsTransmission::ENVIRONMENT_PRODUCTION, CbmsTransmission::TRANSPORT_SIMULATOR],
+        ] as [$environment, $transportKind]) {
+            CbmsTransmission::create([
+                'company_id' => $this->company->id,
+                'transmittable_type' => $invoice->getMorphClass(),
+                'transmittable_id' => $invoice->id,
+                'endpoint_type' => CbmsTransmission::ENDPOINT_BILL,
+                'environment' => $environment,
+                'transport_kind' => $transportKind,
+                'status' => CbmsTransmission::STATUS_SUBMITTED,
+            ]);
+        }
+
+        $blocked = app(CbmsQueueService::class)->queue($return);
+        $this->assertSame(CbmsTransmission::STATUS_NOT_READY, $blocked->status);
+        $this->assertContains(CbmsReadinessService::ORIGINAL_BILL_NOT_CONFIRMED, $blocked->response_body_redacted['reason_codes']);
+
+        CbmsTransmission::create([
+            'company_id' => $this->company->id,
+            'transmittable_type' => $invoice->getMorphClass(),
+            'transmittable_id' => $invoice->id,
+            'endpoint_type' => CbmsTransmission::ENDPOINT_BILL,
+            'environment' => CbmsTransmission::ENVIRONMENT_PRODUCTION,
+            'transport_kind' => CbmsTransmission::TRANSPORT_IRD,
+            'status' => CbmsTransmission::STATUS_SUBMITTED,
+        ]);
+
         $this->assertSame(CbmsTransmission::STATUS_QUEUED, app(CbmsQueueService::class)->queue($return)->status);
     }
 
@@ -306,10 +533,14 @@ class CbmsPhaseOneOperationalTest extends TestCase
         return SalesInvoice::findOrFail($id);
     }
 
-    private function transmission(string $status): CbmsTransmission
+    private function transmission(
+        string $status,
+        string $environment = CbmsTransmission::ENVIRONMENT_LEGACY,
+        string $transportKind = CbmsTransmission::TRANSPORT_LEGACY,
+    ): CbmsTransmission
     {
         $invoice = $this->invoice('SI-STATE-'.uniqid());
-        return CbmsTransmission::create(['company_id' => $this->company->id, 'transmittable_type' => $invoice->getMorphClass(), 'transmittable_id' => $invoice->id, 'endpoint_type' => CbmsTransmission::ENDPOINT_BILL, 'status' => $status, 'payload_hash' => str_repeat('a', 64)]);
+        return CbmsTransmission::create(['company_id' => $this->company->id, 'transmittable_type' => $invoice->getMorphClass(), 'transmittable_id' => $invoice->id, 'endpoint_type' => CbmsTransmission::ENDPOINT_BILL, 'environment' => $environment, 'transport_kind' => $transportKind, 'status' => $status, 'payload_hash' => str_repeat('a', 64)]);
     }
 
     private function salesReturn(SalesInvoice $invoice): SalesReturn

@@ -19,6 +19,7 @@ class CbmsTransmissionProcessor
         private readonly CbmsBillReturnResponseParser $returnParser,
         private readonly CbmsTransmissionStateMachine $states,
         private readonly CbmsEvidenceSanitizer $evidence,
+        private readonly CbmsTransmissionProvenanceService $provenance,
     ) {}
 
     public function process(int $transmissionId): CbmsProcessingResult
@@ -34,6 +35,9 @@ class CbmsTransmissionProcessor
         $document = $transmission->transmittable;
         if (! $document || (int) $document->company_id !== (int) $transmission->company_id) {
             return $this->finishWithoutTransport($transmission, 'document_scope_invalid', CbmsTransmission::STATUS_PERMANENT_FAILURE, $attemptedAt);
+        }
+        if (! $this->provenance->matches($transmission)) {
+            return $this->finishWithoutTransport($transmission, 'transmission_provenance_mismatch', CbmsTransmission::STATUS_NOT_READY, $attemptedAt);
         }
         $built = $this->build($transmission, $document, $attemptedAt);
         if (($built['readiness']['status'] ?? null) !== 'READY' || ! is_array($built['payload'])) {
@@ -58,6 +62,7 @@ class CbmsTransmissionProcessor
             CbmsTransmissionAttempt::create([
                 'company_id' => $locked->company_id, 'cbms_transmission_id' => $locked->id,
                 'attempt_number' => $number,
+                'environment' => $locked->environment, 'transport_kind' => $locked->transport_kind,
                 'attempted_at' => $result->attemptedAt, 'finished_at' => now(),
                 'transport_classification' => $result->classification, 'http_status' => $result->httpStatus,
                 'response_code' => $code, 'parser_classification' => $category,

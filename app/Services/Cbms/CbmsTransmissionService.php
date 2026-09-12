@@ -9,6 +9,7 @@ class CbmsTransmissionService
 {
     public function __construct(
         private readonly CbmsEvidenceSanitizer $evidence,
+        private readonly CbmsTransmissionProvenanceService $provenance,
     ) {}
 
     public function record(Model $document, string $endpointType, array $payload, CbmsReadinessResult $readiness): CbmsTransmission
@@ -18,7 +19,7 @@ class CbmsTransmissionService
             'transmittable_type' => $document->getMorphClass(),
             'transmittable_id' => $document->getKey(),
             'endpoint_type' => $endpointType,
-        ];
+        ] + $this->provenance->forCompany((int) $document->company_id);
 
         return CbmsTransmission::firstOrCreate($identity, [
             'status' => $readiness->isReady() ? CbmsTransmission::STATUS_PENDING : CbmsTransmission::STATUS_NOT_READY,

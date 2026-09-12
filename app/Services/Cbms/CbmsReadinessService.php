@@ -33,6 +33,7 @@ class CbmsReadinessService
         private readonly CbmsFiscalYearFormatter $fiscalYears,
         private readonly CbmsDateFormatter $dates,
         private readonly NepalIrdCbmsModeService $mode,
+        private readonly CbmsTransmissionProvenanceService $provenance,
     ) {}
 
     public function forInvoice(SalesInvoice $invoice, int $companyId): CbmsReadinessResult
@@ -59,12 +60,14 @@ class CbmsReadinessService
         if (!$invoice || blank($invoice->buyer_name_snapshot)) $reasons[] = self::MISSING_BUYER_EVIDENCE;
         if ($isReturn && blank($document->note)) $reasons[] = self::MISSING_RETURN_REASON;
         if ($isReturn && $invoice) {
+            $provenance = $this->provenance->forCompany((int) $document->company_id);
             $confirmed = CbmsTransmission::query()
                 ->where('company_id', $document->company_id)
                 ->where('transmittable_type', $invoice->getMorphClass())
                 ->where('transmittable_id', $invoice->getKey())
                 ->where('endpoint_type', CbmsTransmission::ENDPOINT_BILL)
-                ->where('status', CbmsTransmission::STATUS_SUBMITTED)->exists();
+                ->submittedForProvenance($provenance['environment'], $provenance['transport_kind'])
+                ->exists();
             if (! $confirmed) $reasons[] = self::ORIGINAL_BILL_NOT_CONFIRMED;
         }
 

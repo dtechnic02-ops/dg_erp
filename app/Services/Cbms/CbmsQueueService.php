@@ -35,6 +35,28 @@ class CbmsQueueService
         $readiness = new CbmsReadinessResult($built['readiness']['reason_codes'] ?? []);
         $transmission = $this->transmissions->record($document, $endpoint, $built['payload'] ?? [], $readiness);
 
+        return $this->queueTransmission($transmission, $readiness);
+    }
+
+    public function retry(CbmsTransmission $transmission): CbmsTransmission
+    {
+        if ($transmission->status !== CbmsTransmission::STATUS_RETRYABLE_FAILURE) {
+            throw new LogicException('Only retryable CBMS failures may be retried.');
+        }
+
+        [$endpoint, $built] = $this->build($transmission->transmittable, now());
+        if ($endpoint !== $transmission->endpoint_type) {
+            throw new LogicException('CBMS retry endpoint does not match the frozen transmission.');
+        }
+
+        $readiness = new CbmsReadinessResult($built['readiness']['reason_codes'] ?? []);
+
+        return $this->queueTransmission($transmission, $readiness);
+    }
+
+    private function queueTransmission(CbmsTransmission $transmission, CbmsReadinessResult $readiness): CbmsTransmission
+    {
+
         $dispatch = false;
         $transmission = DB::transaction(function () use ($transmission, $readiness, &$dispatch) {
             $locked = CbmsTransmission::query()->lockForUpdate()->findOrFail($transmission->id);
@@ -57,14 +79,6 @@ class CbmsQueueService
 
         if ($dispatch) TransmitCbmsDocumentJob::dispatch($transmission->id)->afterCommit();
         return $transmission->refresh();
-    }
-
-    public function retry(CbmsTransmission $transmission): CbmsTransmission
-    {
-        if ($transmission->status !== CbmsTransmission::STATUS_RETRYABLE_FAILURE) {
-            throw new LogicException('Only retryable CBMS failures may be retried.');
-        }
-        return $this->queue($transmission->transmittable);
     }
 
     private function build(Model $document, $attemptedAt): array

@@ -8,7 +8,7 @@ use LogicException;
 class CbmsTransmissionAttempt extends Model
 {
     protected $fillable = [
-        'company_id', 'cbms_transmission_id', 'attempt_number', 'attempted_at', 'finished_at',
+        'company_id', 'cbms_transmission_id', 'attempt_number', 'environment', 'transport_kind', 'attempted_at', 'finished_at',
         'transport_classification', 'http_status', 'response_code', 'parser_classification',
         'response_excerpt_redacted', 'payload_hash', 'is_realtime', 'result_status',
     ];

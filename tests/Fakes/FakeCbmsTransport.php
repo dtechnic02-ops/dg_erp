@@ -2,6 +2,7 @@
 
 namespace Tests\Fakes;
 
+use App\Models\CbmsTransmission;
 use App\Services\Cbms\CbmsHttpTransport;
 use App\Services\Cbms\CbmsTransportResult;
 use App\Services\Cbms\CbmsResponseCodeExtractor;
@@ -11,6 +12,13 @@ class FakeCbmsTransport implements CbmsHttpTransport
 {
     public array $calls = [];
     private array $results = [];
+
+    public function __construct(private readonly string $transportKind = CbmsTransmission::TRANSPORT_SIMULATOR) {}
+
+    public function kind(): string
+    {
+        return $this->transportKind;
+    }
 
     public function push(CbmsTransportResult $result): self
     {
