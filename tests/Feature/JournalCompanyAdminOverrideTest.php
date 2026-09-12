@@ -78,9 +78,9 @@ class JournalCompanyAdminOverrideTest extends OpeningBalanceModuleTest
     'allow_manual_entry' => 1,
     'status' => 'active',
 ]);
-       
+
     }
-    
+
 
     public function test_company_staff_cannot_self_approve_submitted_journal(): void
     {
