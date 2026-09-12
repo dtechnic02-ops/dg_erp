@@ -287,7 +287,7 @@ class PurchasePaymentController extends Controller
                 $receiptFile = null;
 
                 if ($request->hasFile('receipt_file')) {
-                    $receiptFile = FileUploadService::uploadFile(
+                    $receiptFile = FileUploadService::uploadPrivateFile(
                         $request->file('receipt_file'),
                         'companies/' . $companyId . '/purchase-payments'
                     );

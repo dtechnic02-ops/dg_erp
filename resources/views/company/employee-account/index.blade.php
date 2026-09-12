@@ -111,7 +111,7 @@
                                         <tr class="dg-row">
                                             <td>
                                                 @if ($employee->photo)
-                                                    <img src="{{ asset($employee->photo) }}" alt="{{ $employee->full_name }}" width="40" height="40">
+                                                    <img src="{{ route('company.protected-files.show', ['employee', $employee->id, 'photo']) }}" alt="{{ $employee->full_name }}" width="40" height="40">
                                                 @endif
                                             </td>
                                             <td>{{ $employee->employee_code }}</td>

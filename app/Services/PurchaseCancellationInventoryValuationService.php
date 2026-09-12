@@ -85,26 +85,42 @@ class PurchaseCancellationInventoryValuationService
                 throw new RuntimeException('This purchase inventory valuation has already been reversed.');
             }
 
-            $tailIds = InventoryValuation::query()
-                ->where('company_id', $purchase->company_id)
-                ->where('product_id', $productId)
-                ->where('valuation_sequence', '>=', $originals->first()->valuation_sequence)
-                ->orderBy('valuation_sequence')
-                ->lockForUpdate()
-                ->pluck('id');
-
-            if ($tailIds->values()->all() !== $originals->pluck('id')->values()->all()) {
-                throw new RuntimeException('This purchase cannot be cancelled safely after later inventory valuation movements.');
-            }
-
             $product = Product::query()
                 ->where('company_id', $purchase->company_id)
                 ->lockForUpdate()
                 ->find($productId);
-            $latest = $originals->last();
+            $latest = InventoryValuation::query()
+                ->where('company_id', $purchase->company_id)
+                ->where('product_id', $productId)
+                ->orderByDesc('valuation_sequence')
+                ->lockForUpdate()
+                ->first();
 
-            if (! $product || bccomp((string) $latest->quantity_after, (string) $product->current_stock, 6) !== 0) {
+            if (! $product || ! $latest || bccomp((string) $latest->quantity_after, (string) $product->current_stock, 6) !== 0) {
                 throw new RuntimeException('Inventory quantity continuity is invalid.');
+            }
+
+            $purchaseQuantity = $originals->reduce(
+                fn (string $total, InventoryValuation $valuation): string => bcadd($total, (string) $valuation->quantity_change, 6),
+                '0.000000'
+            );
+            $purchaseValue = $originals->reduce(
+                fn (string $total, InventoryValuation $valuation): string => bcadd($total, (string) $valuation->inventory_value_change, 4),
+                '0.0000'
+            );
+
+            if (bccomp((string) $latest->quantity_after, $purchaseQuantity, 6) < 0) {
+                throw new RuntimeException('Insufficient current stock to reverse this purchase.');
+            }
+
+            if (bccomp((string) $latest->inventory_value_after, $purchaseValue, 4) < 0) {
+                throw new RuntimeException('The current inventory valuation cannot safely absorb this purchase reversal.');
+            }
+
+            $quantityAfter = bcsub((string) $latest->quantity_after, $purchaseQuantity, 6);
+            $valueAfter = bcsub((string) $latest->inventory_value_after, $purchaseValue, 4);
+            if (bccomp($quantityAfter, '0', 6) === 0 && bccomp($valueAfter, '0', 4) !== 0) {
+                throw new RuntimeException('The current inventory valuation cannot safely absorb this purchase reversal.');
             }
 
             $pairs = collect();
@@ -165,12 +181,16 @@ class PurchaseCancellationInventoryValuationService
 
         $quantityAfter = bcsub((string) $latest->quantity_after, $quantity, 6);
         $valueAfter = bcsub((string) $latest->inventory_value_after, $value, 4);
-        if (bccomp($quantityAfter, '0', 6) < 0 || bccomp($valueAfter, '0', 4) < 0) {
-            throw new RuntimeException('The purchase cancellation would create negative inventory quantity or value.');
+        if (bccomp($quantityAfter, '0', 6) < 0) {
+            throw new RuntimeException('Insufficient current stock to reverse this purchase.');
+        }
+
+        if (bccomp($valueAfter, '0', 4) < 0) {
+            throw new RuntimeException('The current inventory valuation cannot safely absorb this purchase reversal.');
         }
 
         if (bccomp($quantityAfter, '0', 6) === 0 && bccomp($valueAfter, '0', 4) !== 0) {
-            throw new RuntimeException('The purchase cancellation would break inventory valuation continuity.');
+            throw new RuntimeException('The current inventory valuation cannot safely absorb this purchase reversal.');
         }
 
         $movement = StockService::decrease(

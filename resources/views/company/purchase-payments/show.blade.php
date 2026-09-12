@@ -331,7 +331,7 @@
                                                 <span class="dg-summary-bar-label text-muted">Receipt</span>
                                                 <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
                                                 <span class="dg-summary-bar-value">
-                                                    <a href="{{ asset($payment->receipt_file) }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary dg-btn">View Receipt</a>
+                                                    <a href="{{ route('company.protected-files.show', ['purchase-payment', $payment->id, 'receipt_file']) }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary dg-btn">View Receipt</a>
                                                 </span>
                                             </div>
                                         @endif

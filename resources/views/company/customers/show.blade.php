@@ -93,7 +93,7 @@
                                     @if ($customer->image_path)
                                         <div>
                                             <img
-                                                src="{{ asset($customer->image_path) }}"
+                                                src="{{ route('company.protected-files.show', ['customer', $customer->id, 'image_path']) }}"
                                                 alt="{{ $customer->name }} image"
                                                 width="80"
                                                 height="80"

@@ -48,6 +48,11 @@ class ProductPermissionTest extends TestCase
             $t->unsignedBigInteger('unit_id')->nullable();
             $t->string('name');
             $t->string('barcode')->nullable();
+            $t->string('origin_type')->nullable();
+            $t->string('hs_code')->nullable();
+            $t->string('product_type')->nullable();
+            $t->string('model')->nullable();
+            $t->string('size')->nullable();
             $t->decimal('cost_price', 10, 2)->default(0);
             $t->decimal('retail_price', 10, 2)->default(0);
             $t->decimal('wholesale_price', 10, 2)->default(0);
@@ -55,6 +60,11 @@ class ProductPermissionTest extends TestCase
             $t->decimal('current_stock', 15, 2)->default(0);
             $t->string('status')->default('active');
             $t->string('image')->nullable();
+            $t->string('batch_no')->nullable();
+            $t->date('manufacture_date')->nullable();
+            $t->date('expiry_date')->nullable();
+            $t->boolean('allow_online')->default(false);
+            $t->text('description')->nullable();
             $t->timestamps();
         });
         Schema::create('stock_movements', function (Blueprint $t) {
@@ -157,6 +167,56 @@ class ProductPermissionTest extends TestCase
         $this->actingAs($admin)->get(route('company.products.show', $foreign->id))->assertNotFound();
         $this->actingAs($admin)->put(route('company.products.update', $foreign->id), $this->payload())->assertNotFound();
         $this->actingAs($admin)->delete(route('company.products.destroy', $foreign->id))->assertNotFound();
+    }
+
+    public function test_brand_is_optional_and_foreign_brand_is_rejected(): void
+    {
+        $this->actingAs(User::findOrFail(1))
+            ->post(route('company.products.store'), $this->payload() + ['brand_id' => ''])
+            ->assertRedirect(route('company.products.index'))
+            ->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('products', ['name' => 'Route Product', 'company_id' => 1, 'brand_id' => null]);
+
+        DB::table('brands')->insert(['id' => 2, 'company_id' => 2, 'name' => 'Foreign Brand']);
+        $this->post(route('company.products.store'), array_replace($this->payload(), ['name' => 'Invalid brand product', 'brand_id' => 2]))
+            ->assertSessionHasErrors('brand_id');
+        $this->assertDatabaseMissing('products', ['name' => 'Invalid brand product']);
+    }
+
+    public function test_product_fiscal_details_are_controlled_normalized_and_optional(): void
+    {
+        $admin = User::findOrFail(1);
+        $this->actingAs($admin)->post(route('company.products.store'), array_replace($this->payload(), [
+            'name' => 'Imported Device', 'origin_type' => 'imported', 'hs_code' => ' 0847 10 ',
+            'product_type' => ' Computer ', 'model' => ' X100 ', 'size' => ' 13 inch ',
+        ]))->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('products', [
+            'name' => 'Imported Device', 'origin_type' => 'imported', 'hs_code' => '084710',
+            'product_type' => 'Computer', 'model' => 'X100', 'size' => '13 inch',
+        ]);
+
+        $this->post(route('company.products.store'), array_replace($this->payload(), [
+            'name' => 'Leading Zero Device', 'origin_type' => 'imported', 'hs_code' => '0123',
+        ]))->assertSessionHasNoErrors();
+        $this->assertSame('0123', Product::where('name', 'Leading Zero Device')->value('hs_code'));
+
+        $this->post(route('company.products.store'), array_replace($this->payload(), [
+            'name' => 'Domestic Item', 'origin_type' => 'domestic', 'hs_code' => null,
+        ]))->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('products', ['name' => 'Domestic Item', 'origin_type' => 'domestic', 'hs_code' => null]);
+
+        $this->post(route('company.products.store'), array_replace($this->payload(), [
+            'name' => 'Unknown Item', 'origin_type' => 'unknown', 'hs_code' => null,
+        ]))->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('products', ['name' => 'Unknown Item', 'origin_type' => 'unknown']);
+
+        foreach (['123', '12-A', '8471.30'] as $index => $invalid) {
+            $this->post(route('company.products.store'), array_replace($this->payload(), [
+                'name' => 'Invalid Hs '.$index, 'origin_type' => 'imported', 'hs_code' => $invalid,
+            ]))->assertSessionHasErrors('hs_code');
+            $this->assertDatabaseMissing('products', ['name' => 'Invalid Hs '.$index]);
+        }
     }
 
     private function routes(Product $product, array $payload): array

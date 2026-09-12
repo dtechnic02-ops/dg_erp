@@ -12,7 +12,9 @@
     @stack('styles')
     @yield('css')
 </head>
-<body>
+<body data-company-country="{{ auth()->user()?->company?->countryMaster?->iso_code }}"
+      data-auditor-readonly="{{ (int) auth()->user()?->role_id === \App\Models\Role::AUDITOR_ID ? 'true' : 'false' }}"
+      data-nepali-date-url="{{ route('company.calendar.ad-to-bs') }}">
     <input type="checkbox" id="dg-mobile-nav" class="dg-mobile-nav-toggle">
     <label for="dg-mobile-nav" class="dg-mobile-nav-backdrop" aria-hidden="true"></label>
 

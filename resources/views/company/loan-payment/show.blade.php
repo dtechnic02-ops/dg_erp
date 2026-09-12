@@ -120,7 +120,7 @@
                                 <div class="col-md-6">
                                     <div class="dg-row">
                                         <span class="dg-label d-inline mb-0">Next Payment Date :</span>
-                                        {{ optional($payment->next_payment_date)->format('d-m-Y') ?: '-' }}
+                                        {{ optional($payment->next_payment_date)->format('d-m-Y') ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $payment->next_payment_date])
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -298,7 +298,7 @@
                                         <div class="col-md-12">
                                             <div class="dg-row">
                                                 <span class="dg-label d-inline mb-0">Attachment :</span>
-                                                <a href="{{ asset($payment->attachment) }}" target="_blank" rel="noopener noreferrer">View Attachment</a>
+                                                <a href="{{ route('company.protected-files.show', ['loan-payment', $payment->id, 'attachment']) }}" target="_blank" rel="noopener noreferrer">View Attachment</a>
                                             </div>
                                         </div>
                                     @endif
@@ -371,7 +371,7 @@
                                     <div class="col-md-6">
                                         <div class="dg-row">
                                             <span class="dg-label d-inline mb-0">Cancelled Date :</span>
-                                            {{ optional($payment->cancelled_date)->format('d-m-Y') ?: '-' }}
+                                            {{ optional($payment->cancelled_date)->format('d-m-Y') ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $payment->cancelled_date])
                                         </div>
                                     </div>
                                     @if ($payment->cancel_reason)

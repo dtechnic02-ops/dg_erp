@@ -733,6 +733,17 @@ body
 
 }
 
+.dg-table td.dg-action-col .dg-action-btn,
+.dg-table td.dg-action-col-compact .dg-action-btn {
+    min-width:0;
+    width:auto;
+    min-height:22px;
+    padding:1px 6px;
+    font-size:11px;
+    line-height:1.2;
+    vertical-align:middle;
+}
+
 
 /*=========================================================
 10b. LIST TABLE — Compact columns, badges, pagination
@@ -803,6 +814,65 @@ body
 {
     background:#6c757d;
     color:#ffffff;
+}
+
+.dg-btn-brand {
+    background:#061b3a;
+    border-color:#061b3a;
+    color:#ffffff;
+}
+
+.dg-btn-brand:hover,
+.dg-btn-brand:focus {
+    background:#0b3a75;
+    border-color:#16bff3;
+    color:#ffffff;
+}
+
+.dg-btn-brand-outline {
+    background:#ffffff;
+    border-color:#087fdb;
+    color:#061b3a;
+}
+
+.dg-btn-brand-outline:hover,
+.dg-btn-brand-outline:focus {
+    background:#e8f7ff;
+    border-color:#16bff3;
+    color:#061b3a;
+}
+
+.dg-badge-brand {
+    background:#087fdb;
+    color:#ffffff;
+}
+
+.dg-table .dg-col-name {
+    min-width:180px;
+    padding-left:12px;
+    padding-right:12px;
+}
+
+.dg-table .dg-col-barcode {
+    min-width:130px;
+    padding-left:12px;
+    padding-right:12px;
+    white-space:nowrap;
+}
+
+.dg-table .dg-col-brand {
+    min-width:110px;
+    padding-left:12px;
+    padding-right:12px;
+}
+
+.dg-table .dg-col-money {
+    min-width:90px;
+    padding-left:12px;
+    padding-right:12px;
+    text-align:right;
+    white-space:nowrap;
+    font-variant-numeric:tabular-nums;
 }
 
 .dg-list-footer
@@ -5699,4 +5769,13 @@ body:has(#dg-admin-sidebar-collapse:checked) .dg-admin-layout .dg-sidebar-parent
     padding: .55rem;
     color: #64748b;
     font-size: .8rem;
+}
+/* Auditor navigation is presentation-only; EnsureAuditorReadOnly enforces this server-side. */
+body[data-auditor-readonly="true"] #dgPage a[href*="/create"],
+body[data-auditor-readonly="true"] #dgPage a[href*="/edit"],
+body[data-auditor-readonly="true"] #dgPage a[href*="/print"],
+body[data-auditor-readonly="true"] #dgPage a[href*="whatsapp-share"],
+body[data-auditor-readonly="true"] #dgPage form[method="POST"],
+body[data-auditor-readonly="true"] .dg-sidebar a[href*="settings/whatsapp"] {
+    display: none !important;
 }

@@ -170,7 +170,7 @@
                                         <tr class="dg-row">
                                             <td>{{ $leads->firstItem() + $loop->index }}</td>
                                             <td>{{ $lead->lead_no }}</td>
-                                            <td>{{ $lead->lead_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $lead->lead_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $lead->lead_date])</td>
                                             <td>{{ $lead->customer->name ?? '-' }}</td>
                                             <td>{{ $lead->customer->mobile ?? '-' }}</td>
                                             <td>{{ $lead->assignedEmployee->full_name ?? '-' }}</td>

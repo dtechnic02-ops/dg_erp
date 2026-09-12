@@ -126,7 +126,7 @@
                                     <div class="col-md-12">
                                         <div class="dg-row">
                                             <span class="dg-label d-inline mb-0">Attachment :</span>
-                                            <a href="{{ asset($ledger->attachment) }}" target="_blank" rel="noopener noreferrer">View Attachment</a>
+                                            <a href="{{ route('company.protected-files.show', ['loan-saving-ledger', $ledger->id, 'attachment']) }}" target="_blank" rel="noopener noreferrer">View Attachment</a>
                                         </div>
                                     </div>
                                 @endif

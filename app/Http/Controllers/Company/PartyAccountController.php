@@ -15,6 +15,7 @@ use Illuminate\Routing\Controllers\HasMiddleware;
 use App\Models\PartyAccount;
 
 use App\Services\ValidationService;
+use App\Services\FileUploadService;
 
 use Illuminate\Http\Request;
 
@@ -144,17 +145,7 @@ class PartyAccountController extends Controller implements HasMiddleware
 
 
 
-    private function ensureUploadFolder(string $folder): void
-
-    {
-
-        if (!file_exists(public_path($folder))) {
-
-            mkdir(public_path($folder), 0777, true);
-
-        }
-
-    }
+    private function ensureUploadFolder(string $folder): void {}
 
 
 
@@ -170,23 +161,7 @@ class PartyAccountController extends Controller implements HasMiddleware
 
 
 
-        $name = time()
-
-            . '_'
-
-            . rand(1000, 9999)
-
-            . '_'
-
-            . $file->getClientOriginalName();
-
-
-
-        $file->move(public_path($folder), $name);
-
-
-
-        return $folder . '/' . $name;
+        return FileUploadService::uploadPrivateFile($file, $folder);
 
     }
 
@@ -196,11 +171,7 @@ class PartyAccountController extends Controller implements HasMiddleware
 
     {
 
-        if ($path && file_exists(public_path($path))) {
-
-            unlink(public_path($path));
-
-        }
+        FileUploadService::deleteFile($path);
 
     }
 
@@ -501,5 +472,3 @@ class PartyAccountController extends Controller implements HasMiddleware
     }
 
 }
-
-

@@ -309,7 +309,7 @@ class PurchaseReturnRefundController extends Controller
                 $attachmentPath = null;
 
                 if ($cashAmount > 0 && $request->hasFile('attachment')) {
-                    $attachmentPath = FileUploadService::uploadFile(
+                    $attachmentPath = FileUploadService::uploadPrivateFile(
                         $request->file('attachment'),
                         'companies/' . $companyId . '/purchase-return-refunds'
                     );

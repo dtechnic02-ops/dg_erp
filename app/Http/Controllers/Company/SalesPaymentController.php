@@ -292,7 +292,7 @@ class SalesPaymentController extends Controller
 
                 if ($request->hasFile('receipt_file'))
                 {
-                    $receiptFile = FileUploadService::uploadFile(
+                    $receiptFile = FileUploadService::uploadPrivateFile(
                         $request->file('receipt_file'),
                         'companies/' . $companyId . '/sales-payments'
                     );

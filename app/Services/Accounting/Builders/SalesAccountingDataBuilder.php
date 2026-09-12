@@ -50,15 +50,26 @@ class SalesAccountingDataBuilder
         }
 
         $revenueBeforeTax = $this->subtract($grandTotal, $taxAmount);
-        [$rawProductRevenue, $rawServiceRevenue] = $this->itemRevenue($sale);
+        [$rawProductRevenue, $rawServiceRevenue, $usesFiscalLineAmounts, $fiscalLineDiscount] = $this->itemRevenue($sale);
         $rawRevenue = $this->add($rawProductRevenue, $rawServiceRevenue);
 
-        [$productRevenue, $serviceRevenue] = $this->reconcileDiscount(
-            $rawProductRevenue,
-            $rawServiceRevenue,
-            $revenueBeforeTax,
-            $discountAmount
-        );
+        if ($usesFiscalLineAmounts) {
+            if (! $this->equals($fiscalLineDiscount, $discountAmount)) {
+                throw new RuntimeException('Fiscal sales line discounts do not reconcile with the invoice discount.');
+            }
+            if (! $this->equals($rawRevenue, $revenueBeforeTax)) {
+                throw new RuntimeException('The persisted fiscal sales line net bases do not reconcile with invoice revenue.');
+            }
+            $productRevenue = $rawProductRevenue;
+            $serviceRevenue = $rawServiceRevenue;
+        } else {
+            [$productRevenue, $serviceRevenue] = $this->reconcileDiscount(
+                $rawProductRevenue,
+                $rawServiceRevenue,
+                $revenueBeforeTax,
+                $discountAmount
+            );
+        }
 
         $payments = $this->payments($sale, $companyId);
         $paymentTotal = '0.0000';
@@ -97,8 +108,12 @@ class SalesAccountingDataBuilder
     {
         $productRevenue = '0.0000';
         $serviceRevenue = '0.0000';
+        $fiscalLineCount = 0;
+        $itemCount = 0;
+        $fiscalLineDiscount = '0.0000';
 
         foreach ($sale->items()->get() as $item) {
+            $itemCount++;
             $total = $this->amount($item->total_price, 'sales item total_price');
             $vat = $this->amount($item->vat_amount, 'sales item vat_amount');
 
@@ -106,7 +121,22 @@ class SalesAccountingDataBuilder
                 throw new RuntimeException('A sales item tax amount cannot exceed its total price.');
             }
 
-            $revenue = $this->subtract($total, $vat);
+            if ($item->fiscal_discount_amount !== null || $item->fiscal_net_base !== null) {
+                if ($item->fiscal_discount_amount === null || $item->fiscal_net_base === null) {
+                    throw new RuntimeException('Fiscal sales line discount evidence is incomplete.');
+                }
+                $revenue = $this->amount($item->fiscal_net_base, 'sales item fiscal_net_base');
+                $fiscalLineDiscount = $this->add(
+                    $fiscalLineDiscount,
+                    $this->amount($item->fiscal_discount_amount, 'sales item fiscal_discount_amount')
+                );
+                if (! $this->equals($this->add($revenue, $vat), $total)) {
+                    throw new RuntimeException('A fiscal sales item net base and VAT do not equal its total price.');
+                }
+                $fiscalLineCount++;
+            } else {
+                $revenue = $this->subtract($total, $vat);
+            }
 
             if ($item->item_type === 'product') {
                 $productRevenue = $this->add($productRevenue, $revenue);
@@ -121,7 +151,11 @@ class SalesAccountingDataBuilder
             throw new RuntimeException('A persisted sales item has an unsupported item type.');
         }
 
-        return [$productRevenue, $serviceRevenue];
+        if ($fiscalLineCount !== 0 && $fiscalLineCount !== $itemCount) {
+            throw new RuntimeException('Fiscal and legacy sales line economics cannot be mixed on one invoice.');
+        }
+
+        return [$productRevenue, $serviceRevenue, $itemCount > 0 && $fiscalLineCount === $itemCount, $fiscalLineDiscount];
     }
 
     private function reconcileDiscount(

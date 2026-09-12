@@ -14,17 +14,19 @@ use Throwable;
 class CompanyFactoryResetService
 {
     private const PRESERVED_COMPANY_TABLES = [
-        'company_permission', 'company_subscriptions', 'company_whatsapp_settings',
+        'company_permission', 'company_subscriptions', 'company_ird_cbms_settings', 'company_cbms_api_configurations', 'company_tax_settings', 'company_whatsapp_settings',
         'subscription_histories', 'subscription_payments', 'company_factory_reset_audits',
     ];
 
     private const RESET_ORDER = [
+        'cbms_transmission_attempts',
+        'cbms_transmissions',
         'sales_return_refund_adjustments', 'purchase_return_refund_adjustments',
         'sales_cost_snapshots', 'inventory_valuations',
         'delivery_attachments', 'delivery_signatures', 'delivery_status_histories', 'delivery_note_items',
         'crm_attachments', 'crm_notes', 'crm_tasks', 'crm_follow_ups', 'crm_meetings',
         'crm_status_histories', 'crm_opportunities', 'crm_contacts', 'crm_leads',
-        'opening_balance_audit_events', 'journal_audit_events',
+        'fiscal_document_audit_events', 'opening_balance_audit_events', 'journal_audit_events',
         'sales_return_refunds', 'purchase_return_refunds', 'sales_return_items', 'purchase_return_items',
         'sales_payments', 'purchase_payments', 'invoice_payments',
         'stock_transactions', 'stock_movements', 'sales_items', 'purchase_items', 'quotation_items',
@@ -69,8 +71,10 @@ class CompanyFactoryResetService
         'suppliers' => ['image_path'],
     ];
 
-    public function __construct(private DefaultChartAccountBootstrapService $chartAccounts)
-    {
+    public function __construct(
+        private DefaultChartAccountBootstrapService $chartAccounts,
+        private FiscalDocumentPolicyService $fiscalDocumentPolicy,
+    ) {
     }
 
     public function reset(Company $company, int $initiatingAdminId, string $currentSessionId): CompanyFactoryResetAudit
@@ -84,6 +88,9 @@ class CompanyFactoryResetService
             $locked = Company::query()->lockForUpdate()->find($company->id);
             if (! $locked || $locked->status !== 'active') {
                 throw new RuntimeException('The Company is not active or no longer exists.');
+            }
+            if ($this->fiscalDocumentPolicy->companyHasPermanentFiscalHistory($locked)) {
+                throw new RuntimeException('Factory Reset is not allowed while Nepal IRD/CBMS mode is active.');
             }
 
             $users = DB::table('users')->where('company_id', $locked->id)->lockForUpdate()->get(['id', 'email', 'role_id', 'password', 'account_status']);
@@ -158,6 +165,9 @@ class CompanyFactoryResetService
             'company_subscriptions' => DB::table('company_subscriptions')->where('company_id', $companyId)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all(),
             'subscription_payments' => DB::table('subscription_payments')->where('company_id', $companyId)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all(),
             'subscription_histories' => DB::table('subscription_histories')->where('company_id', $companyId)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all(),
+            'ird_cbms' => DB::table('company_ird_cbms_settings')->where('company_id', $companyId)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all(),
+            'cbms_api' => DB::table('company_cbms_api_configurations')->where('company_id', $companyId)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all(),
+            'tax_settings' => DB::table('company_tax_settings')->where('company_id', $companyId)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all(),
             'whatsapp' => DB::table('company_whatsapp_settings')->where('company_id', $companyId)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all(),
         ];
     }
@@ -240,6 +250,7 @@ class CompanyFactoryResetService
         $manifest = [
             ['type' => 'directory', 'path' => $this->storageCompanyRoot().DIRECTORY_SEPARATOR.$companyId, 'root' => $this->storageCompanyRoot()],
             ['type' => 'directory', 'path' => $this->crmRoot().DIRECTORY_SEPARATOR.$companyId, 'root' => $this->crmRoot()],
+            ['type' => 'directory', 'path' => $this->protectedCompanyRoot().DIRECTORY_SEPARATOR.$companyId, 'root' => $this->protectedCompanyRoot()],
         ];
         foreach (self::FILE_COLUMNS as $table => $columns) {
             foreach ($columns as $column) {
@@ -298,4 +309,5 @@ class CompanyFactoryResetService
     private function publicCompanyRoot(): string { return (string) config('dg-erp.destructive_files.public_company_root', public_path('companies')); }
     private function storageCompanyRoot(): string { return (string) config('dg-erp.destructive_files.storage_company_root', storage_path('app/public/companies')); }
     private function crmRoot(): string { return (string) config('dg-erp.destructive_files.crm_root', storage_path('app/crm')); }
+    private function protectedCompanyRoot(): string { return \Illuminate\Support\Facades\Storage::disk('local')->path('protected/companies'); }
 }

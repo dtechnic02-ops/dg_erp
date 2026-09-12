@@ -36,6 +36,17 @@ use App\Services\NepaliDateService;
 use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
 use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use App\Services\WhatsappShareService;
+use App\Services\FiscalDocumentPolicyService;
+use App\Services\SalesTaxClassificationService;
+use App\Services\FiscalDocumentAuditService;
+use App\Services\SalesFiscalSnapshotService;
+use App\Services\SalesFiscalPaymentModeService;
+use App\Services\SalesFiscalIssueDateTimeService;
+use App\Services\NepalIrdCbmsModeService;
+use App\Services\SalesFiscalLineAmountService;
+use App\Services\SalesFiscalReconciliationService;
+use App\Services\SalesFiscalReadinessService;
+use App\Services\Cbms\CbmsQueueService;
 
 class SalesController extends Controller
 {
@@ -47,13 +58,27 @@ class SalesController extends Controller
         private readonly SalesInventoryCostService $salesInventoryCostService,
         private readonly SalesCogsAccountingIntegrationService $salesCogsAccountingIntegrationService,
         private readonly SalesInventoryRestorationService $salesInventoryRestorationService,
-        private readonly NepaliDateService $nepaliDateService
+        private readonly NepaliDateService $nepaliDateService,
+        private readonly FiscalDocumentPolicyService $fiscalDocumentPolicy,
+        private readonly SalesTaxClassificationService $salesTaxClassification,
+        private readonly FiscalDocumentAuditService $fiscalAudit,
+        private readonly SalesFiscalSnapshotService $fiscalSnapshots,
+        private readonly SalesFiscalPaymentModeService $fiscalPaymentModes,
+        private readonly SalesFiscalIssueDateTimeService $fiscalIssueDateTime,
+        private readonly NepalIrdCbmsModeService $nepalIrdCbmsMode,
+        private readonly SalesFiscalLineAmountService $fiscalLineAmounts,
+        private readonly SalesFiscalReconciliationService $fiscalReconciliation,
+        private readonly SalesFiscalReadinessService $fiscalReadiness,
+        private readonly CbmsQueueService $cbmsQueue
     ) {
     }
 
 public function index(Request $request)
 {
     $companyId = auth()->user()->company_id;
+    $company = Company::with('countryMaster')->findOrFail($companyId);
+    $isFiscalDocumentImmutable = $this->fiscalDocumentPolicy
+        ->isIssuedDocumentImmutableForCompany($company);
 
 
     $customers = Customer::where(
@@ -275,7 +300,8 @@ public function index(Request $request)
             'totalPaid',
             'totalDue',
             'perPage',
-            'activeReturnInvoiceIds'
+            'activeReturnInvoiceIds',
+            'isFiscalDocumentImmutable'
         )
     );
 }
@@ -468,6 +494,7 @@ public function create()
 
     $company = Company::with('countryMaster')->findOrFail($companyId);
     $isNepalCompany = $company->countryMaster?->iso_code === 'NP';
+    $isFiscalDiscountMode = $this->nepalIrdCbmsMode->isActiveForCompany($company);
     $saleDateBs = $isNepalCompany
         ? $this->deriveBsDate(old('sale_date', now()->toDateString()))
         : null;
@@ -564,6 +591,7 @@ public function create()
             'invoiceNo',
             'activeFy',
             'isNepalCompany',
+            'isFiscalDiscountMode',
             'saleDateBs'
         )
     );
@@ -593,6 +621,12 @@ $validator = Validator::make($request->all(), [
     'item_type.*' =>
         'required|in:product,service',
 
+    'tax_classification' =>
+        'nullable|array',
+
+    'tax_classification.*' =>
+        'nullable|string',
+
     'product_id' =>
         'required|array',
 
@@ -610,6 +644,12 @@ $validator = Validator::make($request->all(), [
 
     'unit_price.*' =>
         'required|numeric|min:0',
+
+    'line_discount_amount' =>
+        'nullable|array',
+
+    'line_discount_amount.*' =>
+        'nullable|numeric',
 
     'paid_amount' =>
         'nullable|numeric|min:0',
@@ -774,6 +814,12 @@ try {
 
         $customer = Customer::where('company_id', $companyId)
             ->findOrFail($request->customer_id);
+        \App\Models\CompanyIrdCbmsSetting::query()
+            ->where('company_id', $companyId)
+            ->lockForUpdate()
+            ->first();
+        $company = Company::with(['countryMaster', 'irdCbmsSetting'])->findOrFail($companyId);
+        $captureFiscalSnapshot = $this->fiscalDocumentPolicy->isIssuedDocumentImmutableForCompany($company);
 
         $dueDate = $this->calculateInvoiceDueDate(
             $request->sale_date,
@@ -831,6 +877,17 @@ try {
                 'status' => 1,
 
             ]);
+
+        $invoiceSnapshot = $this->fiscalSnapshots->invoiceAttributes($company, $customer);
+        if ($invoiceSnapshot !== []) $invoice->forceFill($invoiceSnapshot)->save();
+
+        $paymentModeSnapshot = $this->fiscalPaymentModes->issuanceAttributes(
+            $company,
+            (float) $paidAmount,
+            (float) $grandTotal,
+            $request->filled('account_id') ? (int) $request->account_id : null
+        );
+        if ($paymentModeSnapshot !== []) $invoice->forceFill($paymentModeSnapshot)->save();
 
         session()->forget('pending_sales_invoice');
     
@@ -1016,6 +1073,8 @@ try {
 
             $vatAmount = $lineItem['vat_amount'];
 
+            $taxClassification = $lineItem['tax_classification'];
+
             $totalPrice = $lineItem['total_price'];
 
             $type = $lineItem['item_type'];
@@ -1061,10 +1120,22 @@ try {
                 'vat_amount' =>
                     $vatAmount,
 
+                'fiscal_discount_amount' =>
+                    $lineItem['fiscal_discount_amount'],
+
+                'fiscal_net_base' =>
+                    $lineItem['fiscal_net_base'],
+
+                'tax_classification' =>
+                    $taxClassification,
+
                 'total_price' =>
                     $totalPrice,
 
             ]);
+
+            $itemSnapshot = $this->fiscalSnapshots->itemAttributes($type, $productId, $serviceId, $companyId, $captureFiscalSnapshot);
+            if ($itemSnapshot !== []) $salesItem->forceFill($itemSnapshot)->save();
 
             if (
                 $type == 'product'
@@ -1120,6 +1191,12 @@ try {
         $this->salesAccountingIntegrationService->postSale($invoice);
         $this->salesCogsAccountingIntegrationService->postSaleCogs($invoice);
 
+        $fiscalIssueTimestamp = $this->fiscalIssueDateTime->issuanceAttributes($company);
+        if ($fiscalIssueTimestamp !== []) $invoice->forceFill($fiscalIssueTimestamp)->save();
+
+        $this->fiscalAudit->recordIssued($invoice->company, 'sales_invoice', $invoice, $invoice->invoice_no, auth()->id());
+        if ($invoice->fiscal_issued_at) $this->cbmsQueue->queueAfterCommit($invoice);
+
         return $invoice;
 
     });
@@ -1144,6 +1221,8 @@ try {
             'VAT amount cannot be negative.',
             'Discount cannot be negative.',
             'Discount cannot exceed gross total.',
+            'Line discount cannot be negative.',
+            'Line discount cannot exceed line gross amount.',
             'Grand total must be greater than zero.',
             'Insufficient stock.',
             'Invalid quantity',
@@ -1154,6 +1233,9 @@ try {
             'Please reopen the sales invoice create form and try again.',
             'Invalid invoice number. Please reopen the sales invoice create form and try again.',
             'Invoice number conflict. Please reopen the sales invoice create form and try again.',
+            "This product's origin is not classified as Domestic or Imported, so fiscal H.S.-code applicability cannot be verified.",
+            'This imported product requires a valid H.S. Code before issuing a Nepal CBMS invoice.',
+            'The selected product has invalid company-owned brand information.',
         ];
 
         $this->logSaleException('Sales invoice store failed.', $e, [
@@ -1175,16 +1257,32 @@ try {
 
 }
 
-public function calculateStoreAmounts(Request $request, int $companyId): array
+public function calculateStoreAmounts(Request $request, int $companyId, bool $captureTaxClassification = true): array
 {
     $lineItems = [];
     $subtotal = 0;
     $totalVat = 0;
+    $fiscalDiscount = 0;
+
+    $isNepalCompany = Company::whereKey($companyId)
+        ->whereHas('countryMaster', fn ($query) => $query->where('iso_code', 'NP'))
+        ->exists();
+    $company = $captureTaxClassification
+        ? Company::with(['countryMaster', 'irdCbmsSetting'])->findOrFail($companyId)
+        : null;
+    $isFiscalDiscountMode = $company !== null && $this->nepalIrdCbmsMode->isActiveForCompany($company);
 
     foreach ($request->item_type as $key => $type) {
         $qty = (float) $request->quantity[$key];
         $price = (float) $request->unit_price[$key];
         $vatRate = (float) ($request->vat_rate[$key] ?? 0);
+        $taxClassification = $captureTaxClassification
+            ? $this->salesTaxClassification->normalizeForNewLine(
+                $request->input("tax_classification.$key"),
+                $vatRate,
+                $isNepalCompany
+            )
+            : null;
 
         if ($qty < 0) {
             throw new \Exception('Quantity cannot be negative.');
@@ -1199,8 +1297,25 @@ public function calculateStoreAmounts(Request $request, int $companyId): array
         }
 
         $lineAmount = round($qty * $price, 2);
-        $vatAmount = round($lineAmount * ($vatRate / 100), 2);
-        $lineTotal = round($lineAmount + $vatAmount, 2);
+        $lineDiscount = null;
+        $fiscalNetBase = null;
+
+        if ($isFiscalDiscountMode) {
+            $fiscal = $this->fiscalLineAmounts->calculate(
+                $qty,
+                $price,
+                (float) $request->input("line_discount_amount.$key", 0),
+                $vatRate
+            );
+            $lineAmount = $fiscal['gross_base'];
+            $lineDiscount = $fiscal['discount_amount'];
+            $fiscalNetBase = $fiscal['net_base'];
+            $vatAmount = $fiscal['vat_amount'];
+            $lineTotal = $fiscal['line_total'];
+        } else {
+            $vatAmount = round($lineAmount * ($vatRate / 100), 2);
+            $lineTotal = round($lineAmount + $vatAmount, 2);
+        }
 
         if ($vatAmount < 0) {
             throw new \Exception('VAT amount cannot be negative.');
@@ -1215,22 +1330,33 @@ public function calculateStoreAmounts(Request $request, int $companyId): array
 
         $subtotal = round($subtotal + $lineAmount, 2);
         $totalVat = round($totalVat + $vatAmount, 2);
+        if ($isFiscalDiscountMode) {
+            $fiscalDiscount = round($fiscalDiscount + $lineDiscount, 2);
+        }
 
-        $lineItems[] = [
+        $lineItem = [
             'item_type'   => $type,
             'quantity'    => $qty,
             'unit_price'  => $price,
             'vat_rate'    => $vatRate,
             'vat_amount'  => $vatAmount,
             'total_price' => $lineTotal,
+            'fiscal_discount_amount' => $lineDiscount,
+            'fiscal_net_base' => $fiscalNetBase,
             'product_id'  => $productId,
             'service_id'  => $serviceId,
         ];
+        if ($captureTaxClassification) {
+            $lineItem['tax_classification'] = $taxClassification;
+        }
+        $lineItems[] = $lineItem;
     }
 
     $grossTotal = round($subtotal + $totalVat, 2);
 
-    $discount = round((float) ($request->discount_amount ?? 0), 2);
+    $discount = $isFiscalDiscountMode
+        ? $fiscalDiscount
+        : round((float) ($request->discount_amount ?? 0), 2);
 
     if ($discount < 0) {
         throw new \Exception('Discount cannot be negative.');
@@ -1240,7 +1366,9 @@ public function calculateStoreAmounts(Request $request, int $companyId): array
         throw new \Exception('Discount cannot exceed gross total.');
     }
 
-    $grandTotal = round($grossTotal - $discount, 2);
+    $grandTotal = $isFiscalDiscountMode
+        ? round(array_sum(array_column($lineItems, 'total_price')), 2)
+        : round($grossTotal - $discount, 2);
 
     if ($grandTotal <= 0) {
         throw new \Exception('Grand total must be greater than zero.');
@@ -1330,9 +1458,11 @@ public function cancel(Request $request, $id)
             $cancelReason = trim($request->cancel_reason);
 
             $invoice = SalesInvoice::where('company_id', $companyId)
-                ->with('items.product')
+                ->with(['items.product', 'company'])
                 ->lockForUpdate()
                 ->findOrFail($id);
+
+            $this->fiscalDocumentPolicy->assertSalesInvoiceMayBeMutated($invoice);
 
             if ($invoice->status == 0)
             {
@@ -1391,7 +1521,14 @@ public function cancel(Request $request, $id)
             $invoice->update([
                 'status' => 0,
                 'note' => trim(($invoice->note ?? '') . ' [Cancelled: ' . $cancelReason . ']'),
+                ...($this->fiscalDocumentPolicy->isIssuedDocumentImmutableForCompany($invoice->company) ? [
+                    'cancelled_at' => now(),
+                    'cancelled_by' => auth()->id(),
+                    'cancellation_reason' => $cancelReason,
+                    'original_fiscal_reference' => $invoice->invoice_no,
+                ] : []),
             ]);
+            $this->fiscalAudit->recordCancelled($invoice->company, 'sales_invoice', $invoice, $invoice->invoice_no, auth()->id(), $cancelReason);
         });
 
         return back()->with('success', 'Sales cancelled successfully.');
@@ -1404,7 +1541,15 @@ public function cancel(Request $request, $id)
             'Invoice cannot be cancelled because one or more active payments exist.',
             'This invoice cannot be cancelled because one or more active sales returns exist.',
             'Cancel date must belong to the active financial year.',
+            FiscalDocumentPolicyService::ISSUED_INVOICE_MUTATION_MESSAGE,
         ];
+
+        if ($e->getMessage() === FiscalDocumentPolicyService::ISSUED_INVOICE_MUTATION_MESSAGE) {
+            $blockedInvoice = SalesInvoice::with('company')->where('company_id', $companyId)->find($id);
+            if ($blockedInvoice) {
+                $this->fiscalAudit->recordBlockedSalesInvoiceAction($blockedInvoice, 'cancel', auth()->id(), 'company.sales.cancel');
+            }
+        }
 
         $this->logSaleException('Sales invoice cancel failed.', $e, [
             'invoice_id' => $id,
@@ -1438,13 +1583,36 @@ public function print($id)
         )
         ->findOrFail($id);
 
+    $isFiscalTaxInvoice = $this->fiscalDocumentPolicy->wasFiscallyIssued($invoice);
+    if ($isFiscalTaxInvoice) {
+        $readinessErrors = $this->fiscalReadiness->fiscalPrintErrors($invoice);
+        if ($readinessErrors !== []) {
+            return back()->with('error', 'Fiscal Tax Invoice cannot be printed: '.implode(' ', $readinessErrors));
+        }
+    }
+
     $saleDateBs = $this->deriveBsDateForCompany($invoice->company, $invoice->sale_date);
+    $fiscalIssuedAtNepal = $this->fiscalIssueDateTime->nepalLocal($invoice);
+    $fiscalIssueDateBs = $fiscalIssuedAtNepal
+        ? $this->nepaliDateService->adToBs($fiscalIssuedAtNepal->format('Y-m-d'))
+        : null;
+    $fiscalPrintLabel = $this->fiscalAudit->recordPrint($invoice->company, 'sales_invoice', $invoice, $invoice->invoice_no, auth()->id());
+    $useFiscalSnapshot = $isFiscalTaxInvoice;
+    $fiscalReconciliation = $this->fiscalReconciliation->reconcile($invoice);
+    $fiscalPaymentPresentation = $this->fiscalPaymentModes->irdPresentation($invoice->fiscal_payment_mode);
 
     return view(
         'company.sales.print',
         compact(
             'invoice',
-            'saleDateBs'
+            'saleDateBs',
+            'fiscalIssuedAtNepal',
+            'fiscalIssueDateBs',
+            'fiscalPrintLabel',
+            'useFiscalSnapshot',
+            'fiscalReconciliation',
+            'fiscalPaymentPresentation'
+            ,'isFiscalTaxInvoice'
         )
     );
 }
@@ -1493,13 +1661,20 @@ public function whatsappShare($id, WhatsappShareService $whatsappShareService)
 
     $saleDateBs = $this->deriveBsDateForCompany($invoice->company, $invoice->sale_date);
     $whatsappShareEnabled = app(WhatsappShareService::class)->isEnabled($invoice->company);
+    $isFiscalDocumentImmutable = $this->fiscalDocumentPolicy->isSalesInvoiceImmutable($invoice)
+        || $this->fiscalDocumentPolicy->isIssuedDocumentImmutableForCompany($invoice->company);
+    $fiscalHistory = $isFiscalDocumentImmutable
+        ? $this->fiscalAudit->history($invoice->company, 'sales_invoice', $invoice)
+        : collect();
 
     return view(
         'company.sales.show',
         compact(
             'invoice',
             'saleDateBs',
-            'whatsappShareEnabled'
+            'whatsappShareEnabled',
+            'isFiscalDocumentImmutable',
+            'fiscalHistory'
         )
     );
 }
@@ -1518,6 +1693,12 @@ public function edit($id)
         ])
         ->where('company_id', $companyId)
         ->findOrFail($id);
+
+    if ($this->fiscalDocumentPolicy->isSalesInvoiceImmutable($invoice)) {
+        $this->fiscalAudit->recordBlockedSalesInvoiceAction($invoice, 'edit', auth()->id(), 'company.sales.edit');
+        return redirect()->route('company.sales.show', $invoice->id)
+            ->with('error', FiscalDocumentPolicyService::ISSUED_INVOICE_MUTATION_MESSAGE);
+    }
 
     $isNepalCompany = $invoice->company?->countryMaster?->iso_code === 'NP';
     $saleDateBs = $isNepalCompany
@@ -1557,6 +1738,12 @@ public function update(Request $request, $id)
 {
     $companyId = auth()->user()->company_id;
 
+    $issuedInvoice = SalesInvoice::with('company')->where('company_id', $companyId)->findOrFail($id);
+    if ($this->fiscalDocumentPolicy->isSalesInvoiceImmutable($issuedInvoice)) {
+        $this->fiscalAudit->recordBlockedSalesInvoiceAction($issuedInvoice, 'update', auth()->id(), 'company.sales.update');
+        return back()->with('error', FiscalDocumentPolicyService::ISSUED_INVOICE_MUTATION_MESSAGE);
+    }
+
     $request->validate([
         'sale_date' => ValidationService::requiredDate(),
         'note'      => ValidationService::text(),
@@ -1568,6 +1755,11 @@ public function update(Request $request, $id)
             $invoice = SalesInvoice::where('company_id', $companyId)
                 ->lockForUpdate()
                 ->findOrFail($id);
+
+            if ($this->fiscalDocumentPolicy->isSalesInvoiceImmutable($invoice)) {
+                $this->fiscalAudit->recordBlockedSalesInvoiceAction($invoice, 'cancel', auth()->id(), 'company.sales.cancel');
+            }
+            $this->fiscalDocumentPolicy->assertSalesInvoiceMayBeMutated($invoice);
 
             if ($invoice->status == 0)
             {
@@ -1653,6 +1845,7 @@ public function update(Request $request, $id)
                     'Please activate financial year first.',
                     'Sales Invoice belongs to another Financial Year.',
                     'No active financial year found for selected sale date.',
+                    FiscalDocumentPolicyService::ISSUED_INVOICE_MUTATION_MESSAGE,
                 ],
                 'Unable to update sales invoice.'
             )

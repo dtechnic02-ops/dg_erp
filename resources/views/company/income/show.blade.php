@@ -263,7 +263,7 @@
                         <div class="dg-invoice-note-block">
                             @if ($income->attachment)
                                 <div class="dg-invoice-note-body">
-                                    <a href="{{ asset($income->attachment) }}" target="_blank" rel="noopener" class="d-print-none">View Attachment</a>
+                                    <a href="{{ route('company.protected-files.show', ['income', $income->id, 'attachment']) }}" target="_blank" rel="noopener" class="d-print-none">View Attachment</a>
                                     <span class="d-none d-print-inline">Attached</span>
                                 </div>
                             @else
@@ -302,7 +302,7 @@
                             <div class="dg-invoice-field-row">
                                 <span class="dg-invoice-field-label">Cancelled Date</span>
                                 <span class="dg-invoice-field-sep" aria-hidden="true">:</span>
-                                <span class="dg-invoice-field-value">{{ $income->cancelled_date?->format('d-m-Y') ?? '-' }}</span>
+                                <span class="dg-invoice-field-value">{{ $income->cancelled_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $income->cancelled_date])</span>
                             </div>
                             <div class="dg-invoice-field-row">
                                 <span class="dg-invoice-field-label">Cancelled By</span>

@@ -271,7 +271,7 @@ class ExpenseController extends Controller
                 $folder = 'companies/' . $companyId . '/expenses';
 
                 if ($request->hasFile('attachment')) {
-                    $file = FileUploadService::uploadFile(
+                    $file = FileUploadService::uploadPrivateFile(
                         $request->file('attachment'),
                         $folder
                     );
@@ -448,7 +448,7 @@ class ExpenseController extends Controller
                 ]);
 
                 $folder = 'companies/' . $companyId . '/expenses';
-                $file = FileUploadService::replaceFile(
+                $file = FileUploadService::replacePrivateFile(
                     $request,
                     'attachment',
                     $expense->attachment,

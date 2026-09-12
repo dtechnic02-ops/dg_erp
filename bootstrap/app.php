@@ -14,6 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
     ->withMiddleware(function (Middleware $middleware): void {
 
+        $middleware->appendToGroup('web', \App\Http\Middleware\SanitizeUserFacingErrors::class);
+
         // 🔥 ROLE MIDDLEWARE
         $middleware->alias([
 
@@ -35,6 +37,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'company.user' =>
                 \App\Http\Middleware\EnsureCompanyUser::class,
 
+            'account.active' =>
+                \App\Http\Middleware\EnsureActiveAccount::class,
+
+            'auditor.readonly' =>
+                \App\Http\Middleware\EnsureAuditorReadOnly::class,
+
         ]);
 
         // 🔥 ONLINE / OFFLINE
@@ -47,8 +55,12 @@ return Application::configure(basePath: dirname(__DIR__))
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {
-
-        //
+        $exceptions->dontFlash([
+            'current_password',
+            'password',
+            'password_confirmation',
+            'credential',
+        ]);
     })
 
     ->create();

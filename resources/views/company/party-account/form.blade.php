@@ -137,7 +137,7 @@
                         @if (!empty($party->photo))
                             <div>
                                 <img
-                                    src="{{ asset($party->photo) }}"
+                                    src="{{ route('company.protected-files.show', ['party-account', $party->id, 'photo']) }}"
                                     alt="{{ $party->name }} photo"
                                     width="60"
                                     height="60"
@@ -169,7 +169,7 @@
                         @if (!empty($party->document))
                             <div>
                                 <a
-                                    href="{{ asset($party->document) }}"
+                                    href="{{ route('company.protected-files.show', ['party-account', $party->id, 'document']) }}"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     class="btn btn-sm btn-outline-secondary dg-btn">

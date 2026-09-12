@@ -606,8 +606,12 @@ $validator = Validator::make($request->all(), [
     'product_id' =>
         'required|array',
 
+    'product_id.*' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('products', 'id')->where('company_id', $companyId)],
+
     'service_id' =>
         'required|array',
+
+    'service_id.*' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('services', 'id')->where('company_id', $companyId)],
 
     'quantity' =>
         'required|array',
@@ -631,6 +635,10 @@ $validator = Validator::make($request->all(), [
 ], [
     'item_type.*.required' => 'Row :position: Product/Service is required.',
     'item_type.*.in' => 'Row :position: Product/Service is invalid.',
+    'product_id.*.integer' => 'Row :position: Select a valid Product.',
+    'product_id.*.exists' => 'Row :position: Select a Product belonging to your company.',
+    'service_id.*.integer' => 'Row :position: Select a valid Service.',
+    'service_id.*.exists' => 'Row :position: Select a Service belonging to your company.',
     'quantity.*.required' => 'Row :position: Quantity is required.',
     'quantity.*.numeric' => 'Row :position: Quantity must be a number.',
     'quantity.*.min' => 'Row :position: Quantity must be at least 1.',
@@ -1502,6 +1510,8 @@ public function cancel(Request $request, $id)
             'This invoice cannot be cancelled because one or more active purchase returns exist.',
             'This invoice cannot be cancelled because one or more active purchase return refunds exist.',
             'Cancel date must belong to the active financial year.',
+            'Insufficient current stock to reverse this purchase.',
+            'The current inventory valuation cannot safely absorb this purchase reversal.',
         ];
 
         $this->logPurchaseException('Purchase invoice cancel failed.', $e, [

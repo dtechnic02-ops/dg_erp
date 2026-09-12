@@ -39,7 +39,7 @@ class QuotationController extends Controller
 
         $quotation = DB::transaction(function () use ($request, $validated, $companyId) {
             $activeFy = $this->activeFinancialYear($companyId, true);
-            $amounts = app(SalesController::class)->calculateStoreAmounts($request, $companyId);
+            $amounts = app(SalesController::class)->calculateStoreAmounts($request, $companyId, false);
             $quotationNo = InvoiceNumberService::generate('QT', $companyId, $activeFy->id, Quotation::class, 'quotation_no');
 
             $quotation = Quotation::create([
@@ -93,7 +93,7 @@ class QuotationController extends Controller
                 abort(409, 'Only Draft quotations may be edited.');
             }
 
-            $amounts = app(SalesController::class)->calculateStoreAmounts($request, $companyId);
+            $amounts = app(SalesController::class)->calculateStoreAmounts($request, $companyId, false);
             $quotation->update([
                 'customer_id' => $validated['customer_id'], 'quotation_date' => $validated['quotation_date'],
                 'valid_until' => $validated['valid_until'] ?? null, 'reference_no' => $validated['reference_no'] ?? null,
@@ -165,6 +165,14 @@ class QuotationController extends Controller
                     'quantity' => $quotation->items->pluck('quantity')->all(),
                     'unit_price' => $quotation->items->pluck('unit_price')->all(),
                     'vat_rate' => $quotation->items->pluck('vat_rate')->all(),
+                    // A positive VAT rate has one unambiguous classification. Zero-rate
+                    // quotation lines remain unclassified and Nepal invoice validation
+                    // will require an explicit classification instead of guessing.
+                    'tax_classification' => $quotation->items
+                        ->map(fn ($item) => (float) $item->vat_rate > 0
+                            ? \App\Services\SalesTaxClassificationService::VAT_TAXABLE
+                            : null)
+                        ->all(),
                     'discount_amount' => $quotation->discount,
                     'paid_amount' => 0,
                     'note' => trim('Generated from quotation ' . $quotation->quotation_no . '. ' . ($quotation->note ?? '')),

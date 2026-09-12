@@ -31,6 +31,14 @@
                                         @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                     </div>
                                     <div class="col-md-6">
+                                        <label for="role_id" class="form-label">Platform Role</label>
+                                        <select id="role_id" name="role_id" class="form-select" required><option value="4">Super Staff</option><option value="5">Country Admin</option></select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="country_id" class="form-label">Assigned Country</label>
+                                        <select id="country_id" name="country_id" class="form-select" required>@foreach($countries as $country)<option value="{{ $country->id }}">{{ $country->name }}</option>@endforeach</select>
+                                    </div>
+                                    <div class="col-md-6">
                                         <label for="password" class="form-label">Password</label>
                                         <input id="password" name="password" type="password" class="form-control dg-input @error('password') is-invalid @enderror" minlength="8" required>
                                         @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror

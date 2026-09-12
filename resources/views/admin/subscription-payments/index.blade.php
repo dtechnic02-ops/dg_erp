@@ -92,7 +92,7 @@
                                             <td>{{ number_format($payment->amount, 2) }}</td>
                                             <td>
                                                 @if ($payment->proof_path)
-                                                    <a href="{{ asset('storage/'.$payment->proof_path) }}" target="_blank" class="btn btn-sm btn-outline-secondary dg-btn">View</a>
+                                                    <a href="{{ route('admin.subscription-payments.proof', $payment->id) }}" target="_blank" class="btn btn-sm btn-outline-secondary dg-btn">View</a>
                                                 @else
                                                     N/A
                                                 @endif

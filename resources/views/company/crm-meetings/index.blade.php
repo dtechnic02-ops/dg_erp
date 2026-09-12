@@ -65,7 +65,7 @@
                                         <tr class="dg-row">
                                             <td>{{ $meetings->firstItem() + $loop->index }}</td>
                                             <td>{{ $meeting->activity_no }}</td>
-                                            <td>{{ $meeting->meeting_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $meeting->meeting_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $meeting->meeting_date])</td>
                                             <td>{{ $meeting->meeting_time ?: '-' }}</td>
                                             <td>
                                                 @if ($meeting->lead)

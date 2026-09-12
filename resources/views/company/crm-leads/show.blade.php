@@ -138,7 +138,7 @@
                                 <tbody>
                                     <tr><th width="220">Relationship No</th><td>{{ $lead->lead_no }}</td></tr>
                                     <tr><th>Financial Year</th><td>{{ $lead->financialYear->name ?? '-' }}</td></tr>
-                                    <tr><th>Relationship Date</th><td>{{ $lead->lead_date?->format('d-m-Y') ?? '-' }}</td></tr>
+                                    <tr><th>Relationship Date</th><td>{{ $lead->lead_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $lead->lead_date])</td></tr>
                                     <tr><th>Customer Code</th><td>{{ $lead->customer ? 'CUST-' . str_pad((string) $lead->customer->id, 6, '0', STR_PAD_LEFT) : '-' }}</td></tr>
                                     <tr><th>Customer Name</th><td>{{ $lead->customer->name ?? '-' }}</td></tr>
                                     <tr><th>Company / Authority</th><td>{{ $lead->customer->authority_name ?? '-' }}</td></tr>
@@ -189,8 +189,8 @@
                                     @forelse ($lead->followUps->sortByDesc('follow_up_date') as $followUp)
                                         <tr>
                                             <td>{{ $followUp->activity_no }}</td>
-                                            <td>{{ $followUp->follow_up_date?->format('d-m-Y') ?? '-' }}</td>
-                                            <td>{{ $followUp->next_follow_up_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $followUp->follow_up_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $followUp->follow_up_date])</td>
+                                            <td>{{ $followUp->next_follow_up_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $followUp->next_follow_up_date])</td>
                                             <td>{{ $followUp->assignedEmployee->full_name ?? '-' }}</td>
                                             <td>{{ ucfirst(str_replace('_', ' ', $followUp->status)) }}</td>
                                             <td>{{ ucfirst(str_replace('_', ' ', $followUp->priority)) }}</td>

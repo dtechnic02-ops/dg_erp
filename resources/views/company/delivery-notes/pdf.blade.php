@@ -84,7 +84,7 @@
             <div class="section-title">Customer Signature</div>
             <div><strong>Receiver:</strong> {{ $deliveryNote->signature->receiver_name ?? '-' }} ({{ $deliveryNote->signature->receiver_mobile ?? '-' }})</div>
             @php
-                $signaturePath = public_path('companies/' . $deliveryNote->company_id . '/deliveries/' . $deliveryNote->id . '/' . $deliveryNote->signature->signature_path);
+                $signaturePath = \Illuminate\Support\Facades\Storage::disk('local')->path('protected/companies/' . $deliveryNote->company_id . '/deliveries/' . $deliveryNote->id . '/' . $deliveryNote->signature->signature_path);
             @endphp
             @if (is_file($signaturePath))
                 <div style="margin-top:8px;">

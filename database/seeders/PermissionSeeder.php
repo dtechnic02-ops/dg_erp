@@ -192,8 +192,10 @@ class PermissionSeeder extends Seeder
             'platform_companies_delete',
             'platform_companies_reset_password',
             'platform_registrations_view',
+            'platform_registrations_create',
             'platform_registrations_approve',
             'platform_registrations_reject',
+            'platform_compliance_manage',
             'platform_subscriptions_view',
             'platform_subscriptions_manage',
             'platform_subscription_payments_view',
@@ -217,6 +219,7 @@ class PermissionSeeder extends Seeder
         $superAdmin = Role::where('name', 'super_admin')->first();
         $admin = Role::where('name', 'company_admin')->first();
         $staff = Role::where('name', 'staff')->first();
+        $auditor = Role::whereKey(Role::AUDITOR_ID)->where('name', 'auditor')->first();
 
         if ($superAdmin) {
             $superAdmin->permissions()->syncWithoutDetaching($permissionIds);
@@ -258,6 +261,31 @@ class PermissionSeeder extends Seeder
                         'view_crm_meeting',
                         'view_crm_task',
                         'report_crm',
+                    ])
+                    ->pluck('id')
+                    ->all()
+            );
+        }
+
+
+        if ($auditor) {
+            $auditor->permissions()->sync(
+                Permission::company()
+                    ->whereIn('name', [
+                        'module_sales', 'view_sales',
+                        'module_sales_payment', 'view_sales_payment',
+                        'module_customer', 'view_customer',
+                        'module_purchase', 'view_purchase',
+                        'module_supplier', 'view_supplier',
+                        'module_stock', 'view_stock',
+                        'module_accounts', 'view_accounts',
+                        'module_account_transaction', 'view_account_transaction',
+                        'module_income', 'view_income', 'view_income_categories',
+                        'module_expense', 'view_expense', 'view_expense_categories',
+                        'module_journal', 'journal.view', 'journal.audit-view',
+                        'module_vat', 'view_vat',
+                        'module_reports', 'view_reports',
+                        'module_company_profile', 'view_company_profile',
                     ])
                     ->pluck('id')
                     ->all()

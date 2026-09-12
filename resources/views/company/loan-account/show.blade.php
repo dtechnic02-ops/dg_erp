@@ -108,7 +108,7 @@
                                 <div class="col-md-6">
                                     <div class="dg-row">
                                         <span class="dg-label d-inline mb-0">Due Date :</span>
-                                        {{ optional($loan->end_date)->format('d-m-Y') ?: '-' }}
+                                        {{ optional($loan->end_date)->format('d-m-Y') ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $loan->end_date])
                                     </div>
                                 </div>
 
@@ -191,7 +191,7 @@
                                     <div class="col-md-6">
                                         <div class="dg-row">
                                             <span class="dg-label d-inline mb-0">Attachment :</span>
-                                            <a href="{{ asset($loan->attachment) }}" target="_blank" rel="noopener noreferrer">View Attachment</a>
+                                            <a href="{{ route('company.protected-files.show', ['loan-account', $loan->id, 'attachment']) }}" target="_blank" rel="noopener noreferrer">View Attachment</a>
                                         </div>
                                     </div>
                                 @endif

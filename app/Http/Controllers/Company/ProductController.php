@@ -256,6 +256,8 @@ public function store(Request $request)
 
 $companyId = auth()->user()->company_id;
 
+$this->normalizeFiscalProductDetails($request);
+
 $request->validate([
 
 'name' => [
@@ -300,6 +302,12 @@ $request->validate([
     'nullable',
     Rule::exists('brands', 'id')->where('company_id', $companyId),
 ],
+
+'origin_type' => ['nullable', Rule::in(['domestic', 'imported', 'unknown'])],
+'hs_code' => ['nullable', 'regex:/^\d{4,20}$/'],
+'product_type' => ValidationService::string(100),
+'model' => ValidationService::string(100),
+'size' => ValidationService::string(100),
 
 'cost_price' =>
 ValidationService::requiredAmount(),
@@ -394,6 +402,12 @@ $request->brand_id,
 $request->unit_id,
 
 'barcode' => $request->barcode,
+
+'origin_type' => $request->origin_type,
+'hs_code' => $request->hs_code,
+'product_type' => $request->product_type,
+'model' => $request->model,
+'size' => $request->size,
 
 'batch_no' => $request->batch_no,
 
@@ -571,13 +585,15 @@ compact(
 
     // 🔥 UPDATE PRODUCT
 
-    public function update(
+public function update(
 Request $request,
 $id
 ){
     $this->authorizeCompanyPermission('view_stock');
 
 $companyId = auth()->user()->company_id;
+
+$this->normalizeFiscalProductDetails($request);
 
 $product=
 
@@ -648,6 +664,12 @@ $request->validate([
     Rule::exists('brands', 'id')->where('company_id', $companyId),
 ],
 
+'origin_type' => ['nullable', Rule::in(['domestic', 'imported', 'unknown'])],
+'hs_code' => ['nullable', 'regex:/^\d{4,20}$/'],
+'product_type' => ValidationService::string(100),
+'model' => ValidationService::string(100),
+'size' => ValidationService::string(100),
+
 'cost_price' =>
 ValidationService::requiredAmount(),
 
@@ -697,6 +719,12 @@ $request->brand_id,
 $request->unit_id,
 
 'barcode' => $request->barcode,
+
+'origin_type' => $request->origin_type,
+'hs_code' => $request->hs_code,
+'product_type' => $request->product_type,
+'model' => $request->model,
+'size' => $request->size,
 
 'batch_no' => $request->batch_no,
 
@@ -954,6 +982,26 @@ throw $e;
     
 
     // 📥 EXPORT EXCEL
+
+    private function normalizeFiscalProductDetails(Request $request): void
+    {
+        $origin = trim((string) $request->input('origin_type'));
+        $hsCode = preg_replace('/\s+/', '', trim((string) $request->input('hs_code')));
+
+        $request->merge([
+            'origin_type' => $origin === '' ? null : strtolower($origin),
+            'hs_code' => $hsCode === '' ? null : $hsCode,
+            'product_type' => $this->trimmedOrNull($request->input('product_type')),
+            'model' => $this->trimmedOrNull($request->input('model')),
+            'size' => $this->trimmedOrNull($request->input('size')),
+        ]);
+    }
+
+    private function trimmedOrNull(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+        return $value === '' ? null : $value;
+    }
 
    public function exportExcel(Request $request)
 {

@@ -257,7 +257,7 @@ class IncomeController extends Controller
                 $folder = 'companies/' . $companyId . '/income';
 
                 if ($request->hasFile('attachment')) {
-                    $file = FileUploadService::uploadFile(
+                    $file = FileUploadService::uploadPrivateFile(
                         $request->file('attachment'),
                         $folder
                     );
@@ -434,7 +434,7 @@ class IncomeController extends Controller
                 ]);
 
                 $folder = 'companies/' . $companyId . '/income';
-                $file = FileUploadService::replaceFile(
+                $file = FileUploadService::replacePrivateFile(
                     $request,
                     'attachment',
                     $income->attachment,

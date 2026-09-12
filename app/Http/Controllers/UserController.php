@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Services\UserSessionRevocationService;
 
 class UserController extends Controller
 {
@@ -61,12 +62,14 @@ class UserController extends Controller
             return back()->with('error', 'Staff limit reached. Upgrade your plan.');
         }
 
+        $roleId = $request->job_role === 'auditor' ? Role::AUDITOR_ID : Role::COMPANY_STAFF_ID;
+
         User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => $request->password,
             'company_id' => $company->id,
-            'role_id' => Role::COMPANY_STAFF_ID,
+            'role_id' => $roleId,
             'job_role' => $request->job_role,
             'account_status' => 'active',
         ]);
@@ -117,6 +120,7 @@ class UserController extends Controller
             $lockedUser->update([
                 'name' => $request->name,
                 'job_role' => $requestedJobRole,
+                'role_id' => $requestedJobRole === 'auditor' ? Role::AUDITOR_ID : Role::COMPANY_STAFF_ID,
             ]);
 
             if ($changed) {
@@ -164,6 +168,7 @@ class UserController extends Controller
         }
 
         $user->update(['account_status' => 'blocked']);
+        app(UserSessionRevocationService::class)->revoke($user);
 
         return back()->with('success', 'Staff member blocked successfully.');
     }

@@ -57,17 +57,24 @@ class SalesReturnRefundAccountingDataBuilder
         $account = $this->validateCashEffect($companyId, $refund, $cash);
         $this->validateCustomerEffect($companyId, $refundId, $customerId, $settlement);
 
-        [$productGross, $serviceGross, $tax, $returnGross] = $this->returnedComponents($return, $invoice, $companyId);
+        [$productGross, $serviceGross, $tax, $returnGross, $fiscalDiscount, $usesFiscalLineAmounts] = $this->returnedComponents($return, $invoice, $companyId);
         if (! $this->same($returnGross, $this->money($return->grand_total, 'sales return grand_total')) || ! $this->same($tax, $this->money($return->total_vat, 'sales return total_vat'))) {
             throw new RuntimeException('Sales return items do not reconcile with the persisted header.');
         }
 
-        [$originalEligible, $originalDiscount] = $this->originalEligibleAmounts($invoice, $companyId);
         $returnEligible = $this->add($productGross, $serviceGross);
-        $allocatedDiscount = $this->proportion($originalDiscount, $returnEligible, $originalEligible);
-        $productDiscount = $this->proportion($allocatedDiscount, $productGross, $returnEligible);
-        $serviceDiscount = $this->sub($allocatedDiscount, $productDiscount);
-        $fullNetReturn = $this->sub($returnEligible, $allocatedDiscount);
+        if ($usesFiscalLineAmounts) {
+            $allocatedDiscount = $fiscalDiscount;
+            $productDiscount = '0.0000';
+            $serviceDiscount = '0.0000';
+            $fullNetReturn = $returnEligible;
+        } else {
+            [$originalEligible, $originalDiscount] = $this->originalEligibleAmounts($invoice, $companyId);
+            $allocatedDiscount = $this->proportion($originalDiscount, $returnEligible, $originalEligible);
+            $productDiscount = $this->proportion($allocatedDiscount, $productGross, $returnEligible);
+            $serviceDiscount = $this->sub($allocatedDiscount, $productDiscount);
+            $fullNetReturn = $this->sub($returnEligible, $allocatedDiscount);
+        }
 
         if (! $this->same($this->add($fullNetReturn, $tax), $returnGross)) {
             throw new RuntimeException('Persisted sales return totals do not reconcile with the allocated invoice discount.');
@@ -159,16 +166,26 @@ class SalesReturnRefundAccountingDataBuilder
 
     private function returnedComponents(SalesReturn $return, SalesInvoice $invoice, int $companyId): array
     {
-        $product = '0.0000'; $service = '0.0000'; $tax = '0.0000'; $gross = '0.0000';
+        $product = '0.0000'; $service = '0.0000'; $tax = '0.0000'; $gross = '0.0000'; $discount = '0.0000'; $fiscalCount = 0; $count = 0;
         foreach (SalesReturnItem::where('company_id', $companyId)->where('sales_return_id', $return->id)->with('salesItem')->get() as $item) {
+            $count++;
             $saleItem = $item->salesItem;
             if (! $saleItem || (int) $saleItem->company_id !== $companyId || (int) $saleItem->sales_invoice_id !== (int) $invoice->id) throw new RuntimeException('A return item does not match the original invoice.');
             $total = $this->money($item->total_price, 'return item total'); $vat = $this->money($item->vat_amount, 'return item VAT');
             if ($this->cmp($vat, $total) > 0) throw new RuntimeException('Return item VAT exceeds its total.');
-            $net = $this->sub($total, $vat); $gross = $this->add($gross, $total); $tax = $this->add($tax, $vat);
+            $net = $this->sub($total, $vat);
+            if ($item->fiscal_discount_amount !== null || $item->fiscal_net_base !== null) {
+                if ($item->fiscal_discount_amount === null || $item->fiscal_net_base === null) throw new RuntimeException('Fiscal return line evidence is incomplete.');
+                $net = $this->money($item->fiscal_net_base, 'return item fiscal net base');
+                if (! $this->same($this->add($net, $vat), $total)) throw new RuntimeException('Fiscal return line amounts do not reconcile.');
+                $discount = $this->add($discount, $this->money($item->fiscal_discount_amount, 'return item fiscal discount'));
+                $fiscalCount++;
+            }
+            $gross = $this->add($gross, $total); $tax = $this->add($tax, $vat);
             if ($saleItem->item_type === 'product') $product = $this->add($product, $net); elseif ($saleItem->item_type === 'service') $service = $this->add($service, $net); else throw new RuntimeException('Unsupported original sales classification.');
         }
-        return [$product, $service, $tax, $gross];
+        if ($fiscalCount !== 0 && $fiscalCount !== $count) throw new RuntimeException('Fiscal and legacy return economics cannot be mixed.');
+        return [$product, $service, $tax, $gross, $discount, $count > 0 && $fiscalCount === $count];
     }
 
     private function originalEligibleAmounts(SalesInvoice $invoice, int $companyId): array

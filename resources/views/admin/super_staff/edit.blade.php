@@ -32,6 +32,10 @@
                                         @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                     </div>
                                     <div class="col-12">
+                                        <label for="country_id" class="form-label">Assigned Country</label>
+                                        <select id="country_id" name="country_id" class="form-select" required>@foreach($countries as $country)<option value="{{ $country->id }}" @selected($user->country_id == $country->id)>{{ $country->name }}</option>@endforeach</select>
+                                    </div>
+                                    <div class="col-12">
                                         <button type="submit" class="btn btn-primary dg-btn">Save Changes</button>
                                     </div>
                                 </div>

@@ -8,6 +8,7 @@ use App\Models\Contra;
 use App\Models\Account;
 use App\Models\FinancialYear;
 use App\Services\ContraPostingService;
+use App\Services\FileUploadService;
 use Illuminate\Support\Facades\DB;
 
 class ContraController extends Controller
@@ -429,7 +430,7 @@ $request->validate([
 
     'amount' => 'required|numeric|min:0.01',
 
-    'attachment' => 'nullable|mimes:jpg,jpeg,png,pdf|max:5120'
+    'attachment' => 'nullable|mimes:jpg,jpeg,png,pdf|extensions:jpg,jpeg,png,pdf|max:5120'
 
 ]);
 
@@ -679,6 +680,10 @@ $contraNo =
 
 if($request->hasFile('attachment')){
 
+    $file = FileUploadService::uploadPrivateFile($request->file('attachment'), 'companies/'.$companyId.'/contra');
+
+/* legacy public uploader removed
+
     $folder =
 
     'companies/'
@@ -737,7 +742,7 @@ if($request->hasFile('attachment')){
 
     .$name;
 
-}
+*/}
 
 
 
@@ -902,7 +907,7 @@ $request->validate([
 
 'amount' => 'required|numeric|min:0.01',
 
-'attachment' => 'nullable|mimes:jpg,jpeg,png,pdf|max:5120'
+'attachment' => 'nullable|mimes:jpg,jpeg,png,pdf|extensions:jpg,jpeg,png,pdf|max:5120'
 
 
 ]);
@@ -1014,6 +1019,11 @@ $file = $contra->attachment;
 
 if($request->hasFile('attachment')){
 
+FileUploadService::deleteFile($contra->attachment);
+$file = FileUploadService::uploadPrivateFile($request->file('attachment'), 'companies/'.$companyId.'/contra');
+
+/* legacy public uploader removed
+
 
 $folder =
 
@@ -1104,7 +1114,7 @@ if(
 }
 
 
-}
+*/}
 
 
 

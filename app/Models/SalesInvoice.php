@@ -18,6 +18,16 @@ class SalesInvoice extends Model
 
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::deleting(function (SalesInvoice $invoice): void {
+            app(\App\Services\FiscalDocumentAuditService::class)
+                ->recordBlockedSalesInvoiceAction($invoice, 'delete', auth()->id(), 'sales_invoice.model.delete');
+            app(\App\Services\FiscalDocumentPolicyService::class)
+                ->assertSalesInvoiceMayBeMutated($invoice);
+        });
+    }
+
 
 
     protected $fillable = [
@@ -71,6 +81,7 @@ class SalesInvoice extends Model
 
 
         'status',
+        'cancelled_at', 'cancelled_by', 'cancellation_reason', 'original_fiscal_reference',
 
 
 
@@ -97,6 +108,10 @@ class SalesInvoice extends Model
         'due_amount'     => 'decimal:2',
 
         'status'         => 'integer',
+        'cancelled_at'   => 'datetime',
+        'fiscal_snapshot_captured_at' => 'datetime',
+        'fiscal_payment_mode_captured_at' => 'datetime',
+        'fiscal_issued_at' => 'datetime',
 
     ];
 
@@ -140,6 +155,17 @@ class SalesInvoice extends Model
 
         );
 
+    }
+
+    public function fiscalAuditEvents()
+    {
+        return $this->hasMany(FiscalDocumentAuditEvent::class, 'document_id')
+            ->where('document_type', 'sales_invoice')->orderBy('event_at')->orderBy('id');
+    }
+
+    public function cbmsTransmissions()
+    {
+        return $this->morphMany(CbmsTransmission::class, 'transmittable');
     }
 
 
@@ -263,5 +289,3 @@ class SalesInvoice extends Model
     }
 
 }
-
-

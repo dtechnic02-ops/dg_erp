@@ -41,6 +41,7 @@ class ValidationService
             'nullable',
             'image',
             'mimes:jpg,jpeg,png',
+            'extensions:jpg,jpeg,png',
             'max:' . $max,
         ];
     }
@@ -58,6 +59,7 @@ class ValidationService
             'required',
             'image',
             'mimes:jpg,jpeg,png',
+            'extensions:jpg,jpeg,png',
             'max:' . $max,
         ];
     }
@@ -79,6 +81,7 @@ class ValidationService
             'nullable',
             'file',
             'mimes:pdf,jpg,jpeg,png',
+            'extensions:pdf,jpg,jpeg,png',
             'max:' . $max,
         ];
     }
@@ -96,6 +99,7 @@ class ValidationService
             'required',
             'file',
             'mimes:pdf,jpg,jpeg,png',
+            'extensions:pdf,jpg,jpeg,png',
             'max:' . $max,
         ];
     }

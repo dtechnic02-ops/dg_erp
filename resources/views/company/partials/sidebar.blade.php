@@ -25,6 +25,9 @@ $canViewCrmFollowUp = $canSeeMenu('crm');
 $canViewCrmMeeting = $canSeeMenu('crm');
 $canViewCrmTask = $canSeeMenu('crm');
 $canViewOpeningBalance = $user?->hasPermission('opening-balance.view') ?? false;
+$isNepalCbmsActive = $company
+    ? app(\App\Services\NepalIrdCbmsModeService::class)->isActiveForCompany($company)
+    : false;
 
 $subscriptionService = $company ? app(\App\Services\SubscriptionService::class) : null;
 $subscriptionAllowsCrm = $company && $subscriptionService?->canAccessModule($company, 'crm');
@@ -112,6 +115,7 @@ $accountingReportsOpen = request()->routeIs('company.accounting-reports.*');
 $settingsOpen = request()->routeIs(
     'company.profile',
     'company.settings.whatsapp.*',
+    'company.settings.ird-cbms.*',
     'company.financial-years.*',
     'company.maintenance.*'
 );
@@ -485,7 +489,8 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                         </label>
                         <div class="dg-sidebar-submenu">
                             <div class="dg-sidebar-child">
-                                <a href="{{ route('company.vat-report.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.vat-report.*') }}">VAT Report</a>
+                                <a href="{{ route('company.vat-report.index') }}" class="dg-sidebar-child-link {{ request()->routeIs('company.vat-report.index', 'company.vat-report.print') ? 'active' : '' }}">VAT Report</a>
+                                <a href="{{ route('company.vat-report.fiscal-sales') }}" class="dg-sidebar-child-link {{ request()->routeIs('company.vat-report.fiscal-sales*') ? 'active' : '' }}">Fiscal Sales Account</a>
                             </div>
                             @if ($canViewSalary)
                             <div class="dg-sidebar-child">
@@ -556,6 +561,14 @@ $groupOpen = fn (bool $open): string => $open ? 'dg-sidebar-group-is-open' : '';
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.settings.whatsapp.edit') }}" class="dg-sidebar-child-link {{ $linkActive('company.settings.whatsapp.*') }}">WhatsApp Share</a>
                             </div>
+                            @if($isNepalCbmsActive)
+                            <div class="dg-sidebar-child">
+                                <a href="{{ route('company.settings.ird-cbms.edit') }}" class="dg-sidebar-child-link {{ $linkActive('company.settings.ird-cbms.*') }}">IRD / CBMS</a>
+                                @if((int) auth()->user()->role_id === \App\Models\Role::COMPANY_ADMIN_ID && auth()->user()->company?->countryMaster?->iso_code === 'NP')
+                                    <a href="{{ route('company.settings.cbms-api.edit') }}" class="dg-sidebar-child-link {{ $linkActive('company.settings.cbms-api.*') }}">CBMS API Configuration</a>
+                                @endif
+                            </div>
+                            @endif
                             @endif
                             <div class="dg-sidebar-child">
                                 <a href="{{ route('company.financial-years.index') }}" class="dg-sidebar-child-link {{ $linkActive('company.financial-years.*') }}">Financial Years</a>

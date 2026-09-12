@@ -22,6 +22,16 @@ class CrmAttachmentService
 
     private const MAX_FILE_SIZE = 5242880; // 5 MB
 
+    private const MIME_EXTENSIONS = [
+        'application/pdf' => 'pdf',
+        'application/msword' => 'doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        'image/gif' => 'gif',
+    ];
+
     public function __construct(
         private CrmStatusHistoryService $historyService
     ) {
@@ -43,7 +53,8 @@ class CrmAttachmentService
                 mkdir($directory, 0755, true);
             }
 
-            $storedName = $documentType . '_' . time() . '_' . Str::random(8) . '.' . $file->getClientOriginalExtension();
+            $mime = (string) $file->getMimeType();
+            $storedName = (string) Str::uuid().'.'.self::MIME_EXTENSIONS[$mime];
             $file->move($directory, $storedName);
 
             $relativePath = $this->relativePath($companyId, $entityType, $entityId, $storedName);
@@ -55,7 +66,7 @@ class CrmAttachmentService
                 'document_type' => $documentType,
                 'file_path' => $relativePath,
                 'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getClientMimeType(),
+                'mime_type' => $mime,
                 'file_size' => $file->getSize(),
                 'remarks' => $remarks,
                 'created_by' => auth()->id(),
@@ -108,7 +119,7 @@ class CrmAttachmentService
             throw new \Exception('Attachment exceeds the maximum allowed size of 5 MB.');
         }
 
-        $mime = $file->getClientMimeType() ?: $file->getMimeType();
+        $mime = (string) $file->getMimeType();
 
         if (!in_array($mime, self::ALLOWED_MIME_TYPES, true)) {
             throw new \Exception('This file type is not allowed for CRM attachments.');

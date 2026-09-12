@@ -212,7 +212,7 @@
                                     <tr><th>Customer Relationship</th><td>{{ $opportunity->lead->lead_no ?? '-' }}</td></tr>
                                     <tr><th>Assigned Employee</th><td>{{ $opportunity->assignedEmployee->full_name ?? '-' }}</td></tr>
                                     <tr><th>Potential Value</th><td>{{ number_format($opportunity->potential_value, 2) }}</td></tr>
-                                    <tr><th>Expected Closing Date</th><td>{{ $opportunity->expected_closing_date?->format('d-m-Y') ?? '-' }}</td></tr>
+                                    <tr><th>Expected Closing Date</th><td>{{ $opportunity->expected_closing_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $opportunity->expected_closing_date])</td></tr>
                                     <tr><th>Probability</th><td>{{ number_format($opportunity->probability, 2) }}%</td></tr>
                                     <tr><th>Remarks</th><td>{{ $opportunity->remarks ?: '-' }}</td></tr>
                                     @if ($opportunity->closed_at)

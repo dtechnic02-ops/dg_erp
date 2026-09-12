@@ -35,6 +35,20 @@ class CompanyAuthorizationService
                 ->exists();
         }
 
+        if ((int) $user->role_id === Role::AUDITOR_ID) {
+            $module = PermissionModuleResolver::companyModule($permission);
+            if (! $module) return false;
+
+            return $user->role()->whereHas('permissions', fn ($query) => $query
+                    ->where('permissions.name', $permission)
+                    ->where('permissions.scope', Permission::SCOPE_COMPANY))
+                ->exists()
+                && ($module === $permission || $user->role()->whereHas('permissions', fn ($query) => $query
+                    ->where('permissions.name', $module)
+                    ->where('permissions.scope', Permission::SCOPE_COMPANY))
+                    ->exists());
+        }
+
         if ((int) $user->role_id !== Role::COMPANY_STAFF_ID || in_array($permission, self::OWNER_RESERVED, true)) return false;
 
         $module = PermissionModuleResolver::companyModule($permission);

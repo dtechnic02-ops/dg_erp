@@ -107,7 +107,7 @@
                                     <input type="file" name="attachment" id="attachment" class="form-control dg-input">
                                     @if ($expense->attachment)
                                         <div class="small mt-1">
-                                            <a href="{{ asset($expense->attachment) }}" target="_blank">View current attachment</a>
+                                            <a href="{{ route('company.protected-files.show', ['expense', $expense->id, 'attachment']) }}" target="_blank">View current attachment</a>
                                         </div>
                                     @endif
                                 </div>

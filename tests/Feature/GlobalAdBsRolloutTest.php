@@ -184,4 +184,54 @@ class GlobalAdBsRolloutTest extends TestCase
         $this->assertStringNotContainsString('name="start_date_bs"', $source);
         $this->assertStringNotContainsString('name="end_date_bs"', $source);
     }
+
+    public function test_remaining_date_inputs_are_enhanced_centrally_for_nepal_only(): void
+    {
+        $layout = file_get_contents(resource_path('views/company/layout.blade.php'));
+        $javascript = file_get_contents(public_path('assets/company/js/dg.js'));
+
+        $this->assertStringContainsString("company?->countryMaster?->iso_code", $layout);
+        $this->assertStringContainsString('data-nepali-date-url', $layout);
+        $this->assertStringContainsString('input[type="date"]', $javascript);
+        $this->assertStringContainsString("data-company-country') !== 'NP'", $javascript);
+        $this->assertStringContainsString("addEventListener('change', synchronize)", $javascript);
+        $this->assertStringContainsString('readonly aria-readonly="true"', $javascript);
+        $this->assertStringNotContainsString('name="', substr($javascript, strpos($javascript, 'function enhanceUnpairedDateInputs'), 2200));
+    }
+
+    public function test_product_hr_crm_loan_and_effective_cancellation_displays_use_shared_bs(): void
+    {
+        $views = [
+            'products/show.blade.php' => ['manufacture_date', 'expiry_date'],
+            'products/index.blade.php' => ['manufacture_date', 'expiry_date'],
+            'employee-account/show.blade.php' => ['dob', 'joining_date'],
+            'crm-leads/show.blade.php' => ['lead_date', 'follow_up_date'],
+            'crm-contacts/show.blade.php' => ['contact_date'],
+            'crm-meetings/index.blade.php' => ['meeting_date'],
+            'crm-opportunities/show.blade.php' => ['expected_closing_date'],
+            'crm-tasks/index.blade.php' => ['due_date'],
+            'loan-account/show.blade.php' => ['start_date', 'end_date'],
+            'loan-payment/show.blade.php' => ['payment_date', 'next_payment_date', 'cancelled_date'],
+            'income/show.blade.php' => ['income_date', 'cancelled_date'],
+            'expense/show.blade.php' => ['expense_date', 'cancelled_date'],
+        ];
+
+        foreach ($views as $path => $fields) {
+            $source = file_get_contents(resource_path('views/company/'.$path));
+            foreach ($fields as $field) {
+                $this->assertStringContainsString($field, $source, $path.' '.$field);
+            }
+            $this->assertStringContainsString("@include('company.components.nepali-date-display'", $source, $path);
+        }
+    }
+
+    public function test_audit_timestamps_are_not_passed_to_nepali_date_components(): void
+    {
+        $viewSources = collect(glob(resource_path('views/company/**/*.blade.php')))
+            ->map(fn ($path) => file_get_contents($path))->implode("\n");
+
+        foreach (['created_at', 'updated_at', 'approved_at', 'submitted_at', 'cancelled_at', 'printed_at', 'reprinted_at'] as $timestamp) {
+            $this->assertStringNotContainsString("'adDate' => \$".$timestamp, $viewSources);
+        }
+    }
 }

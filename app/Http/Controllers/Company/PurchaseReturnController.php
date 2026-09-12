@@ -14,6 +14,7 @@ use App\Services\InvoiceNumberService;
 use App\Services\PurchaseReturnSyncService;
 use App\Services\StockService;
 use App\Services\ValidationService;
+use App\Services\FileUploadService;
 use App\Services\Accounting\PurchaseReturnValuationService;
 use App\Services\Accounting\Integrations\PurchaseReturnAccountingIntegrationService;
 use Illuminate\Http\Request;
@@ -223,7 +224,7 @@ class PurchaseReturnController extends Controller
             'quantity'            => 'required|array',
             'quantity.*'          => 'nullable|numeric|min:0',
             'note'                => 'nullable|string|max:1000',
-            'damage_photo'        => 'nullable|image|max:5120',
+            'damage_photo'        => ValidationService::image(),
         ]);
 
         $safeMessages = [
@@ -314,12 +315,7 @@ class PurchaseReturnController extends Controller
                 $photo = null;
 
                 if ($request->hasFile('damage_photo')) {
-                    $photo = $request
-                        ->file('damage_photo')
-                        ->store(
-                            "companies/{$companyId}/returns",
-                            'public'
-                        );
+                    $photo = FileUploadService::uploadPrivateImage($request->file('damage_photo'), "companies/{$companyId}/returns");
                 }
 
                 $return = PurchaseReturn::create([

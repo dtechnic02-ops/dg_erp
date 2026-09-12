@@ -397,7 +397,7 @@ class EmployeePaymentController extends Controller implements HasMiddleware
 
                 if ($request->hasFile('attachment')) {
 
-                    $attachment = FileUploadService::uploadFile(
+                    $attachment = FileUploadService::uploadPrivateFile(
 
                         $request->file('attachment'),
 
@@ -753,7 +753,7 @@ class EmployeePaymentController extends Controller implements HasMiddleware
 
                 $folder = 'companies/' . $companyId . '/employee-payments';
 
-                $attachment = FileUploadService::replaceFile(
+                $attachment = FileUploadService::replacePrivateFile(
 
                     $request,
 
@@ -1087,5 +1087,4 @@ class EmployeePaymentController extends Controller implements HasMiddleware
     }
 
 }
-
 

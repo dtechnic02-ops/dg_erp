@@ -582,7 +582,7 @@
 
                                 <div class="card-body dg-card-body py-2 px-3">
 
-                                    <img src="{{ asset('storage/' . $return->damage_photo) }}" alt="Damage photo" class="img-fluid" style="max-width: 180px; max-height: 180px;">
+                                    <img src="{{ route('company.protected-files.show', ['purchase-return', $return->id, 'damage_photo']) }}" alt="Damage photo" class="img-fluid" style="max-width: 180px; max-height: 180px;">
 
                                 </div>
 

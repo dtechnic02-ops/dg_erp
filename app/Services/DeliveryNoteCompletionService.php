@@ -147,7 +147,8 @@ class DeliveryNoteCompletionService
 
             /** @var UploadedFile $file */
             $file = $request->file($field);
-            $filename = $documentType . '_' . time() . '_' . Str::random(6) . '.' . $file->getClientOriginalExtension();
+            $extension = $file->getMimeType() === 'image/png' ? 'png' : 'jpg';
+            $filename = (string) Str::uuid().'.'.$extension;
             $file->move($storagePath, $filename);
 
             DeliveryAttachment::create([

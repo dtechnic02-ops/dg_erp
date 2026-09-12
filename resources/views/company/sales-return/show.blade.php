@@ -56,6 +56,25 @@
 
 
 
+@if($isFiscalDocumentImmutable ?? false)
+    <div class="alert alert-info dg-alert d-print-none">Issued Nepal IRD/CBMS fiscal document — editing is locked.</div>
+@endif
+
+@if($return->cancelled_at)
+    <div class="alert alert-danger dg-alert"><strong>CANCELLED</strong> — {{ $return->cancellation_reason }} — {{ $return->cancelled_at }}</div>
+@endif
+
+@if(($isFiscalDocumentImmutable ?? false) && $fiscalHistory->isNotEmpty())
+    <section class="card dg-card mb-3 d-print-none">
+        <div class="card-header dg-card-header">Fiscal History</div>
+        <ul class="list-group list-group-flush">
+            @foreach($fiscalHistory as $event)
+                <li class="list-group-item">{{ str_replace('_', ' ', ucfirst($event->event_type)) }} — {{ $event->event_at }} — {{ $event->actor?->name ?? 'System' }}@if($event->metadata['reason'] ?? null) — {{ $event->metadata['reason'] }}@endif</li>
+            @endforeach
+        </ul>
+    </section>
+@endif
+
 <div class="dg-page">
 
 
@@ -72,7 +91,7 @@
 
                     <a href="{{ route('company.sales-return.print', $return->id) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
 
-                    @if ((int) $return->status === 1)
+                    @if ((int) $return->status === 1 && ! ($isFiscalDocumentImmutable ?? false))
                         <a href="{{ route('company.sales-return.edit', $return->id) }}" class="btn btn-outline-primary dg-btn">Edit</a>
                     @endif
 
@@ -582,7 +601,7 @@
 
                                 <div class="card-body dg-card-body py-2 px-3">
 
-                                    <img src="{{ asset('storage/' . $return->damage_photo) }}" alt="Damage photo" class="img-fluid" style="max-width: 180px; max-height: 180px;">
+                                    <img src="{{ route('company.protected-files.show', ['sales-return', $return->id, 'damage_photo']) }}" alt="Damage photo" class="img-fluid" style="max-width: 180px; max-height: 180px;">
 
                                 </div>
 

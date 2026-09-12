@@ -4,6 +4,11 @@ namespace App\Services;
 
 class InvoiceSummaryService
 {
+    public static function calculateTaxBases(iterable $items): array
+    {
+        return app(SalesTaxClassificationService::class)->summarize($items);
+    }
+
     /**
      * Sum line base amounts (quantity × unit price) for VAT-applicable items only.
      * Excludes No VAT and zero-rate lines. Display-only; does not affect saved totals.

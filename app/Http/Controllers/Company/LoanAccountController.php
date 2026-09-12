@@ -15,6 +15,7 @@ use App\Models\PartyAccount;
 use App\Models\AccountTransaction;
 use App\Services\AccountBalanceService;
 use App\Services\ValidationService;
+use App\Services\FileUploadService;
 use App\Services\Money;
 use App\Services\Accounting\Integrations\LoanAccountingIntegrationService;
 use Illuminate\Http\Request;
@@ -294,19 +295,7 @@ class LoanAccountController extends Controller implements HasMiddleware
                 $file = null;
 
                 if ($request->hasFile('attachment')) {
-                    $folder = 'companies/' . $companyId . '/loans';
-
-                    if (!file_exists(public_path($folder))) {
-                        mkdir(public_path($folder), 0777, true);
-                    }
-
-                    $name = time()
-                        . '_'
-                        . $request->file('attachment')->getClientOriginalName();
-
-                    $request->file('attachment')->move(public_path($folder), $name);
-
-                    $file = $folder . '/' . $name;
+                    $file = FileUploadService::uploadPrivateFile($request->file('attachment'), 'companies/' . $companyId . '/loans');
                 }
 
                 $loanNo = $this->generateLoanNo($companyId);
@@ -491,23 +480,8 @@ class LoanAccountController extends Controller implements HasMiddleware
         ];
 
         if ($request->hasFile('attachment')) {
-            if ($loan->attachment && file_exists(public_path($loan->attachment))) {
-                unlink(public_path($loan->attachment));
-            }
-
-            $folder = 'companies/' . $companyId . '/loans';
-
-            if (!file_exists(public_path($folder))) {
-                mkdir(public_path($folder), 0777, true);
-            }
-
-            $name = time()
-                . '_'
-                . $request->file('attachment')->getClientOriginalName();
-
-            $request->file('attachment')->move(public_path($folder), $name);
-
-            $data['attachment'] = $folder . '/' . $name;
+            FileUploadService::deleteFile($loan->attachment);
+            $data['attachment'] = FileUploadService::uploadPrivateFile($request->file('attachment'), 'companies/' . $companyId . '/loans');
         }
 
         $loan->update($data);

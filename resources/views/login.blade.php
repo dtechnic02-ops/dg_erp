@@ -85,7 +85,6 @@
                 <button type="submit">Login</button>
             </form>
 
-            <a href="{{ route('company.register') }}" class="dg-login-register">Register Company</a>
         </div>
     </section>
 </main>

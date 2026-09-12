@@ -157,6 +157,30 @@
                                 </div>
 
                                 <div class="col-lg-4 col-md-6 col-12">
+                                    <label for="origin_type" class="form-label dg-label">Origin</label>
+                                    <select name="origin_type" id="origin_type" class="form-select dg-select">
+                                        @foreach (['unknown' => 'Unknown', 'domestic' => 'Domestic', 'imported' => 'Imported'] as $value => $label)
+                                            <option value="{{ $value }}" @selected(old('origin_type', $product->origin_type ?? 'unknown') === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="col-lg-4 col-md-6 col-12">
+                                    <label for="hs_code" class="form-label dg-label">H.S. Code</label>
+                                    <input type="text" inputmode="numeric" name="hs_code" id="hs_code" maxlength="20"
+                                           class="form-control dg-input" value="{{ old('hs_code', $product->hs_code ?? '') }}">
+                                    <div class="form-text">For imported goods used in Nepal VAT electronic billing, enter the applicable H.S. Code.</div>
+                                </div>
+
+                                @foreach (['product_type' => 'Product Type', 'model' => 'Model', 'size' => 'Size'] as $field => $label)
+                                    <div class="col-lg-4 col-md-6 col-12">
+                                        <label for="{{ $field }}" class="form-label dg-label">{{ $label }}</label>
+                                        <input type="text" name="{{ $field }}" id="{{ $field }}" maxlength="100"
+                                               class="form-control dg-input" value="{{ old($field, $product->{$field} ?? '') }}">
+                                    </div>
+                                @endforeach
+
+                                <div class="col-lg-4 col-md-6 col-12">
                                     <label for="cost_price" class="form-label dg-label">
                                         Cost Price
                                     </label>

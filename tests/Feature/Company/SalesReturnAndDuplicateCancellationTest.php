@@ -49,6 +49,8 @@ class SalesReturnAndDuplicateCancellationTest extends TestCase
         $this->assertSame($context['fixture']['salesInvoice']->id, $returns[1]->sales_invoice_id);
         $this->assertSame($context['fixture']['product']->id, $returnItems[0]->product_id);
         $this->assertSame($context['fixture']['product']->id, $returnItems[1]->product_id);
+        $this->assertSame('export', $returnItems[0]->tax_classification);
+        $this->assertSame('export', $returnItems[1]->tax_classification);
         $this->assertSame('0.75', number_format((float) $returnItems[0]->quantity, 2, '.', ''));
         $this->assertSame('0.50', number_format((float) $returnItems[1]->quantity, 2, '.', ''));
         $this->assertSame('1.25', number_format((float) $returnItems->sum('quantity'), 2, '.', ''));
@@ -167,7 +169,10 @@ class SalesReturnAndDuplicateCancellationTest extends TestCase
         $this->createOperationalCompanySubscription($company, $this->createActiveSubscriptionPlan());
         $this->authenticateCompanyAdmin($user);
 
-        return ['company' => $company, 'user' => $user, 'old_last_seen' => $user->last_seen->copy(), 'fixture' => $this->createPostedProductSale($company, $user, $this->createActiveFinancialYear($company, $user), $this->createActiveWarehouse($company), $this->createCustomer($company, $user), $this->createProduct($company))];
+        $fixture = $this->createPostedProductSale($company, $user, $this->createActiveFinancialYear($company, $user), $this->createActiveWarehouse($company), $this->createCustomer($company, $user), $this->createProduct($company));
+        $fixture['salesItem']->update(['tax_classification' => 'export']);
+
+        return ['company' => $company, 'user' => $user, 'old_last_seen' => $user->last_seen->copy(), 'fixture' => $fixture];
     }
 
     private function returnPayload(array $context, string $quantity, string $date, string $note): array

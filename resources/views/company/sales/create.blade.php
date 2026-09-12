@@ -70,7 +70,8 @@
 
                 $oldItemFields = [
                     'item_type', 'product_id', 'service_id', 'quantity', 'unit_price',
-                    'vat_rate', 'vat_amount', 'total_price',
+                    'vat_rate', 'tax_classification', 'vat_amount', 'total_price',
+                    'line_discount_amount',
                 ];
                 $oldItemRowCount = collect($oldItemFields)
                     ->map(fn ($field) => count((array) old($field, [])))
@@ -78,7 +79,7 @@
                 $salesRowCount = $oldItemRowCount > 0 ? $oldItemRowCount : 1;
             @endphp
 
-            <form id="dgForm" method="POST" action="{{ route('company.sales.store') }}">
+            <form id="dgForm" method="POST" action="{{ route('company.sales.store') }}" data-fiscal-line-discount="{{ $isFiscalDiscountMode ? '1' : '0' }}">
                 @csrf
 
                 <section class="dg-section mb-2">
@@ -152,6 +153,9 @@
                                             <th scope="col" width="8%">Quantity</th>
                                             <th scope="col" width="8%">Unit</th>
                                             <th scope="col">Unit Price</th>
+                                            @if ($isFiscalDiscountMode)
+                                                <th scope="col">Line Discount</th>
+                                            @endif
                                             <th scope="col">VAT Rate</th>
                                             <th scope="col">VAT Amount</th>
                                             <th scope="col">Total Price</th>
@@ -236,8 +240,26 @@
                                                 <input type="number" name="unit_price[]" class="form-control form-control-sm dg-input @error("unit_price.$rowIndex") is-invalid @enderror" min="0" step="0.01" value="{{ old("unit_price.$rowIndex") }}" aria-label="Unit Price">
                                             </td>
 
+                                            @if ($isFiscalDiscountMode)
+                                                <td>
+                                                    <label class="form-label visually-hidden">Line Discount</label>
+                                                    <input type="number" name="line_discount_amount[]" class="form-control form-control-sm dg-input @error("line_discount_amount.$rowIndex") is-invalid @enderror" min="0" step="0.01" value="{{ old("line_discount_amount.$rowIndex", 0) }}" aria-label="Line Discount">
+                                                </td>
+                                            @endif
+
                                             <td>
                                                 <label class="form-label visually-hidden">VAT Rate</label>
+                                                @if ($isNepalCompany)
+                                                    <label class="form-label small mb-1">Tax Classification</label>
+                                                    <select name="tax_classification[]" class="form-select form-select-sm dg-select dg-tax-classification mb-1" aria-label="Tax Classification" required>
+                                                        <option value="">Select classification</option>
+                                                        <option value="vat_taxable" @selected(old("tax_classification.$rowIndex") === 'vat_taxable')>VAT Taxable</option>
+                                                        <option value="vat_exempt" @selected(old("tax_classification.$rowIndex") === 'vat_exempt')>VAT Exempt</option>
+                                                        <option value="zero_rated" @selected(old("tax_classification.$rowIndex") === 'zero_rated')>Zero Rated</option>
+                                                        <option value="export" @selected(old("tax_classification.$rowIndex") === 'export')>Export</option>
+                                                        <option value="out_of_scope" @selected(old("tax_classification.$rowIndex") === 'out_of_scope')>Out of Scope</option>
+                                                    </select>
+                                                @endif
                                                 <select name="vat_rate[]" class="form-select form-select-sm dg-select" aria-label="VAT Rate">
                                                     <option value="0" @selected((string) old("vat_rate.$rowIndex", '0') === '0')>No VAT</option>
                                                     @foreach ($vats as $vat)
@@ -304,7 +326,10 @@
 
                                         <div class="col-md-3">
                                             <label for="discount_amount" class="form-label small fw-semibold mb-1">Discount</label>
-                                            <input type="number" name="discount_amount" id="discount_amount" class="form-control form-control-sm dg-input" min="0" step="0.01" value="{{ number_format(old('discount_amount', 0), 2) }}">
+                                            <input type="number" name="discount_amount" id="discount_amount" class="form-control form-control-sm dg-input" min="0" step="0.01" value="{{ number_format(old('discount_amount', 0), 2) }}" @readonly($isFiscalDiscountMode)>
+                                            @if ($isFiscalDiscountMode)
+                                                <small class="form-text text-muted">Calculated from line discounts.</small>
+                                            @endif
                                         </div>
 
                                         <div class="col-md-12">

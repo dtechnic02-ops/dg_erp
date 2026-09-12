@@ -18,6 +18,7 @@ class User extends Authenticatable
     'password',
     'role_id',
     'company_id',
+    'country_id',
     'job_role', 
     'account_status',
     'online_status',
@@ -47,6 +48,11 @@ class User extends Authenticatable
 {
     return $this->belongsTo(\App\Models\Company::class, 'company_id');
 }
+
+    public function countryMaster()
+    {
+        return $this->belongsTo(Country::class, 'country_id');
+    }
 
    public function permissions()
 {

@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\AuthorizesCompanyPermission;
 use Illuminate\Http\Request;
 use App\Models\Customer;
 use App\Services\ValidationService;
+use App\Services\TaxIdentifierService;
 use App\Services\WhatsappShareService;
 use Illuminate\Support\Facades\DB;
 
@@ -153,6 +154,8 @@ Request $request
 ){
     $this->authorizeCompanyPermission('create_customer');
 
+$this->normalizeAndValidateTaxNumber($request);
+
 $request->validate([
     'credit_days' => ValidationService::quantity(),
 ]);
@@ -246,6 +249,8 @@ $request->validate([
 
 'mimes:jpg,jpeg,png,pdf',
 
+'extensions:jpg,jpeg,png,pdf',
+
 'max:10240'
 
 ]
@@ -271,7 +276,7 @@ $request->file(
 
 $folder=
 
-public_path(
+\Illuminate\Support\Facades\Storage::disk('local')->path('protected/'.
 
 'companies/'.
 
@@ -313,7 +318,7 @@ time()
 
 .'.'
 
-.$file->getClientOriginalExtension();
+.$file->extension();
 
 
 $file->move(
@@ -393,6 +398,8 @@ auth()->user()->company_id
 )
 
 ->firstOrFail();
+
+$this->normalizeAndValidateTaxNumber($request);
 
 $request->validate([
     'credit_days' => ValidationService::quantity(),
@@ -481,6 +488,8 @@ $request->validate([
 'image'=>[
 'file',
 'mimes:jpg,jpeg,png,pdf',
+
+'extensions:jpg,jpeg,png,pdf',
 'max:10240'
 ]
 
@@ -503,7 +512,7 @@ $customer->image_path &&
 
 file_exists(
 
-public_path(
+\Illuminate\Support\Facades\Storage::disk('local')->path('protected/'.
 
 $customer->image_path
 
@@ -525,7 +534,6 @@ $customer->image_path
 
 }
 
-
 $file=
 $request->file(
 'image'
@@ -534,7 +542,7 @@ $request->file(
 
 $folder=
 
-public_path(
+storage_path('app/protected/'.
 
 'companies/'.
 
@@ -574,7 +582,7 @@ time()
 
 .'.'
 
-.$file->getClientOriginalExtension();
+.$file->extension();
 
 
 $file->move(
@@ -827,6 +835,21 @@ compact(
 
 );
 
+}
+
+private function normalizeAndValidateTaxNumber(Request $request): void
+{
+    $company = auth()->user()->company->loadMissing('countryMaster');
+    $identifiers = app(TaxIdentifierService::class);
+    $taxNumber = $company->countryMaster?->iso_code === 'NP'
+        ? $identifiers->normalize($request->input('tax_no'))
+        : (blank($request->input('tax_no')) ? null : trim((string) $request->input('tax_no')));
+
+    $request->merge(['tax_no' => $taxNumber]);
+
+    if ($company->countryMaster?->iso_code === 'NP') {
+        $request->validate(['tax_no' => ['nullable', $identifiers->validationRule()]]);
+    }
 }
 
 }

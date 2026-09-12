@@ -92,8 +92,8 @@
                                         <tr class="dg-row">
                                             <td>{{ $followUps->firstItem() + $loop->index }}</td>
                                             <td>{{ $followUp->activity_no }}</td>
-                                            <td>{{ $followUp->follow_up_date?->format('d-m-Y') ?? '-' }}</td>
-                                            <td>{{ $followUp->next_follow_up_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $followUp->follow_up_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $followUp->follow_up_date])</td>
+                                            <td>{{ $followUp->next_follow_up_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $followUp->next_follow_up_date])</td>
                                             <td>
                                                 @if ($followUp->lead)
                                                     <span class="d-block">{{ $followUp->lead->customer?->name ?? '-' }}</span>

@@ -65,7 +65,7 @@ class CompanyRegistrationApprovalTest extends TestCase
         $country = Country::query()->create(['name' => 'Nepal', 'iso_code' => 'NP', 'is_active' => true]);
         $plainPassword = 'Secure-Approval-2026!';
 
-        $this->post(route('company.register.post'), [
+        $this->actingAs($admin)->post(route('company.register.post'), [
             'company_name' => 'Approved Company',
             'full_name' => 'Approved Owner',
             'email' => 'approved-owner@example.test',
@@ -73,7 +73,7 @@ class CompanyRegistrationApprovalTest extends TestCase
             'password' => $plainPassword,
             'mobile_no' => '9800000001',
             'country_id' => $country->id,
-        ])->assertRedirect(route('login'));
+        ])->assertRedirect(route('admin.registrations'));
 
         $registration = CompanyRegistration::query()->sole();
         $this->assertNotSame($plainPassword, $registration->password);
@@ -144,9 +144,10 @@ class CompanyRegistrationApprovalTest extends TestCase
     public function test_invalid_registration_password_is_rejected_and_failed_approval_sends_no_email(): void
     {
         Mail::fake();
+        $admin = $this->superAdmin();
         $country = Country::query()->create(['name' => 'Nepal', 'iso_code' => 'NP', 'is_active' => true]);
 
-        $this->post(route('company.register.post'), [
+        $this->actingAs($admin)->post(route('company.register.post'), [
             'company_name' => 'Invalid Password Company',
             'full_name' => 'Invalid Owner',
             'email' => 'invalid-owner@example.test',

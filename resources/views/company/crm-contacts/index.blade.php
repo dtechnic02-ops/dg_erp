@@ -106,7 +106,7 @@
                                             <td>{{ $contact->mobile ?: '-' }}</td>
                                             <td>{{ $contact->assignedEmployee->full_name ?? '-' }}</td>
                                             <td><span class="badge bg-secondary">{{ $statusLabel }}</span></td>
-                                            <td>{{ $contact->contact_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $contact->contact_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $contact->contact_date])</td>
                                             <td>
                                                 <a href="{{ route('company.crm-contacts.show', $contact->id) }}" class="btn btn-sm btn-outline-info dg-btn">View</a>
                                             </td>

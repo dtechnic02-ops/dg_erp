@@ -7,6 +7,23 @@ use Illuminate\Database\Eloquent\Model;
 class FinancialYear extends Model
 {
 
+    protected static function booted(): void
+    {
+        static::updating(function (FinancialYear $financialYear): void {
+            if (! $financialYear->isDirty(['name', 'start_date', 'end_date'])) return;
+            if (app(\App\Services\FiscalDocumentPolicyService::class)
+                ->financialYearHasPermanentFiscalHistory($financialYear)) {
+                throw new \RuntimeException('This fiscal year contains issued fiscal documents and cannot be materially changed.');
+            }
+        });
+        static::deleting(function (FinancialYear $financialYear): void {
+            if (app(\App\Services\FiscalDocumentPolicyService::class)
+                ->financialYearHasPermanentFiscalHistory($financialYear)) {
+                throw new \RuntimeException('This fiscal year contains issued fiscal documents and cannot be deleted.');
+            }
+        });
+    }
+
     protected $fillable = [
 
         'company_id',

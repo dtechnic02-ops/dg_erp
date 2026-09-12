@@ -224,7 +224,7 @@ class DeliveryNoteService
     {
         $this->assertSubscriptionModule($companyId, 'delivery');
 
-        return public_path('companies/' . $companyId . '/deliveries/' . $deliveryNoteId);
+        return \Illuminate\Support\Facades\Storage::disk('local')->path('protected/companies/' . $companyId . '/deliveries/' . $deliveryNoteId);
     }
 
     public function ensureDeliveryStorageDirectory(int $companyId, int $deliveryNoteId): string

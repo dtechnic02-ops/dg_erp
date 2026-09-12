@@ -16,10 +16,17 @@ use App\Services\StockService;
 use App\Services\SalesInventoryRestorationService;
 use App\Services\Accounting\Integrations\SalesReturnCogsAccountingIntegrationService;
 use App\Services\ValidationService;
+use App\Services\FileUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Concerns\HandlesTransactionDocumentationEdit;
+use App\Services\FiscalDocumentPolicyService;
+use App\Services\FiscalDocumentAuditService;
+use App\Services\SalesFiscalLineAmountService;
+use App\Services\SalesFiscalPaymentModeService;
+use App\Services\SalesFiscalReconciliationService;
+use App\Services\Cbms\CbmsQueueService;
 
 class SalesReturnController extends Controller
 {
@@ -27,7 +34,13 @@ class SalesReturnController extends Controller
 
     public function __construct(
         private readonly SalesInventoryRestorationService $salesInventoryRestorationService,
-        private readonly SalesReturnCogsAccountingIntegrationService $salesReturnCogsAccountingIntegrationService
+        private readonly SalesReturnCogsAccountingIntegrationService $salesReturnCogsAccountingIntegrationService,
+        private readonly FiscalDocumentPolicyService $fiscalDocumentPolicy,
+        private readonly FiscalDocumentAuditService $fiscalAudit,
+        private readonly SalesFiscalLineAmountService $fiscalLineAmounts,
+        private readonly SalesFiscalPaymentModeService $fiscalPaymentModes,
+        private readonly SalesFiscalReconciliationService $fiscalReconciliation,
+        private readonly CbmsQueueService $cbmsQueue
     ) {
     }
 
@@ -216,7 +229,7 @@ class SalesReturnController extends Controller
             'quantity'         => 'required|array',
             'quantity.*'       => 'nullable|numeric|min:0',
             'note'             => 'nullable|string|max:1000',
-            'damage_photo'     => 'nullable|image|max:5120',
+            'damage_photo'     => ValidationService::image(),
         ]);
 
         $safeMessages = [
@@ -231,6 +244,8 @@ class SalesReturnController extends Controller
             'Customer does not match the selected sales invoice.',
             'Invalid quantity',
             'Financial Year is required for stock transaction.',
+            'A meaningful Credit Note reason is required for a fiscal Sales Return.',
+            'Fiscal Credit Note totals do not reconcile with their frozen return lines.',
         ];
 
         try {
@@ -282,6 +297,12 @@ class SalesReturnController extends Controller
                     );
                 }
 
+                $isFiscalCreditNote = $this->fiscalDocumentPolicy->wasFiscallyIssued($invoice);
+                $reason = trim((string) $request->note);
+                if ($isFiscalCreditNote && $reason === '') {
+                    throw new \Exception('A meaningful Credit Note reason is required for a fiscal Sales Return.');
+                }
+
                 $returnNo = InvoiceNumberService::generate(
                     'SR',
                     $companyId,
@@ -293,12 +314,7 @@ class SalesReturnController extends Controller
                 $photo = null;
 
                 if ($request->hasFile('damage_photo')) {
-                    $photo = $request
-                        ->file('damage_photo')
-                        ->store(
-                            "companies/{$companyId}/returns",
-                            'public'
-                        );
+                    $photo = FileUploadService::uploadPrivateImage($request->file('damage_photo'), "companies/{$companyId}/returns");
                 }
 
                 $return = SalesReturn::create([
@@ -311,7 +327,7 @@ class SalesReturnController extends Controller
                     'subtotal'           => 0,
                     'total_vat'          => 0,
                     'grand_total'        => 0,
-                    'note'               => $request->note,
+                    'note'               => $reason !== '' ? $reason : null,
                     'damage_photo'       => $photo,
                     'created_by'         => auth()->id(),
                     'status'             => 1,
@@ -355,14 +371,37 @@ class SalesReturnController extends Controller
                         );
                     }
 
-                    $subtotal = $returnQty * $salesItem->unit_price;
+                    $subtotal = round($returnQty * (float) $salesItem->unit_price, 2);
+                    $fiscalDiscount = null;
+                    $fiscalNetBase = null;
 
-                    $vatAmount = round(
-                        ($subtotal * $salesItem->vat_rate) / 100,
-                        2
-                    );
-
-                    $total = $subtotal + $vatAmount;
+                    if ($salesItem->fiscal_discount_amount !== null && $salesItem->fiscal_net_base !== null) {
+                        $alreadyReturned = SalesReturnItem::where('company_id', $companyId)
+                            ->where('sales_item_id', $salesItem->id)
+                            ->where('status', 1)
+                            ->lockForUpdate()
+                            ->get();
+                        $share = $this->fiscalLineAmounts->returnShare([
+                            'quantity' => (float) $salesItem->quantity,
+                            'discount_amount' => (float) $salesItem->fiscal_discount_amount,
+                            'net_base' => (float) $salesItem->fiscal_net_base,
+                            'vat_amount' => (float) $salesItem->vat_amount,
+                            'line_total' => (float) $salesItem->total_price,
+                        ], [
+                            'quantity' => (float) $alreadyReturned->sum('quantity'),
+                            'discount_amount' => (float) $alreadyReturned->sum('fiscal_discount_amount'),
+                            'net_base' => (float) $alreadyReturned->sum('fiscal_net_base'),
+                            'vat_amount' => (float) $alreadyReturned->sum('vat_amount'),
+                            'line_total' => (float) $alreadyReturned->sum('total_price'),
+                        ], $returnQty);
+                        $fiscalDiscount = $share['discount_amount'];
+                        $fiscalNetBase = $share['net_base'];
+                        $vatAmount = $share['vat_amount'];
+                        $total = $share['line_total'];
+                    } else {
+                        $vatAmount = round(($subtotal * $salesItem->vat_rate) / 100, 2);
+                        $total = round($subtotal + $vatAmount, 2);
+                    }
 
                     $totalSubtotal += $subtotal;
                     $totalVat += $vatAmount;
@@ -377,6 +416,9 @@ class SalesReturnController extends Controller
                         'unit_price'        => $salesItem->unit_price,
                         'vat_rate'          => $salesItem->vat_rate,
                         'vat_amount'        => $vatAmount,
+                        'fiscal_discount_amount' => $fiscalDiscount,
+                        'fiscal_net_base' => $fiscalNetBase,
+                        'tax_classification' => $salesItem->tax_classification ?: \App\Services\SalesTaxClassificationService::LEGACY_UNCLASSIFIED,
                         'total_price'       => $total,
                         'created_by'        => auth()->id(),
                         'status'            => 1,
@@ -445,6 +487,18 @@ class SalesReturnController extends Controller
 
                 SalesReturnSyncService::sync($return, true);
                 $this->salesReturnCogsAccountingIntegrationService->postReturn($return);
+                if ($isFiscalCreditNote) {
+                    $reconciliation = $this->fiscalReconciliation->reconcileReturn($return->fresh('items'));
+                    if (! $reconciliation['is_reconciled']) {
+                        throw new \Exception('Fiscal Credit Note totals do not reconcile with their frozen return lines.');
+                    }
+
+                    $return->forceFill(['fiscal_issued_at' => now()])->save();
+                    $return->refresh();
+                    $this->fiscalAudit->recordIssued($return->company, 'sales_return', $return, $return->return_no, auth()->id());
+                    $this->fiscalAudit->recordSalesReturnCreated($invoice, $return, auth()->id());
+                    $this->cbmsQueue->queueAfterCommit($return);
+                }
 
                 return $return;
             });
@@ -477,6 +531,7 @@ class SalesReturnController extends Controller
         $return = SalesReturn::with([
             'customer',
             'invoice',
+            'company',
             'items.product',
             'items.salesItem.service',
             'refunds',
@@ -485,10 +540,9 @@ class SalesReturnController extends Controller
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        return view(
-            'company.sales-return.show',
-            compact('return')
-        );
+        $isFiscalDocumentImmutable = $this->fiscalDocumentPolicy->isSalesReturnImmutable($return);
+        $fiscalHistory = $isFiscalDocumentImmutable ? $this->fiscalAudit->history($return->company, 'sales_return', $return) : collect();
+        return view('company.sales-return.show', compact('return', 'isFiscalDocumentImmutable', 'fiscalHistory'));
     }
 
     public function edit($id)
@@ -499,9 +553,15 @@ class SalesReturnController extends Controller
             'customer',
             'invoice',
             'financialYear',
+            'company',
         ])
             ->where('company_id', $companyId)
             ->findOrFail($id);
+
+        if ($this->fiscalDocumentPolicy->isSalesReturnImmutable($return)) {
+            return redirect()->route('company.sales-return.show', $return->id)
+                ->with('error', 'Issued Nepal IRD/CBMS sales returns cannot be edited. Use the controlled cancellation workflow.');
+        }
 
         if ((int) $return->status === 0) {
             return redirect()
@@ -519,6 +579,11 @@ class SalesReturnController extends Controller
     {
         $companyId = auth()->user()->company_id;
 
+        $issuedReturn = SalesReturn::with('company')->where('company_id', $companyId)->findOrFail($id);
+        if ($this->fiscalDocumentPolicy->isSalesReturnImmutable($issuedReturn)) {
+            return back()->with('error', 'Issued Nepal IRD/CBMS sales returns cannot be edited. Use the controlled cancellation workflow.');
+        }
+
         $request->validate(
             $this->documentationEditRules('return_date')
         );
@@ -529,6 +594,7 @@ class SalesReturnController extends Controller
             'Sales Return belongs to another Financial Year.',
             'Selected date must fall within the active financial year.',
             'Deleted transaction cannot be edited.',
+            'Issued Nepal IRD/CBMS sales returns cannot be edited. Use the controlled cancellation workflow.',
         ];
 
         try {
@@ -536,6 +602,10 @@ class SalesReturnController extends Controller
                 $return = SalesReturn::where('company_id', $companyId)
                     ->lockForUpdate()
                     ->findOrFail($id);
+
+                if ($this->fiscalDocumentPolicy->isSalesReturnImmutable($return)) {
+                    throw new \Exception('Issued Nepal IRD/CBMS sales returns cannot be edited. Use the controlled cancellation workflow.');
+                }
 
                 $this->guardEditableTransaction(
                     $return,
@@ -594,6 +664,7 @@ class SalesReturnController extends Controller
         $return = SalesReturn::with([
             'customer',
             'invoice',
+            'company',
             'items.product',
             'items.salesItem.service',
             'financialYear',
@@ -601,15 +672,47 @@ class SalesReturnController extends Controller
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
+        $fiscalPrintLabel = $this->fiscalAudit->recordPrint(
+            $return->company,
+            'sales_return',
+            $return,
+            $return->return_no,
+            auth()->id()
+        );
+        $fiscalPaymentPresentation = $this->fiscalPaymentModes
+            ->irdPresentation($return->invoice?->fiscal_payment_mode);
+        $isFiscalCreditNote = $this->fiscalDocumentPolicy->isSalesReturnImmutable($return);
+        $fiscalCreditNote = null;
+        if ($isFiscalCreditNote) {
+            $invoice = $return->invoice;
+            $fiscalCreditNote = [
+                'seller_name' => $invoice->seller_name_snapshot,
+                'seller_address' => $invoice->seller_address_snapshot,
+                'seller_pan' => $invoice->seller_pan_snapshot ?: $invoice->seller_vat_snapshot,
+                'buyer_name' => $invoice->buyer_name_snapshot,
+                'buyer_address' => $invoice->buyer_address_snapshot,
+                'buyer_pan' => $invoice->buyer_tax_no_snapshot,
+                'original_invoice_no' => $invoice->invoice_no,
+                'original_invoice_date' => $invoice->sale_date,
+                'original_invoice_issued_at' => $invoice->fiscal_issued_at,
+                'reconciliation' => $this->fiscalReconciliation->reconcileReturn($return),
+            ];
+        }
+
         return view(
             'company.sales-return.print',
-            compact('return')
+            compact('return', 'fiscalPrintLabel', 'fiscalPaymentPresentation', 'isFiscalCreditNote', 'fiscalCreditNote')
         );
     }
 
     public function cancel(Request $request, $id)
     {
         $companyId = auth()->user()->company_id;
+
+        $issuedReturn = SalesReturn::where('company_id', $companyId)->findOrFail($id);
+        if ($this->fiscalDocumentPolicy->isSalesReturnImmutable($issuedReturn)) {
+            return back()->with('error', FiscalDocumentPolicyService::ISSUED_CREDIT_NOTE_MUTATION_MESSAGE);
+        }
 
         $request->validate([
             'cancel_date' =>
@@ -622,6 +725,7 @@ class SalesReturnController extends Controller
             'Sales return already cancelled.',
             'Cannot cancel a sales return with refund settlements.',
             'Cancel date must belong to the active financial year.',
+            FiscalDocumentPolicyService::ISSUED_CREDIT_NOTE_MUTATION_MESSAGE,
         ];
 
         try {
@@ -648,6 +752,10 @@ class SalesReturnController extends Controller
                     ->where('company_id', $companyId)
                     ->lockForUpdate()
                     ->findOrFail($id);
+
+                if ($this->fiscalDocumentPolicy->isSalesReturnImmutable($return)) {
+                    throw new \Exception(FiscalDocumentPolicyService::ISSUED_CREDIT_NOTE_MUTATION_MESSAGE);
+                }
 
                 if ((int) $return->status !== 1) {
                     throw new \Exception('Sales return already cancelled.');
@@ -699,7 +807,15 @@ class SalesReturnController extends Controller
                 $return->update([
                     'status' => 0,
                     'note' => trim(($return->note ?? '') . ' [Cancelled: ' . $cancelReason . ']'),
+                    ...($this->fiscalDocumentPolicy->isSalesReturnImmutable($return) ? [
+                        'cancelled_at' => now(),
+                        'cancelled_by' => auth()->id(),
+                        'cancellation_reason' => $cancelReason,
+                        'original_fiscal_reference' => $return->return_no,
+                    ] : []),
                 ]);
+
+                $this->fiscalAudit->recordCancelled($return->company, 'sales_return', $return, $return->return_no, auth()->id(), $cancelReason);
 
                 SalesReturnSyncService::sync($return, true);
             });

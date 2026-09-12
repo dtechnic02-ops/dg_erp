@@ -100,7 +100,7 @@
                                             <td>{{ $tasks->firstItem() + $loop->index }}</td>
                                             <td>{{ $task->activity_no }}</td>
                                             <td>{{ $typeLabel }}</td>
-                                            <td>{{ $task->due_date?->format('d-m-Y') ?? '-' }}</td>
+                                            <td>{{ $task->due_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $task->due_date])</td>
                                             <td>
                                                 @if ($task->lead)
                                                     <span class="d-block">{{ $task->lead->customer?->name ?? '-' }}</span>

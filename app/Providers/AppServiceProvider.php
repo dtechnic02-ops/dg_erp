@@ -14,7 +14,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(
+            \App\Services\Cbms\CbmsHttpTransport::class,
+            \App\Services\Cbms\PhaseOneDisabledCbmsHttpTransport::class,
+        );
+        $this->app->bind(
+            \App\Services\Cbms\CbmsReconciliationVerifier::class,
+            \App\Services\Cbms\UnavailableCbmsReconciliationVerifier::class,
+        );
     }
 
     /**

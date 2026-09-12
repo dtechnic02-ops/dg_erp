@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Mail\CompanyFactoryResetOtpMail;
 use App\Models\Company;
 use App\Models\CompanyDestructiveChallenge;
+use App\Models\CompanyIrdCbmsSetting;
 use App\Models\CompanySubscription;
+use App\Models\Country;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SubscriptionPlan;
@@ -66,7 +68,10 @@ class CompanyFactoryResetTest extends TestCase
         $this->get(route('company.settings.factory-reset.show'))->assertRedirect();
 
         $adminA->update(['account_status' => 'blocked']);
-        $this->actingAs($adminA->fresh())->get(route('company.settings.factory-reset.show'))->assertForbidden();
+        $this->actingAs($adminA->fresh())->get(route('company.settings.factory-reset.show'))
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('error', 'Your account is not active. Please contact an administrator.');
+        $this->assertGuest();
     }
 
     public function test_factory_otp_goes_only_to_initiating_admin_and_request_cannot_override_recipient(): void
@@ -145,6 +150,10 @@ class CompanyFactoryResetTest extends TestCase
             ['company_id' => $companyA->id, 'is_enabled' => 1, 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyB->id, 'is_enabled' => 1, 'created_at' => now(), 'updated_at' => now()],
         ]);
+        DB::table('company_cbms_api_configurations')->insert([
+            ['company_id'=>$companyA->id,'environment'=>'test','encrypted_credential'=>'encrypted-a','configured_by'=>$adminA->id,'updated_by'=>$adminA->id,'created_at'=>now(),'updated_at'=>now()],
+            ['company_id'=>$companyB->id,'environment'=>'test','encrypted_credential'=>'encrypted-b','configured_by'=>$adminB->id,'updated_by'=>$adminB->id,'created_at'=>now(),'updated_at'=>now()],
+        ]);
         DB::table('customers')->insert([$this->customerRow($companyA->id, 'Customer A'), $this->customerRow($companyB->id, 'Customer B')]);
         DB::table('financial_years')->insert([
             ['company_id' => $companyA->id, 'name' => 'FY A', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31', 'is_active' => 1, 'created_by' => $adminA->id, 'created_at' => now(), 'updated_at' => now()],
@@ -178,6 +187,7 @@ class CompanyFactoryResetTest extends TestCase
         $this->assertDatabaseHas('user_permissions', ['user_id' => $adminA->id, 'permission_id' => $permission->id]);
         $this->assertDatabaseHas('company_permission', ['company_id' => $companyA->id, 'permission_id' => $permission->id]);
         $this->assertDatabaseHas('company_whatsapp_settings', ['company_id' => $companyA->id]);
+        $this->assertDatabaseHas('company_cbms_api_configurations', ['company_id'=>$companyA->id,'encrypted_credential'=>'encrypted-a']);
         $this->assertSame($subscriptionA, CompanySubscription::where('company_id', $companyA->id)->firstOrFail()->toArray());
         $this->assertDatabaseMissing('customers', ['company_id' => $companyA->id]);
         $this->assertDatabaseMissing('financial_years', ['company_id' => $companyA->id]);
@@ -193,6 +203,103 @@ class CompanyFactoryResetTest extends TestCase
         $this->assertSame($companyBSnapshot, $this->snapshot($companyB->id));
         $this->assertTrue(File::exists($fileB));
         $this->assertDatabaseHas('users', ['id' => $staffB->id, 'company_id' => $companyB->id]);
+        $this->assertDatabaseHas('company_cbms_api_configurations', ['company_id'=>$companyB->id,'encrypted_credential'=>'encrypted-b']);
+    }
+
+    public function test_nepal_cbms_active_blocks_factory_reset_before_any_company_data_changes(): void
+    {
+        $nepal = Country::create(['name' => 'Nepal', 'iso_code' => 'NP', 'is_active' => true]);
+        $company = $this->company('Protected Nepal Company');
+        $company->update(['country_id' => $nepal->id]);
+        $admin = $this->user(Role::COMPANY_ADMIN_ID, $company->id, 'protected-nepal@example.test');
+        CompanyIrdCbmsSetting::create(['company_id' => $company->id, 'is_enabled' => true, 'updated_by' => $admin->id]);
+        $this->createFiscallyIssuedInvoice($company, $admin, 'SI-LOCK-RESET');
+        DB::table('customers')->insert($this->customerRow($company->id, 'Protected Business Data'));
+        DB::table('fiscal_document_audit_events')->insert([
+            'company_id' => $company->id,
+            'document_type' => 'sales_invoice',
+            'document_id' => 999,
+            'document_number' => 'SI-PROTECTED',
+            'event_type' => 'issued',
+            'actor_id' => $admin->id,
+            'event_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(CompanyFactoryResetService::class)->reset($company->fresh(), $admin->id, 'current-session');
+            $this->fail('Factory Reset was not blocked.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Factory Reset is not allowed while Nepal IRD/CBMS mode is active.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseHas('companies', ['id' => $company->id, 'country_id' => $nepal->id, 'status' => 'active']);
+        $this->assertDatabaseHas('company_ird_cbms_settings', ['company_id' => $company->id, 'is_enabled' => true]);
+        $this->assertDatabaseHas('customers', ['company_id' => $company->id, 'name' => 'Protected Business Data']);
+        $this->assertDatabaseHas('fiscal_document_audit_events', ['company_id' => $company->id, 'document_number' => 'SI-PROTECTED', 'event_type' => 'issued']);
+        $this->assertDatabaseCount('company_factory_reset_audits', 0);
+    }
+
+    public function test_factory_reset_remains_available_for_nepal_off_non_nepal_and_missing_setting(): void
+    {
+        $nepal = Country::create(['name' => 'Nepal', 'iso_code' => 'NP', 'is_active' => true]);
+        $uae = Country::create(['name' => 'United Arab Emirates', 'iso_code' => 'AE', 'is_active' => true]);
+
+        $nepalOff = $this->company('Nepal Off');
+        $nepalOff->update(['country_id' => $nepal->id]);
+        $nepalOffAdmin = $this->user(Role::COMPANY_ADMIN_ID, $nepalOff->id, 'nepal-off@example.test');
+        CompanyIrdCbmsSetting::create(['company_id' => $nepalOff->id, 'is_enabled' => false, 'updated_by' => $nepalOffAdmin->id]);
+
+        $nonNepal = $this->company('Non Nepal');
+        $nonNepal->update(['country_id' => $uae->id]);
+        $nonNepalAdmin = $this->user(Role::COMPANY_ADMIN_ID, $nonNepal->id, 'non-nepal@example.test');
+        CompanyIrdCbmsSetting::create(['company_id' => $nonNepal->id, 'is_enabled' => true, 'updated_by' => $nonNepalAdmin->id]);
+
+        $missingSetting = $this->company('Nepal Missing Setting');
+        $missingSetting->update(['country_id' => $nepal->id]);
+        $missingAdmin = $this->user(Role::COMPANY_ADMIN_ID, $missingSetting->id, 'nepal-missing@example.test');
+
+        foreach ([
+            [$nepalOff, $nepalOffAdmin, 'Nepal OFF Data'],
+            [$nonNepal, $nonNepalAdmin, 'Non-Nepal Data'],
+            [$missingSetting, $missingAdmin, 'Missing Setting Data'],
+        ] as [$company, $admin, $customerName]) {
+            DB::table('customers')->insert($this->customerRow($company->id, $customerName));
+            $audit = app(CompanyFactoryResetService::class)->reset($company->fresh(), $admin->id, 'session-'.$company->id);
+            $this->assertSame('reset', $audit->result);
+            $this->assertDatabaseMissing('customers', ['company_id' => $company->id, 'name' => $customerName]);
+            $this->assertDatabaseHas('companies', ['id' => $company->id, 'status' => 'active']);
+        }
+    }
+
+    public function test_request_tampering_cannot_bypass_nepal_cbms_factory_reset_block(): void
+    {
+        $nepal = Country::create(['name' => 'Nepal', 'iso_code' => 'NP', 'is_active' => true]);
+        $uae = Country::create(['name' => 'United Arab Emirates', 'iso_code' => 'AE', 'is_active' => true]);
+        $company = $this->company('Request Protected Nepal');
+        $company->update(['country_id' => $nepal->id]);
+        $otherCompany = $this->company('Tampered Target');
+        $otherCompany->update(['country_id' => $uae->id]);
+        $admin = $this->user(Role::COMPANY_ADMIN_ID, $company->id, 'request-protected@example.test');
+        CompanyIrdCbmsSetting::create(['company_id' => $company->id, 'is_enabled' => true, 'updated_by' => $admin->id]);
+        $this->createFiscallyIssuedInvoice($company, $admin, 'SI-LOCK-TAMPER');
+        DB::table('customers')->insert($this->customerRow($company->id, 'Must Remain'));
+        [$challenge, $otp] = app(CompanyDestructiveChallengeService::class)->issue($company->id, $admin->id, CompanyDestructiveChallenge::PURPOSE_FACTORY_RESET);
+
+        $this->actingAs($admin)->withSession(['company_factory_reset_challenge' => $challenge->id])
+            ->post(route('company.settings.factory-reset.execute'), [
+                'challenge_id' => $challenge->id,
+                'current_password' => 'Password!123',
+                'confirmation_phrase' => 'RESET MY COMPANY',
+                'otp' => $otp,
+                'company_id' => $otherCompany->id,
+                'country_id' => $uae->id,
+                'is_enabled' => 0,
+            ])->assertSessionHas('error', 'Factory Reset is not allowed while Nepal IRD/CBMS mode is active.');
+
+        $this->assertDatabaseHas('customers', ['company_id' => $company->id, 'name' => 'Must Remain']);
+        $this->assertDatabaseCount('company_factory_reset_audits', 0);
     }
 
     private function company(string $name): Company
@@ -201,6 +308,24 @@ class CompanyFactoryResetTest extends TestCase
         $company = Company::create(['company_name' => $name, 'email' => strtolower(str_replace(' ', '-', $name)).'@example.test', 'mobile' => '981000'.str_pad((string) $this->mobileSuffix, 4, '0', STR_PAD_LEFT), 'status' => 'active']);
         CompanySubscription::create(['company_id' => $company->id, 'subscription_type' => 'paid', 'subscription_plan_id' => $this->plan->id, 'status' => 'active', 'start_date' => now()->subDay()->toDateString(), 'expiry_date' => now()->addYear()->toDateString(), 'staff_limit' => 10, 'is_all_modules_enabled' => true, 'activated_at' => now()]);
         return $company;
+    }
+
+    private function createFiscallyIssuedInvoice(Company $company, User $admin, string $number): int
+    {
+        $financialYearId = DB::table('financial_years')->insertGetId([
+            'company_id' => $company->id, 'name' => $number, 'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31', 'is_active' => 1, 'is_closed' => 0, 'is_locked' => 0,
+            'created_by' => $admin->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $customerId = DB::table('customers')->insertGetId($this->customerRow($company->id, $number));
+
+        return DB::table('sales_invoices')->insertGetId([
+            'created_by' => $admin->id, 'company_id' => $company->id, 'financial_year_id' => $financialYearId,
+            'customer_id' => $customerId, 'invoice_no' => $number, 'sale_date' => '2026-06-15',
+            'subtotal' => 100, 'discount' => 0, 'total_vat' => 0, 'grand_total' => 100,
+            'paid_amount' => 0, 'due_amount' => 100, 'payment_status' => 'unpaid', 'status' => 1,
+            'fiscal_issued_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
     }
 
     private function user(int $roleId, ?int $companyId, string $email): User

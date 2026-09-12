@@ -17,6 +17,7 @@ class JobRoleVisibilityService
         'receiver' => 'Receiver',
         'delivery' => 'Delivery',
         'company_staff' => 'Company Staff',
+        'auditor' => 'Auditor',
     ];
 
     private const OPERATIONAL_DOMAINS = [
@@ -29,6 +30,7 @@ class JobRoleVisibilityService
         'receiver' => ['purchase', 'suppliers', 'inventory'],
         'delivery' => ['delivery'],
         'company_staff' => [],
+        'auditor' => ['sales', 'sales_payments', 'customers', 'purchase', 'suppliers', 'inventory', 'accounts', 'cash_accounts', 'account_transactions', 'income', 'expense', 'journal', 'vat', 'reports', 'settings'],
     ];
 
     private const DOMAIN_PERMISSION_MODULES = [
@@ -64,6 +66,7 @@ class JobRoleVisibilityService
             Role::SUPER_ADMIN_ID => 'super_admin',
             Role::SUPER_STAFF_ID => 'super_staff',
             Role::COMPANY_ADMIN_ID => 'company_admin',
+            Role::AUDITOR_ID => 'auditor',
             default => array_key_exists($user->job_role, self::JOB_ROLES)
                 ? $user->job_role
                 : 'company_staff',

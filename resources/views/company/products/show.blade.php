@@ -15,6 +15,16 @@
             <div class="d-flex gap-2">
                 <a href="{{ url()->previous() }}" class="btn btn-secondary dg-btn">Back</a>
 
+                @if ($product)
+                    <a href="{{ route('company.products.edit', $product->id) }}" class="btn dg-btn dg-btn-brand">Edit</a>
+
+                    <form method="POST" action="{{ route('company.products.destroy', $product->id) }}" class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger dg-btn" onclick="return confirm('Delete Product?')">Delete</button>
+                    </form>
+                @endif
+
                 <button type="button" onclick="window.print()" class="btn btn-primary dg-btn">Print</button>
 
                 <a href="{{ route('company.products.index') }}" class="btn btn-outline-primary dg-btn">Product List</a>
@@ -151,7 +161,7 @@
                                         <div class="dg-row small mb-0 py-0">
                                             <span class="dg-label d-inline mb-0">Status :</span>
                                             @if ($product->status == 'active')
-                                                <span class="badge bg-success">Active</span>
+                                                <span class="dg-badge dg-badge-status dg-badge-brand">Active</span>
                                             @else
                                                 <span class="badge bg-danger">Inactive</span>
                                             @endif
@@ -162,6 +172,27 @@
                                         <div class="dg-row small mb-0 py-0">
                                             <span class="dg-label d-inline mb-0">Barcode :</span>
                                             {{ $product->barcode ?: '-' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="col-6">
+                                        <div class="dg-row small mb-0 py-0">
+                                            <span class="dg-label d-inline mb-0">Batch No :</span>
+                                            {{ $product->batch_no ?: '-' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="col-6">
+                                        <div class="dg-row small mb-0 py-0">
+                                            <span class="dg-label d-inline mb-0">Manufacture Date :</span>
+                                            {{ optional($product->manufacture_date)->format('Y-m-d') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $product->manufacture_date])
+                                        </div>
+                                    </div>
+
+                                    <div class="col-6">
+                                        <div class="dg-row small mb-0 py-0">
+                                            <span class="dg-label d-inline mb-0">Expiry Date :</span>
+                                            {{ optional($product->expiry_date)->format('Y-m-d') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $product->expiry_date])
                                         </div>
                                     </div>
 

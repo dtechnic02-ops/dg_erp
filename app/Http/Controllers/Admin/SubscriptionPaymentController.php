@@ -20,6 +20,9 @@ use App\Models\SubscriptionPlan;
 
 use App\Services\SubscriptionService;
 use App\Services\PlatformAuthorizationService;
+use App\Services\PlatformCountryScopeService;
+use App\Services\FileUploadService;
+use Illuminate\Support\Facades\Storage;
 
 use Illuminate\Http\Request;
 
@@ -37,7 +40,8 @@ class SubscriptionPaymentController extends Controller
 
     public function __construct(
         private SubscriptionService $subscriptionService,
-        private PlatformAuthorizationService $platformAuthorization
+        private PlatformAuthorizationService $platformAuthorization,
+        private PlatformCountryScopeService $countryScope
     )
 
     {
@@ -124,7 +128,7 @@ class SubscriptionPaymentController extends Controller
 
             'payment_method' => 'required|string|max:50',
 
-            'proof' => 'nullable|image',
+            'proof' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png'],
 
             'notes' => 'nullable|string|max:1000',
 
@@ -148,7 +152,9 @@ class SubscriptionPaymentController extends Controller
 
                 'payment_method' => $validated['payment_method'],
 
-                'proof_path' => $request->file('proof')?->store('subscription-payments', 'public'),
+                'proof_path' => $request->file('proof')
+                    ? FileUploadService::uploadPrivateImage($request->file('proof'), 'companies/'.(int) $validated['company_id'].'/subscription-payments')
+                    : null,
 
                 'notes' => $validated['notes'] ?? null,
 
@@ -164,6 +170,17 @@ class SubscriptionPaymentController extends Controller
 
         return back()->with('success', 'Manual subscription payment saved.');
 
+    }
+
+    public function proof(int $id)
+    {
+        $this->authorizePlatform('platform_subscription_payments_view');
+        $payment = $this->countryScope->scopeSubscriptionPayments(SubscriptionPayment::query(), auth()->user())->findOrFail($id);
+        abort_unless($payment->proof_path && str_starts_with($payment->proof_path, 'companies/'.(int) $payment->company_id.'/'), 404);
+        $path = FileUploadService::privatePath($payment->proof_path);
+        abort_unless(Storage::disk('local')->exists($path), 404);
+
+        return response()->file(Storage::disk('local')->path($path));
     }
 
 
@@ -296,4 +313,3 @@ class SubscriptionPaymentController extends Controller
     }
 
 }
-

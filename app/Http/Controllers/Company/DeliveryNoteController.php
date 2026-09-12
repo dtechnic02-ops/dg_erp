@@ -403,8 +403,13 @@ class DeliveryNoteController extends Controller implements HasMiddleware
 
         $lineItems = $this->deliveryNoteService->buildShowLineItems($companyId, $deliveryNote);
 
-        if ($deliveryNote->pdf_path && is_file(public_path('companies/' . $companyId . '/' . $deliveryNote->pdf_path))) {
-            return response()->file(public_path('companies/' . $companyId . '/' . $deliveryNote->pdf_path));
+        if ($deliveryNote->pdf_path) {
+            $storedPath = 'companies/' . $companyId . '/' . $deliveryNote->pdf_path;
+            if (\Illuminate\Support\Facades\Storage::disk('local')->exists(\App\Services\FileUploadService::privatePath($storedPath))
+                || is_file(public_path($storedPath))) {
+                return app(\App\Services\ProtectedCompanyFileService::class)
+                    ->response('delivery-note', (int) $deliveryNote->id, 'pdf_path');
+            }
         }
 
         $pdf = Pdf::loadView('company.delivery-notes.pdf', compact(

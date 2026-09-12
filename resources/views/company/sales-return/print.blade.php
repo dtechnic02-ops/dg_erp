@@ -8,6 +8,19 @@
 
 @section('content')
 
+@if(!empty($fiscalPrintLabel))
+    <div class="text-center fw-bold mb-2">{{ $fiscalPrintLabel }}</div>
+@endif
+@if($return->cancelled_at)
+    <div class="alert alert-danger text-center py-2">
+        <strong>CANCELLED</strong> — {{ $return->cancellation_reason }}
+        ({{ $return->cancelled_at->format('Y-m-d H:i:s') }})
+    </div>
+@endif
+@if(!empty($fiscalPaymentPresentation))
+    <div class="text-center small mb-2">Original Invoice Mode of Payment: {{ $fiscalPaymentPresentation['display'] }}</div>
+@endif
+
 
 
 @php
@@ -15,6 +28,13 @@
     $company = auth()->user()->company;
 
     $invoice = $return->invoice;
+
+    $sellerName = $isFiscalCreditNote ? $fiscalCreditNote['seller_name'] : $company?->company_name;
+    $sellerAddress = $isFiscalCreditNote ? $fiscalCreditNote['seller_address'] : $company?->address;
+    $sellerPan = $isFiscalCreditNote ? $fiscalCreditNote['seller_pan'] : ($company?->pan_number ?: $company?->vat_number);
+    $buyerName = $isFiscalCreditNote ? $fiscalCreditNote['buyer_name'] : $return->customer?->name;
+    $buyerAddress = $isFiscalCreditNote ? $fiscalCreditNote['buyer_address'] : $return->customer?->address;
+    $buyerPan = $isFiscalCreditNote ? $fiscalCreditNote['buyer_pan'] : ($return->customer?->pan_number ?? null);
 
 
 
@@ -86,7 +106,7 @@
 
                         @endif
 
-                        <h1 class="dg-print-title mb-0">SALES RETURN</h1>
+                        <h1 class="dg-print-title mb-0">{{ $isFiscalCreditNote ? 'CREDIT NOTE' : 'SALES RETURN' }}</h1>
 
                     </header>
 
@@ -116,7 +136,7 @@
 
                                             <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
 
-                                            <span class="dg-summary-bar-value">{{ $company->company_name ?? '-' }}</span>
+                                            <span class="dg-summary-bar-value">{{ $sellerName ?: '-' }}</span>
 
                                         </div>
 
@@ -128,9 +148,9 @@
 
                                             <span class="dg-summary-bar-value">
 
-                                                @if (!empty($company?->address))
+                                                @if (!empty($sellerAddress))
 
-                                                    {{ $company->address }}@if (!empty($company?->address_line_2)), {{ $company->address_line_2 }}@endif
+                                                    {{ $sellerAddress }}
 
                                                 @else
 
@@ -178,7 +198,7 @@
 
                                             <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
 
-                                            <span class="dg-summary-bar-value">{{ $company->pan_number ?? '-' }}</span>
+                                            <span class="dg-summary-bar-value">{{ $sellerPan ?: '-' }}</span>
 
                                         </div>
 
@@ -218,8 +238,14 @@
 
                                             <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
 
-                                            <span class="dg-summary-bar-value">{{ $return->customer->name ?? '-' }}</span>
+                                            <span class="dg-summary-bar-value">{{ $buyerName ?: '-' }}</span>
 
+                                        </div>
+
+                                        <div class="dg-summary-bar-item">
+                                            <span class="dg-summary-bar-label text-muted">Address</span>
+                                            <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
+                                            <span class="dg-summary-bar-value">{{ $buyerAddress ?: '-' }}</span>
                                         </div>
 
                                         <div class="dg-summary-bar-item">
@@ -258,7 +284,7 @@
 
                                             <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
 
-                                            <span class="dg-summary-bar-value">{{ !empty($return->customer?->tax_no) ? $return->customer->tax_no : '-' }}</span>
+                                            <span class="dg-summary-bar-value">{{ $buyerPan ?: '-' }}</span>
 
                                         </div>
 
@@ -268,7 +294,7 @@
 
                                             <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
 
-                                            <span class="dg-summary-bar-value">-</span>
+                                            <span class="dg-summary-bar-value">{{ $buyerPan ?: '-' }}</span>
 
                                         </div>
 
@@ -298,7 +324,7 @@
 
                                         <div class="dg-summary-bar-item">
 
-                                            <span class="dg-summary-bar-label text-muted">Return No</span>
+                                            <span class="dg-summary-bar-label text-muted">{{ $isFiscalCreditNote ? 'Credit Note No.' : 'Return No' }}</span>
 
                                             <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
 
@@ -362,6 +388,14 @@
 
                                     <div class="col-6">
 
+                                        @if($isFiscalCreditNote)
+                                            <div class="dg-summary-bar-item">
+                                                <span class="dg-summary-bar-label text-muted">Issue Date</span>
+                                                <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
+                                                <span class="dg-summary-bar-value">{{ $return->fiscal_issued_at?->timezone('Asia/Kathmandu')->format('d-m-Y H:i:s') ?? '-' }}</span>
+                                            </div>
+                                        @endif
+
                                         <div class="dg-summary-bar-item">
 
                                             <span class="dg-summary-bar-label text-muted">Return Date</span>
@@ -381,6 +415,14 @@
                                             <span class="dg-summary-bar-value">{{ $invoice->invoice_no ?? '-' }}</span>
 
                                         </div>
+
+                                        @if($isFiscalCreditNote && $fiscalCreditNote['original_invoice_issued_at'])
+                                            <div class="dg-summary-bar-item">
+                                                <span class="dg-summary-bar-label text-muted">Original Invoice Issue Date</span>
+                                                <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
+                                                <span class="dg-summary-bar-value">{{ $fiscalCreditNote['original_invoice_issued_at']->timezone('Asia/Kathmandu')->format('d-m-Y H:i:s') }}</span>
+                                            </div>
+                                        @endif
 
                                         <div class="dg-summary-bar-item">
 
@@ -468,7 +510,7 @@
 
                                             <div class="dg-note dg-summary-bar-item">
 
-                                                <span class="dg-summary-bar-label text-muted">Note</span>
+                                                <span class="dg-summary-bar-label text-muted">{{ $isFiscalCreditNote ? 'Reason' : 'Note' }}</span>
 
                                                 <span class="dg-summary-bar-sep text-muted" aria-hidden="true">:</span>
 
@@ -514,6 +556,12 @@
 
                                                 <th scope="col" class="dg-col-num">Unit Price</th>
 
+                                                @if($isFiscalCreditNote)
+                                                    <th scope="col" class="dg-col-num">Gross</th>
+                                                    <th scope="col" class="dg-col-num">Discount</th>
+                                                    <th scope="col" class="dg-col-num">Net</th>
+                                                    <th scope="col">Tax Class</th>
+                                                @endif
                                                 <th scope="col" class="dg-col-num">VAT</th>
 
                                                 <th scope="col" class="dg-col-num">Total</th>
@@ -530,11 +578,29 @@
 
                                                     <td>{{ $loop->iteration }}</td>
 
-                                                    <td>{{ $item->product->name ?? ($item->salesItem->service->name ?? 'Deleted Item') }}</td>
+                                                    <td>
+                                                        {{ $item->salesItem?->item_name_snapshot ?? ($item->product->name ?? ($item->salesItem?->service?->name ?? 'Deleted Item')) }}
+                                                        @if ($item->salesItem?->item_type === 'product')
+                                                            <div class="small text-muted">
+                                                                @if ($item->salesItem->fiscal_hs_code) H.S.: {{ $item->salesItem->fiscal_hs_code }} @endif
+                                                                @if ($item->salesItem->fiscal_brand_name) | Brand: {{ $item->salesItem->fiscal_brand_name }} @endif
+                                                                @if ($item->salesItem->fiscal_product_type) | Type: {{ $item->salesItem->fiscal_product_type }} @endif
+                                                                @if ($item->salesItem->fiscal_model) | Model: {{ $item->salesItem->fiscal_model }} @endif
+                                                                @if ($item->salesItem->fiscal_size) | Size: {{ $item->salesItem->fiscal_size }} @endif
+                                                            </div>
+                                                        @endif
+                                                    </td>
 
                                                     <td class="dg-col-num">{{ number_format($item->quantity, 2) }}</td>
 
                                                     <td class="dg-col-num">{{ number_format($item->unit_price, 2) }}</td>
+
+                                                    @if($isFiscalCreditNote)
+                                                        <td class="dg-col-num">{{ number_format((float) $item->fiscal_net_base + (float) $item->fiscal_discount_amount, 2) }}</td>
+                                                        <td class="dg-col-num">{{ number_format($item->fiscal_discount_amount, 2) }}</td>
+                                                        <td class="dg-col-num">{{ number_format($item->fiscal_net_base, 2) }}</td>
+                                                        <td>{{ str_replace('_', ' ', strtoupper($item->tax_classification)) }}</td>
+                                                    @endif
 
                                                     <td class="dg-col-num">{{ number_format($item->vat_amount, 2) }}</td>
 
@@ -550,7 +616,7 @@
 
                                             <tr>
 
-                                                <th colspan="5" class="text-end">Subtotal</th>
+                                                <th colspan="{{ $isFiscalCreditNote ? 9 : 5 }}" class="text-end">Subtotal</th>
 
                                                 <td class="dg-col-num">{{ number_format($return->subtotal, 2) }}</td>
 
@@ -558,7 +624,7 @@
 
                                             <tr>
 
-                                                <th colspan="5" class="text-end">VAT</th>
+                                                <th colspan="{{ $isFiscalCreditNote ? 9 : 5 }}" class="text-end">VAT</th>
 
                                                 <td class="dg-col-num">{{ number_format($return->total_vat, 2) }}</td>
 
@@ -566,7 +632,7 @@
 
                                             <tr>
 
-                                                <th colspan="5" class="text-end">Return Total</th>
+                                                <th colspan="{{ $isFiscalCreditNote ? 9 : 5 }}" class="text-end">{{ $isFiscalCreditNote ? 'Credit Note Total' : 'Return Total' }}</th>
 
                                                 <td class="dg-col-num fw-bold">{{ number_format($return->grand_total, 2) }}</td>
 
@@ -575,6 +641,21 @@
                                         </tfoot>
 
                                     </table>
+
+                                    @if($isFiscalCreditNote)
+                                        @php($fiscalTotals = $fiscalCreditNote['reconciliation'])
+                                        <div class="row g-2 mt-2 small">
+                                            <div class="col-4">Gross: {{ number_format($fiscalTotals['gross_sales'], 2) }}</div>
+                                            <div class="col-4">Discount: {{ number_format($fiscalTotals['total_discount'], 2) }}</div>
+                                            <div class="col-4">Net: {{ number_format($fiscalTotals['net_sales'], 2) }}</div>
+                                            <div class="col-4">Taxable: {{ number_format($fiscalTotals['taxable_sales'], 2) }}</div>
+                                            <div class="col-4">Exempt: {{ number_format($fiscalTotals['exempt_sales'], 2) }}</div>
+                                            <div class="col-4">Zero-rated: {{ number_format($fiscalTotals['zero_rated_sales'], 2) }}</div>
+                                            <div class="col-4">Export: {{ number_format($fiscalTotals['export_sales'], 2) }}</div>
+                                            <div class="col-4">Out-of-scope: {{ number_format($fiscalTotals['out_of_scope_sales'], 2) }}</div>
+                                            <div class="col-4">VAT reversal: {{ number_format($fiscalTotals['vat_total'], 2) }}</div>
+                                        </div>
+                                    @endif
 
                                 </div>
 
@@ -647,4 +728,3 @@
 
 
 @endsection
-

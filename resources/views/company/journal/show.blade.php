@@ -216,7 +216,7 @@
                         <div class="dg-invoice-note-block">
                             @if ($journal->attachment)
                                 <div class="dg-invoice-note-body">
-                                    <a href="{{ asset($journal->attachment) }}" target="_blank" rel="noopener">View Attachment</a>
+                                    <a href="{{ route('company.protected-files.show', ['journal', $journal->id, 'attachment']) }}" target="_blank" rel="noopener">View Attachment</a>
                                 </div>
                             @else
                                 <div class="dg-invoice-note-body">-</div>

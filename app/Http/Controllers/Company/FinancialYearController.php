@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\FinancialYear;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use App\Models\SalesInvoice;
+use App\Models\SalesReturn;
+use App\Services\FiscalDocumentPolicyService;
 
 class FinancialYearController extends Controller
 {
@@ -163,7 +167,8 @@ class FinancialYearController extends Controller
 
     public function update(
         Request $request,
-        $id
+        $id,
+        FiscalDocumentPolicyService $fiscalPolicy
     )
     {
 
@@ -231,36 +236,30 @@ class FinancialYearController extends Controller
 
 
 
-        if($request->boolean('is_active')){
+        $blocked = DB::transaction(function () use ($request, $id, $fiscalPolicy): bool {
+            $financialYear = FinancialYear::where('company_id', Auth::user()->company_id)
+                ->lockForUpdate()->findOrFail($id);
+            $materiallyChanged = (string) $financialYear->name !== (string) $request->name
+                || (string) $financialYear->start_date !== (string) $request->start_date
+                || (string) $financialYear->end_date !== (string) $request->end_date;
 
-            FinancialYear::where(
-                'company_id',
-                Auth::user()->company_id
-            )
+            if ($materiallyChanged && $fiscalPolicy->financialYearHasPermanentFiscalHistory($financialYear)) {
+                return true;
+            }
 
-            ->update([
-
-                'is_active'=>0
-
+            if ($request->boolean('is_active')) {
+                FinancialYear::where('company_id', Auth::user()->company_id)->update(['is_active' => 0]);
+            }
+            $financialYear->update([
+                'name' => $request->name, 'start_date' => $request->start_date,
+                'end_date' => $request->end_date, 'is_active' => $request->boolean('is_active'),
             ]);
+            return false;
+        }, 3);
 
+        if ($blocked) {
+            return back()->withInput()->with('error', 'This fiscal year contains issued fiscal documents and cannot be materially changed.');
         }
-
-
-
-        $financialYear->update([
-
-            'name'=>$request->name,
-
-            'start_date'=>$request->start_date,
-
-            'end_date'=>$request->end_date,
-
-            'is_active'=>$request->boolean(
-                'is_active'
-            )
-
-        ]);
 
 
         return redirect()
@@ -282,7 +281,7 @@ class FinancialYearController extends Controller
 
 
 
-    public function destroy($id)
+    public function destroy($id, FiscalDocumentPolicyService $fiscalPolicy)
     {
 
         $financialYear = FinancialYear::where([
@@ -297,21 +296,31 @@ class FinancialYearController extends Controller
 
 
 
-        if($financialYear->is_active){
+        $result = DB::transaction(function () use ($id, $fiscalPolicy): string {
+            $financialYear = FinancialYear::where('company_id', Auth::user()->company_id)
+                ->lockForUpdate()->findOrFail($id);
+            if ($fiscalPolicy->financialYearHasPermanentFiscalHistory($financialYear)) {
+                return 'fiscal';
+            }
+            if ($financialYear->is_active) {
+                return 'active';
+            }
 
-            return back()->with(
+            // Preserve the pre-hardening FK behavior for non-fiscal records only.
+            SalesInvoice::where('company_id', $financialYear->company_id)
+                ->where('financial_year_id', $financialYear->id)->update(['financial_year_id' => null]);
+            SalesReturn::where('company_id', $financialYear->company_id)
+                ->where('financial_year_id', $financialYear->id)->delete();
+            $financialYear->delete();
+            return 'deleted';
+        }, 3);
 
-                'error',
-
-                'Active Financial Year Cannot Be Deleted.'
-
-            );
-
+        if ($result === 'fiscal') {
+            return back()->with('error', 'This fiscal year contains issued fiscal documents and cannot be deleted.');
         }
-
-
-
-        $financialYear->delete();
+        if ($result === 'active') {
+            return back()->with('error', 'Active Financial Year Cannot Be Deleted.');
+        }
 
 
 

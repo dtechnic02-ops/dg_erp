@@ -64,6 +64,11 @@ class CompanyClientController extends Controller
 
     ]);
 
+    $selectedCountryIsNepal = Country::query()
+        ->whereKey($request->integer('country_id'))
+        ->where('iso_code', 'NP')
+        ->exists();
+
     /**
      * 🔥 COMPANY FOLDER
      */
@@ -120,10 +125,10 @@ class CompanyClientController extends Controller
             $request->language,
 
         'pan_number' =>
-            $request->pan_number,
+            $selectedCountryIsNepal ? $company->pan_number : $request->pan_number,
 
         'vat_number' =>
-            $request->vat_number,
+            $selectedCountryIsNepal ? $company->vat_number : $request->vat_number,
 
         'address' =>
             $request->address,

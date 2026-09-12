@@ -91,7 +91,7 @@
                                     @if ($party->photo)
                                         <div>
                                             <img
-                                                src="{{ asset($party->photo) }}"
+                                                src="{{ route('company.protected-files.show', ['party-account', $party->id, 'photo']) }}"
                                                 alt="{{ $party->name }} photo"
                                                 width="80"
                                                 height="80"
@@ -224,7 +224,7 @@
                                 <h6 class="mb-1">Photo</h6>
                                 @if ($party->photo)
                                     <img
-                                        src="{{ asset($party->photo) }}"
+                                        src="{{ route('company.protected-files.show', ['party-account', $party->id, 'photo']) }}"
                                         alt="{{ $party->name }} photo"
                                         width="120"
                                         class="rounded border">
@@ -237,7 +237,7 @@
                                 <h6 class="mb-1">PDF Document</h6>
                                 @if ($party->document)
                                     <a
-                                        href="{{ asset($party->document) }}"
+                                        href="{{ route('company.protected-files.show', ['party-account', $party->id, 'document']) }}"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         class="btn btn-sm btn-outline-secondary dg-btn">
@@ -253,7 +253,7 @@
                                 @if ($party->id_card)
                                     @if (str_ends_with(strtolower($party->id_card), '.pdf'))
                                         <a
-                                            href="{{ asset($party->id_card) }}"
+                                            href="{{ route('company.protected-files.show', ['party-account', $party->id, 'id_card']) }}"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             class="btn btn-sm btn-outline-secondary dg-btn">
@@ -261,7 +261,7 @@
                                         </a>
                                     @else
                                         <img
-                                            src="{{ asset($party->id_card) }}"
+                                            src="{{ route('company.protected-files.show', ['party-account', $party->id, 'id_card']) }}"
                                             alt="ID Card"
                                             width="120"
                                             class="rounded border">

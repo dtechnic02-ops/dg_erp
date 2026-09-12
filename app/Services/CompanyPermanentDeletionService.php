@@ -12,18 +12,22 @@ use Throwable;
 
 class CompanyPermanentDeletionService
 {
+    public function __construct(private readonly FiscalDocumentPolicyService $fiscalDocumentPolicy)
+    {
+    }
+
     /** Every pre-feature application table that directly carries company_id. */
     public const COMPANY_TABLES = [
         'account_transactions', 'accounting_entries', 'accounting_period_locks', 'accounts',
-        'brands', 'cash_accounts', 'chart_accounts', 'company_permission', 'company_subscriptions',
-        'company_whatsapp_settings', 'contras', 'crm_attachments', 'crm_configurations',
+        'brands', 'cash_accounts', 'cbms_transmission_attempts', 'cbms_transmissions', 'chart_accounts', 'company_permission', 'company_subscriptions',
+        'company_ird_cbms_settings', 'company_cbms_api_configurations', 'company_tax_settings', 'company_whatsapp_settings', 'contras', 'crm_attachments', 'crm_configurations',
         'company_factory_reset_audits',
         'crm_contacts', 'crm_follow_ups', 'crm_leads', 'crm_meetings', 'crm_notes',
         'crm_opportunities', 'crm_status_histories', 'crm_tasks', 'customer_transactions',
         'customers', 'delivery_attachments', 'delivery_note_items', 'delivery_notes',
         'delivery_signatures', 'delivery_status_histories', 'employee_accounts', 'employee_payments',
         'expense_categories', 'expenses', 'financial_years', 'income_categories', 'incomes',
-        'inventory_valuations', 'invoice_payments', 'journal_audit_events', 'journal_items',
+        'fiscal_document_audit_events', 'inventory_valuations', 'invoice_payments', 'journal_audit_events', 'journal_items',
         'journal_number_sequences', 'journals', 'loan_accounts', 'loan_integrity_seeded_chart_accounts',
         'loan_payments', 'loan_saving_ledgers', 'opening_balance_audit_events',
         'opening_balance_legacy_records', 'opening_balances', 'party_accounts', 'product_categories',
@@ -39,12 +43,14 @@ class CompanyPermanentDeletionService
 
     /** Child-first order from the approved dependency audit. */
     private const DELETE_ORDER = [
+        'cbms_transmission_attempts',
+        'cbms_transmissions',
         'sales_return_refund_adjustments', 'purchase_return_refund_adjustments',
         'sales_cost_snapshots', 'inventory_valuations',
         'delivery_attachments', 'delivery_signatures', 'delivery_status_histories', 'delivery_note_items',
         'crm_attachments', 'crm_notes', 'crm_tasks', 'crm_follow_ups', 'crm_meetings',
         'crm_status_histories', 'crm_opportunities', 'crm_contacts', 'crm_leads',
-        'opening_balance_audit_events', 'journal_audit_events',
+        'fiscal_document_audit_events', 'opening_balance_audit_events', 'journal_audit_events',
         'sales_return_refunds', 'purchase_return_refunds', 'sales_return_items', 'purchase_return_items',
         'sales_payments', 'purchase_payments', 'invoice_payments',
         'stock_transactions', 'stock_movements', 'sales_items', 'purchase_items', 'quotation_items',
@@ -60,11 +66,21 @@ class CompanyPermanentDeletionService
         'accounting_period_locks', 'journal_number_sequences', 'opening_balance_legacy_records',
         'loan_integrity_seeded_chart_accounts', 'financial_years', 'chart_accounts',
         'subscription_histories', 'subscription_payments', 'company_subscriptions',
-        'company_factory_reset_audits', 'company_whatsapp_settings', 'company_permission',
+        'company_factory_reset_audits', 'company_ird_cbms_settings', 'company_cbms_api_configurations', 'company_tax_settings', 'company_whatsapp_settings', 'company_permission',
     ];
 
     public function delete(Company $company, int $actorId, ?int $challengeId = null): CompanyDeletionAudit
     {
+        if ($this->fiscalDocumentPolicy->companyHasPermanentFiscalHistory($company)) {
+            foreach (\App\Models\SalesInvoice::with('company')->where('company_id', $company->id)->get() as $invoice) {
+                if (! $this->fiscalDocumentPolicy->wasFiscallyIssued($invoice)) continue;
+                app(FiscalDocumentAuditService::class)->recordBlockedSalesInvoiceAction(
+                    $invoice, 'company_delete', $actorId, 'company.permanent_delete'
+                );
+            }
+            throw new RuntimeException(FiscalDocumentPolicyService::ISSUED_INVOICE_MUTATION_MESSAGE);
+        }
+
         $this->assertInventoryComplete();
         $this->assertQueueIsSafe();
         $manifest = $this->buildFileManifest($company);
@@ -74,6 +90,9 @@ class CompanyPermanentDeletionService
             $locked = Company::query()->lockForUpdate()->find($company->id);
             if (! $locked) {
                 throw new RuntimeException('The target Company no longer exists.');
+            }
+            if ($this->fiscalDocumentPolicy->companyHasPermanentFiscalHistory($locked)) {
+                throw new RuntimeException(FiscalDocumentPolicyService::ISSUED_INVOICE_MUTATION_MESSAGE);
             }
 
             $userRows = DB::table('users')->where('company_id', $locked->id)->lockForUpdate()->get(['id', 'email', 'role_id']);
@@ -192,6 +211,7 @@ class CompanyPermanentDeletionService
             ['type' => 'directory', 'path' => $this->publicCompanyRoot().DIRECTORY_SEPARATOR.$company->id, 'root' => $this->publicCompanyRoot()],
             ['type' => 'directory', 'path' => $this->storageCompanyRoot().DIRECTORY_SEPARATOR.$company->id, 'root' => $this->storageCompanyRoot()],
             ['type' => 'directory', 'path' => $this->crmRoot().DIRECTORY_SEPARATOR.$company->id, 'root' => $this->crmRoot()],
+            ['type' => 'directory', 'path' => $this->protectedCompanyRoot().DIRECTORY_SEPARATOR.$company->id, 'root' => $this->protectedCompanyRoot()],
         ];
 
         foreach (DB::table('subscription_payments')->where('company_id', $company->id)->pluck('proof_path')->filter() as $path) {
@@ -263,5 +283,10 @@ class CompanyPermanentDeletionService
     private function storagePublicRoot(): string
     {
         return (string) config('dg-erp.destructive_files.storage_public_root', storage_path('app/public'));
+    }
+
+    private function protectedCompanyRoot(): string
+    {
+        return \Illuminate\Support\Facades\Storage::disk('local')->path('protected/companies');
     }
 }

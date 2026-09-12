@@ -8,7 +8,6 @@
     $canCancel = userCan('cancel_delivery') && $deliveryNote->isCancellable();
     $canProcess = userCan('process_delivery') && $deliveryNote->isProcessable();
     $canPrint = userCan('print_delivery') && $deliveryNote->isCompleted();
-    $storageBase = 'companies/' . $deliveryNote->company_id . '/deliveries/' . $deliveryNote->id . '/';
 @endphp
 
 <div class="dg-page">
@@ -166,7 +165,7 @@
                                     <div><strong>Receiver:</strong> {{ $deliveryNote->signature->receiver_name ?? '-' }}</div>
                                     <div><strong>Mobile:</strong> {{ $deliveryNote->signature->receiver_mobile ?? '-' }}</div>
                                     <div class="mt-2">
-                                        <img src="{{ asset($storageBase . $deliveryNote->signature->signature_path) }}" alt="Signature" class="img-fluid border" style="max-height:160px;">
+                                        <img src="{{ route('company.protected-files.show', ['delivery-signature', $deliveryNote->signature->id, 'signature_path']) }}" alt="Signature" class="img-fluid border" style="max-height:160px;">
                                     </div>
                                 </div>
                             @endif
@@ -175,7 +174,7 @@
                                 @foreach ($deliveryNote->attachments->whereIn('document_type', ['photo', 'additional_photo']) as $attachment)
                                     <div class="col-md-4">
                                         <div class="small text-muted mb-1">{{ ucfirst(str_replace('_', ' ', $attachment->document_type)) }}</div>
-                                        <img src="{{ asset($storageBase . $attachment->file_path) }}" alt="Delivery photo" class="img-fluid border rounded">
+                                        <img src="{{ route('company.protected-files.show', ['delivery-attachment', $attachment->id, 'file_path']) }}" alt="Delivery photo" class="img-fluid border rounded">
                                     </div>
                                 @endforeach
                             </div>

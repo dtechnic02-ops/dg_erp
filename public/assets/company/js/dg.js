@@ -653,14 +653,26 @@ DG.salesBilling = (function () {
         var vatSelect = qs('select[name="vat_rate[]"]', row);
         var vatAmountField = qs('input[name="vat_amount[]"]', row);
         var totalPriceField = qs('input[name="total_price[]"]', row);
+        var lineDiscountField = qs('input[name="line_discount_amount[]"]', row);
 
         var quantity = toNumber(quantityField ? quantityField.value : 0);
         var price = toNumber(priceField ? priceField.value : 0);
         var vatRate = toNumber(vatSelect ? vatSelect.value : 0);
 
-        var lineAmount = quantity * price;
-        var vatAmount = lineAmount * (vatRate / 100);
-        var totalPrice = lineAmount + vatAmount;
+        var lineAmount = toNumber(toMoney(quantity * price));
+        var lineDiscount = Math.max(0, toNumber(toMoney(lineDiscountField ? lineDiscountField.value : 0)));
+        if (lineDiscount > lineAmount) {
+            lineDiscount = lineAmount;
+            if (lineDiscountField) {
+                lineDiscountField.value = toMoney(lineDiscount);
+                markInvalid(lineDiscountField);
+            }
+        } else if (lineDiscountField) {
+            clearInvalid(lineDiscountField);
+        }
+        var netLineAmount = toNumber(toMoney(lineAmount - lineDiscount));
+        var vatAmount = toNumber(toMoney(netLineAmount * (vatRate / 100)));
+        var totalPrice = toNumber(toMoney(netLineAmount + vatAmount));
 
         if (vatAmountField) {
             vatAmountField.value = toMoney(vatAmount);
@@ -689,7 +701,7 @@ DG.salesBilling = (function () {
             var quantity = toNumber(quantityField ? quantityField.value : 0);
             var price = toNumber(priceField ? priceField.value : 0);
 
-            subtotal += quantity * price;
+            subtotal += toNumber(toMoney(quantity * price));
         });
 
         return subtotal;
@@ -717,13 +729,17 @@ DG.salesBilling = (function () {
             var vatSelect = qs('select[name="vat_rate[]"]', row);
             var lineVat = toNumber(vatAmountField ? vatAmountField.value : 0);
             var vatRate = toNumber(vatSelect ? vatSelect.value : 0);
+            var lineDiscountField = qs('input[name="line_discount_amount[]"]', row);
 
             if (lineVat <= 0 && vatRate <= 0) {
                 return;
             }
 
-            taxableAmount += toNumber(quantityField ? quantityField.value : 0)
-                * toNumber(priceField ? priceField.value : 0);
+            taxableAmount += toNumber(toMoney(
+                (toNumber(quantityField ? quantityField.value : 0)
+                    * toNumber(priceField ? priceField.value : 0))
+                    - toNumber(lineDiscountField ? lineDiscountField.value : 0)
+            ));
         });
 
         return taxableAmount;
@@ -767,7 +783,13 @@ DG.salesBilling = (function () {
         clampDiscountToSubtotal(subtotal);
 
         var discountField = qs('#discount_amount');
-        var discount = toNumber(discountField ? discountField.value : 0);
+        var fiscalLineDiscountFields = qsa('input[name="line_discount_amount[]"]', itemsBody);
+        var discount = fiscalLineDiscountFields.length
+            ? fiscalLineDiscountFields.reduce(function (sum, field) { return sum + toNumber(field.value); }, 0)
+            : toNumber(discountField ? discountField.value : 0);
+        if (fiscalLineDiscountFields.length && discountField) {
+            discountField.value = toMoney(discount);
+        }
         var displayTaxableAmount = calculateTaxableAmount();
         var grandTotal = Math.max(0, subtotal - discount) + totalVat;
 
@@ -1203,6 +1225,21 @@ DG.salesBilling = (function () {
 
         if (event.target.matches('select[name="vat_rate[]"]')) {
             recalcRow(row);
+            return;
+        }
+
+        if (event.target.matches('select[name="tax_classification[]"]')) {
+            var classification = event.target.value;
+            var vatSelect = qs('select[name="vat_rate[]"]', row);
+            if (vatSelect && classification && classification !== 'vat_taxable') {
+                for (var i = 0; i < vatSelect.options.length; i++) {
+                    if (parseFloat(vatSelect.options[i].value) === 0) {
+                        vatSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+            recalcRow(row);
         }
     }
 
@@ -1227,7 +1264,7 @@ DG.salesBilling = (function () {
             return;
         }
 
-        if (event.target.matches('input[name="quantity[]"], input[name="unit_price[]"]')) {
+        if (event.target.matches('input[name="quantity[]"], input[name="unit_price[]"], input[name="line_discount_amount[]"]')) {
             clearInvalid(event.target);
             recalcRow(row);
         }
@@ -3504,7 +3541,7 @@ DG.nepaliDate = (function () {
     'use strict';
 
     function initField(field) {
-        var adInput = document.getElementById(field.getAttribute('data-ad-input-id'));
+        var adInput = field._dgAdInput || document.getElementById(field.getAttribute('data-ad-input-id'));
         var bsOutput = field.querySelector('input[readonly]');
         var endpoint = field.getAttribute('data-conversion-url');
 
@@ -3538,8 +3575,39 @@ DG.nepaliDate = (function () {
         synchronize();
     }
 
+    function enhanceUnpairedDateInputs() {
+        if (document.body.getAttribute('data-company-country') !== 'NP') {
+            return;
+        }
+
+        var endpoint = document.body.getAttribute('data-nepali-date-url');
+        if (!endpoint) {
+            return;
+        }
+
+        document.querySelectorAll('input[type="date"]').forEach(function (input, index) {
+            if (!input.id || input.closest('[data-nepali-date-field]')
+                || document.querySelector('[data-nepali-date-field][data-ad-input-id="' + input.id + '"]')) {
+                return;
+            }
+
+            var field = document.createElement('div');
+            field.className = 'dg-auto-bs-date mt-1';
+            field.setAttribute('data-nepali-date-field', '');
+            field.setAttribute('data-ad-input-id', input.id);
+            field.setAttribute('data-conversion-url', endpoint);
+            var bsId = input.id + '_bs_auto_' + index;
+            field.innerHTML = '<label class="form-label small mb-1" for="' + bsId + '">मिति (BS)</label>'
+                + '<input type="text" id="' + bsId + '" class="form-control dg-input" readonly aria-readonly="true">';
+            field._dgAdInput = input;
+            input.insertAdjacentElement('afterend', field);
+            initField(field);
+        });
+    }
+
     function init() {
         document.querySelectorAll('[data-nepali-date-field]').forEach(initField);
+        enhanceUnpairedDateInputs();
     }
 
     if (document.readyState === 'loading') {

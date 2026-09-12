@@ -4,12 +4,15 @@ namespace Tests\Feature;
 
 use App\Mail\CompanyPermanentDeletionOtpMail;
 use App\Models\Company;
+use App\Models\CompanyIrdCbmsSetting;
 use App\Models\CompanyDestructiveChallenge;
+use App\Models\Country;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\CompanyDestructiveChallengeService;
 use App\Services\CompanyPermanentDeletionService;
+use App\Services\FiscalDocumentPolicyService;
 use App\Services\PlatformMailService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -168,6 +171,10 @@ class CompanyPermanentDeletionTest extends TestCase
             ['company_id' => $companyA->id, 'is_enabled' => 1, 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyB->id, 'is_enabled' => 1, 'created_at' => now(), 'updated_at' => now()],
         ]);
+        DB::table('company_cbms_api_configurations')->insert([
+            ['company_id'=>$companyA->id,'environment'=>'test','encrypted_credential'=>'encrypted-a','configured_by'=>$adminA->id,'updated_by'=>$adminA->id,'created_at'=>now(),'updated_at'=>now()],
+            ['company_id'=>$companyB->id,'environment'=>'test','encrypted_credential'=>'encrypted-b','configured_by'=>$adminB->id,'updated_by'=>$adminB->id,'created_at'=>now(),'updated_at'=>now()],
+        ]);
         DB::table('sessions')->insert([
             ['id' => 'session-a', 'user_id' => $adminA->id, 'ip_address' => '127.0.0.1', 'user_agent' => 'test', 'payload' => 'x', 'last_activity' => time()],
             ['id' => 'session-b', 'user_id' => $adminB->id, 'ip_address' => '127.0.0.1', 'user_agent' => 'test', 'payload' => 'y', 'last_activity' => time()],
@@ -186,6 +193,7 @@ class CompanyPermanentDeletionTest extends TestCase
         $this->assertDatabaseMissing('users', ['company_id' => $companyA->id]);
         $this->assertDatabaseMissing('customers', ['company_id' => $companyA->id]);
         $this->assertDatabaseMissing('company_whatsapp_settings', ['company_id' => $companyA->id]);
+        $this->assertDatabaseMissing('company_cbms_api_configurations', ['company_id'=>$companyA->id]);
         $this->assertFalse(File::exists($pathA));
 
         $this->assertDatabaseHas('companies', ['id' => $companyB->id, 'company_name' => 'Company B']);
@@ -195,9 +203,64 @@ class CompanyPermanentDeletionTest extends TestCase
         $this->assertDatabaseHas('customers', ['company_id' => $companyB->id, 'name' => 'Customer B']);
         $this->assertDatabaseHas('sessions', ['id' => 'session-b']);
         $this->assertDatabaseHas('company_whatsapp_settings', ['company_id' => $companyB->id]);
+        $this->assertDatabaseHas('company_cbms_api_configurations', ['company_id'=>$companyB->id,'encrypted_credential'=>'encrypted-b']);
         $this->assertTrue(File::exists($pathB.'/b.txt'));
         $this->assertDatabaseHas('users', ['id' => $superAdmin->id, 'company_id' => null]);
         $this->assertDatabaseHas('roles', ['id' => Role::COMPANY_ADMIN_ID]);
+    }
+
+    public function test_nepal_cbms_issued_invoice_blocks_permanent_delete_before_any_data_is_removed(): void
+    {
+        $country = Country::create(['name' => 'Nepal', 'iso_code' => 'NP', 'is_active' => true]);
+        $company = $this->company('Protected Fiscal Company');
+        $company->update(['country_id' => $country->id]);
+        $admin = $this->user(Role::COMPANY_ADMIN_ID, $company->id, 'protected-admin@example.test');
+        $superAdmin = $this->user(Role::SUPER_ADMIN_ID, null, 'protected-super@example.test');
+        $financialYearId = DB::table('financial_years')->insertGetId([
+            'company_id' => $company->id, 'name' => '2026', 'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31', 'is_active' => 1, 'is_closed' => 0, 'is_locked' => 0,
+            'created_by' => $admin->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $customerId = DB::table('customers')->insertGetId($this->customerRow($company->id, 'Protected Customer'));
+        $invoiceId = DB::table('sales_invoices')->insertGetId([
+            'created_by' => $admin->id, 'company_id' => $company->id, 'financial_year_id' => $financialYearId,
+            'customer_id' => $customerId, 'invoice_no' => 'SI-PROTECTED', 'sale_date' => '2026-06-15',
+            'subtotal' => 100, 'discount' => 0, 'total_vat' => 0, 'grand_total' => 100,
+            'paid_amount' => 0, 'due_amount' => 100, 'payment_status' => 'unpaid', 'status' => 1,
+            'fiscal_issued_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        CompanyIrdCbmsSetting::create(['company_id' => $company->id, 'is_enabled' => true, 'updated_by' => $admin->id]);
+
+        try {
+            app(CompanyPermanentDeletionService::class)->delete($company->fresh(), $superAdmin->id);
+            $this->fail('Permanent deletion did not preserve the issued fiscal invoice.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame(FiscalDocumentPolicyService::ISSUED_INVOICE_MUTATION_MESSAGE, $e->getMessage());
+        }
+
+        $this->assertDatabaseHas('companies', ['id' => $company->id]);
+        $this->assertDatabaseHas('sales_invoices', ['id' => $invoiceId, 'status' => 1]);
+        $this->assertDatabaseHas('customers', ['id' => $customerId]);
+        $this->assertDatabaseHas('company_ird_cbms_settings', ['company_id' => $company->id, 'is_enabled' => 1]);
+        $this->assertDatabaseHas('fiscal_document_audit_events', [
+            'company_id' => $company->id,
+            'document_type' => 'sales_invoice',
+            'document_id' => $invoiceId,
+            'event_type' => 'protected_company_deletion_blocked',
+        ]);
+
+        try {
+            $company->fresh()->delete();
+            $this->fail('Direct Company model deletion bypassed protected fiscal history.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame(FiscalDocumentPolicyService::ISSUED_INVOICE_MUTATION_MESSAGE, $e->getMessage());
+        }
+        $this->assertDatabaseHas('companies', ['id' => $company->id]);
+        $this->assertSame(2, DB::table('fiscal_document_audit_events')
+            ->where('company_id', $company->id)
+            ->where('document_id', $invoiceId)
+            ->where('event_type', 'protected_company_deletion_blocked')->count());
     }
 
     private function company(string $name): Company

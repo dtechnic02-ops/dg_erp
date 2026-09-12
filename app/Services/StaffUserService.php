@@ -19,7 +19,7 @@ class StaffUserService
     {
         return User::query()
             ->where('company_id', $companyId)
-            ->where('role_id', $this->staffRoleId());
+            ->whereIn('role_id', [Role::COMPANY_STAFF_ID, Role::AUDITOR_ID]);
     }
 
     public function paginateStaff(Request $request, int $companyId): LengthAwarePaginator

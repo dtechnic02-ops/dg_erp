@@ -150,7 +150,7 @@ class EmployeeAccountController extends Controller implements HasMiddleware
                 $contract = null;
 
                 if ($request->hasFile('photo')) {
-                    $photo = FileUploadService::uploadImage(
+                    $photo = FileUploadService::uploadPrivateImage(
                         $request->file('photo'),
                         $folder,
                         800
@@ -158,21 +158,21 @@ class EmployeeAccountController extends Controller implements HasMiddleware
                 }
 
                 if ($request->hasFile('cv_attachment')) {
-                    $cv = FileUploadService::uploadFile(
+                    $cv = FileUploadService::uploadPrivateFile(
                         $request->file('cv_attachment'),
                         $folder
                     );
                 }
 
                 if ($request->hasFile('id_document')) {
-                    $idDocument = FileUploadService::uploadFile(
+                    $idDocument = FileUploadService::uploadPrivateFile(
                         $request->file('id_document'),
                         $folder
                     );
                 }
 
                 if ($request->hasFile('contract_document')) {
-                    $contract = FileUploadService::uploadFile(
+                    $contract = FileUploadService::uploadPrivateFile(
                         $request->file('contract_document'),
                         $folder
                     );
@@ -273,7 +273,7 @@ class EmployeeAccountController extends Controller implements HasMiddleware
 
         try {
             DB::transaction(function () use ($request, $employee, $folder) {
-                $photo = FileUploadService::replaceImage(
+                $photo = FileUploadService::replacePrivateImage(
                     $request,
                     'photo',
                     $employee->photo,
@@ -281,21 +281,21 @@ class EmployeeAccountController extends Controller implements HasMiddleware
                     800
                 );
 
-                $cvAttachment = FileUploadService::replaceFile(
+                $cvAttachment = FileUploadService::replacePrivateFile(
                     $request,
                     'cv_attachment',
                     $employee->cv_attachment,
                     $folder
                 );
 
-                $idDocument = FileUploadService::replaceFile(
+                $idDocument = FileUploadService::replacePrivateFile(
                     $request,
                     'id_document',
                     $employee->id_document,
                     $folder
                 );
 
-                $contractDocument = FileUploadService::replaceFile(
+                $contractDocument = FileUploadService::replacePrivateFile(
                     $request,
                     'contract_document',
                     $employee->contract_document,

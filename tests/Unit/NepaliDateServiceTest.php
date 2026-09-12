@@ -87,6 +87,14 @@ class NepaliDateServiceTest extends TestCase
         $this->assertSame($before, $ad->format('Y-m-d H:i:s'));
     }
 
+    public function test_ird_dotted_date_reuses_the_central_conversion(): void
+    {
+        $this->assertSame('2081.01.01', $this->service->adToIrdBs('2024-04-13'));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->service->adToIrdBs('2033-04-14');
+    }
+
     public function test_company_country_eligibility_is_isolated_per_company(): void
     {
         $nepalCompany = $this->companyIn('NP');

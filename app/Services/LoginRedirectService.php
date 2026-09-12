@@ -35,7 +35,7 @@ class LoginRedirectService
             return $this->denyAccess('No role assigned');
         }
 
-        if ((int) $user->role_id === Role::SUPER_STAFF_ID) {
+        if (in_array((int) $user->role_id, [Role::SUPER_STAFF_ID, Role::COUNTRY_ADMIN_ID], true)) {
             return $this->redirectSuperStaffUser($user);
         }
 

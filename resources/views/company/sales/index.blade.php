@@ -249,9 +249,11 @@
                                                         @php
                                                             $hasActivePayments = (int) ($invoice->active_payments_count ?? 0) > 0;
                                                             $hasActiveReturns = in_array((int) $invoice->id, $activeReturnInvoiceIds ?? [], true);
-                                                            $canCancelInvoice = !$hasActivePayments && !$hasActiveReturns;
+                                                            $canCancelInvoice = !($isFiscalDocumentImmutable ?? false) && !$hasActivePayments && !$hasActiveReturns;
 
-                                                            if ($hasActivePayments && $hasActiveReturns) {
+                                                            if ($isFiscalDocumentImmutable ?? false) {
+                                                                $cancelBlockMessage = 'Issued IRD/CBMS invoices must use the prescribed return/credit-note correction process.';
+                                                            } elseif ($hasActivePayments && $hasActiveReturns) {
                                                                 $cancelBlockMessage = 'Cannot cancel: active payment(s) and sales return(s) exist.';
                                                             } elseif ($hasActivePayments) {
                                                                 $cancelBlockMessage = 'Cannot cancel: one or more active payments exist.';
@@ -299,7 +301,7 @@
                 @php
                     $hasActivePayments = (int) ($invoice->active_payments_count ?? 0) > 0;
                     $hasActiveReturns = in_array((int) $invoice->id, $activeReturnInvoiceIds ?? [], true);
-                    $canCancelInvoice = !$hasActivePayments && !$hasActiveReturns;
+                    $canCancelInvoice = !($isFiscalDocumentImmutable ?? false) && !$hasActivePayments && !$hasActiveReturns;
                 @endphp
                 @if ((int) $invoice->status === 1 && $canCancelInvoice)
                     @include('company.partials.dg-sales-cancel-modal', [

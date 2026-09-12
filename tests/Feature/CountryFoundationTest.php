@@ -25,7 +25,7 @@ class CountryFoundationTest extends TestCase
         parent::setUp();
         foreach (['company_subscriptions','subscription_plans','user_permissions','permission_role','permissions','users','roles','countries','company_registrations','companies'] as $table) Schema::dropIfExists($table);
         Schema::create('companies', function(Blueprint $t){$t->id();$t->string('company_name');$t->string('mobile')->unique();$t->string('email')->unique();foreach(['telephone','fax_no','website','address','address_line_2','country','language','pan_number','vat_number','logo_path','signature_path'] as $c)$t->string($c)->nullable();$t->string('status')->default('active');$t->timestamps();});
-        Schema::create('company_registrations', function(Blueprint $t){$t->id();$t->string('company_name');$t->string('full_name');$t->string('email')->unique();$t->string('username')->unique();$t->string('password');$t->string('mobile_no')->nullable();$t->string('country')->nullable();$t->integer('selected_user_limit')->default(5);$t->string('status')->default('pending');$t->timestamps();});
+        Schema::create('company_registrations', function(Blueprint $t){$t->id();$t->string('company_name');$t->string('full_name');$t->string('email')->unique();$t->string('username')->unique();$t->string('password');$t->string('mobile_no')->nullable();$t->string('country')->nullable();$t->unsignedBigInteger('registered_by_user_id')->nullable();$t->integer('selected_user_limit')->default(5);$t->string('status')->default('pending');$t->unsignedBigInteger('approved_by')->nullable();$t->timestamp('approved_at')->nullable();$t->unsignedBigInteger('rejected_by')->nullable();$t->timestamp('rejected_at')->nullable();$t->timestamps();});
         DB::table('companies')->insert([['id'=>1,'company_name'=>'Nepal Legacy','mobile'=>'100','email'=>'one@example.test','country'=>'NEPAL'],['id'=>2,'company_name'=>'Unmapped Legacy','mobile'=>'200','email'=>'two@example.test','country'=>'Atlantis']]);
         DB::table('company_registrations')->insert([['id'=>1,'company_name'=>'NP Registration','full_name'=>'One','email'=>'reg@example.test','username'=>'reg','password'=>'x','mobile_no'=>'300','country'=>'NP','status'=>'pending'],['id'=>2,'company_name'=>'Unknown Registration','full_name'=>'Two','email'=>'unknown@example.test','username'=>'unknown','password'=>'x','mobile_no'=>'400','country'=>'Unknown Land','status'=>'pending']]);
         Log::spy();
@@ -42,7 +42,7 @@ class CountryFoundationTest extends TestCase
         }
 
         Schema::create('roles', fn(Blueprint $t)=>[$t->id(),$t->string('name'),$t->timestamps()]);
-        Schema::create('users', function(Blueprint $t){$t->id();$t->string('name');$t->string('email')->unique();$t->string('password');$t->unsignedBigInteger('role_id')->nullable();$t->unsignedBigInteger('company_id')->nullable();$t->string('account_status')->default('active');$t->timestamp('last_seen')->nullable();$t->rememberToken();$t->timestamps();});
+        Schema::create('users', function(Blueprint $t){$t->id();$t->string('name');$t->string('email')->unique();$t->string('password');$t->unsignedBigInteger('role_id')->nullable();$t->unsignedBigInteger('company_id')->nullable();$t->unsignedBigInteger('country_id')->nullable();$t->string('account_status')->default('active');$t->timestamp('last_seen')->nullable();$t->rememberToken();$t->timestamps();});
         Schema::create('permissions', fn(Blueprint $t)=>[$t->id(),$t->string('name'),$t->string('scope'),$t->timestamps()]);
         Schema::create('permission_role', fn(Blueprint $t)=>[$t->id(),$t->unsignedBigInteger('permission_id'),$t->unsignedBigInteger('role_id'),$t->timestamps()]);
         Schema::create('user_permissions', fn(Blueprint $t)=>[$t->id(),$t->unsignedBigInteger('user_id'),$t->unsignedBigInteger('permission_id'),$t->boolean('is_allowed'),$t->timestamps()]);
@@ -85,9 +85,9 @@ class CountryFoundationTest extends TestCase
     public function test_registration_dropdown_saves_only_active_country_id(): void
     {
         $nepal=Country::where('iso_code','NP')->sole();
-        $this->get(route('company.register'))->assertOk()->assertSee('name="country_id"',false)->assertDontSee('name="country"',false);
+        $this->actingAs(User::findOrFail(99))->get(route('company.register'))->assertOk()->assertSee('name="country_id"',false)->assertDontSee('name="country"',false);
         $payload=['company_name'=>'New Co','full_name'=>'New Owner','email'=>'new@example.test','mobile_no'=>'500','username'=>'new-owner','password'=>'secret1','country_id'=>$nepal->id];
-        $this->post(route('company.register.post'),$payload)->assertRedirect(route('login'));
+        $this->post(route('company.register.post'),$payload)->assertRedirect(route('admin.registrations'));
         $this->assertDatabaseHas('company_registrations',['email'=>'new@example.test','country_id'=>$nepal->id]);
         $inactive=Country::create(['name'=>'Inactive','iso_code'=>'ZZ','is_active'=>0]);$payload['email']='bad@example.test';$payload['username']='bad-owner';$payload['mobile_no']='501';$payload['country_id']=$inactive->id;
         $this->post(route('company.register.post'),$payload)->assertSessionHasErrors('country_id');

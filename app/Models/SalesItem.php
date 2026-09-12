@@ -35,6 +35,13 @@ class SalesItem extends Model
 
         'vat_amount',
 
+        'fiscal_discount_amount',
+
+        'fiscal_net_base',
+
+        'tax_classification',
+
+
         'total_price',
 
     ];
@@ -45,6 +52,8 @@ class SalesItem extends Model
         'unit_price'   => 'decimal:2',
         'vat_rate'     => 'decimal:2',
         'vat_amount'   => 'decimal:2',
+        'fiscal_discount_amount' => 'decimal:2',
+        'fiscal_net_base' => 'decimal:2',
         'total_price'  => 'decimal:2',
     ];
 

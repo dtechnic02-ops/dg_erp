@@ -250,6 +250,7 @@
            value="{{ $company->language }}">
 </div>
 
+@if($company->countryMaster?->iso_code !== 'NP')
 <!-- PAN -->
 <div class="row">
     <span class="label">PAN Number</span>
@@ -269,6 +270,16 @@
            name="vat_number"
            value="{{ $company->vat_number }}">
 </div>
+@else
+<div class="row">
+    <span class="label">Nepal Tax Identity</span>
+    <div style="width:100%;">
+        <span>PAN: {{ $company->pan_number ?: 'Not configured' }}</span><br>
+        <span>VAT: {{ $company->vat_number ?: 'Not registered' }}</span><br>
+        <a href="{{ route('company.settings.ird-cbms.edit') }}">Manage Nepal PAN/VAT settings</a>
+    </div>
+</div>
+@endif
 
 <!-- ADDRESS -->
 <div class="row">

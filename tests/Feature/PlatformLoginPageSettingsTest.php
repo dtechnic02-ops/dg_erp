@@ -61,7 +61,7 @@ class PlatformLoginPageSettingsTest extends TestCase
             ->assertSee('Business without boundaries')
             ->assertSee('Business dashboard')
             ->assertSee(route('login.post'), false)
-            ->assertSee(route('company.register'), false);
+            ->assertDontSee(route('company.register'), false);
     }
 
     public function test_replacing_media_deletes_only_the_previous_login_media_after_success(): void

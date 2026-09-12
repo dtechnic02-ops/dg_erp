@@ -1,6 +1,11 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Company-owned uploads are delivered only by authenticated Laravel routes.
+    RewriteRule ^companies/[0-9]+/(?:customers|employees|employee-payments|expenses|income|contra|loans|loan-payments|party-accounts|purchase-payments|sales-payments|purchase-return-refunds|sales-return-refunds|returns|deliveries)(?:/|$) - [R=404,L,NC]
+    RewriteRule ^storage/companies/[0-9]+/(?:customers|employees|employee-payments|expenses|income|contra|loans|loan-payments|party-accounts|purchase-payments|sales-payments|purchase-return-refunds|sales-return-refunds|returns|deliveries)(?:/|$) - [R=404,L,NC]
+    RewriteRule ^storage/subscription-payments(?:/|$) - [R=404,L,NC]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

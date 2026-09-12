@@ -77,6 +77,7 @@ use App\Http\Controllers\Company\IncomeController;
 use App\Http\Controllers\Company\IncomeCategoryController;
 use App\Http\Controllers\Company\JournalController;
 use App\Http\Controllers\Company\FinancialYearController;
+use App\Http\Controllers\Company\IrdCbmsSettingController;
 use App\Http\Controllers\Company\ContraController;
 use App\Http\Controllers\Company\VatReportController;
 use App\Http\Controllers\Company\SalarySheetController;
@@ -103,13 +104,22 @@ Route::post('/login', function (Request $request) {
         'password' => 'required',
     ]);
 
+    $key = 'login:'.hash('sha256', strtolower(trim((string) $request->email)).'|'.$request->ip());
+    if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($key, 5)) {
+        return back()->with('error', 'Too many login attempts. Please try again later.')->setStatusCode(429);
+    }
+
     if (Auth::attempt($request->only('email','password'))) {
+
+        \Illuminate\Support\Facades\RateLimiter::clear($key);
 
         $request->session()->regenerate();
         $user = Auth::user();
 
         if ($user->account_status !== 'active') {
             Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
             return back()->with('error', 'Access denied');
         }
@@ -123,6 +133,7 @@ Route::post('/login', function (Request $request) {
         return app(LoginRedirectService::class)->redirectAfterLogin($user);
     }
 
+    \Illuminate\Support\Facades\RateLimiter::hit($key, 60);
     return back()->with('error','Invalid Credentials');
 
 })->name('login.post');
@@ -150,15 +161,14 @@ Route::middleware('throttle:10,1')->prefix('password-reset')->name('password-res
 
 
 
- Route::get('/company/register', [App\Http\Controllers\CompanyRegisterController::class, 'showForm'])->name('company.register');
-
- Route::post('/company/register', [App\Http\Controllers\CompanyRegisterController::class, 'register'])->name('company.register.post');
-
-
-
 //SUPER ADMIN ROUTES
 
-Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'account.active', 'platform.user'])->prefix('admin')->group(function () {
+
+    Route::get('/company/register', [CompanyRegisterController::class, 'showForm'])
+        ->middleware('platform.permission:platform_registrations_create')->name('company.register');
+    Route::post('/company/register', [CompanyRegisterController::class, 'register'])
+        ->middleware('platform.permission:platform_registrations_create')->name('company.register.post');
 
     Route::middleware('platform.permission:platform_settings_manage')->prefix('countries')->name('admin.countries.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Admin\CountryController::class, 'index'])->name('index');
@@ -185,6 +195,12 @@ Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function ()
 
     Route::get('/companies', [CompanyController::class, 'index'])->name('admin.companies');
     Route::get('/company/{company}', [CompanyController::class, 'show'])->name('admin.company.show');
+    Route::put('/company/{company}/ird-cbms', [CompanyController::class, 'updateIrdCbmsStatus'])
+        ->middleware('platform.permission:platform_compliance_manage')->name('admin.company.ird-cbms.update');
+    Route::put('/company/{company}/tax-identity', [CompanyController::class, 'updateTaxIdentity'])
+        ->middleware('platform.permission:platform_compliance_manage')->name('admin.company.tax-identity.update');
+    Route::get('/company/{company}/cbms-api', [\App\Http\Controllers\CbmsApiConfigurationController::class,'platformEdit'])->name('admin.company.cbms-api.edit');
+    Route::put('/company/{company}/cbms-api', [\App\Http\Controllers\CbmsApiConfigurationController::class,'platformUpdate'])->name('admin.company.cbms-api.update');
 
     Route::post('/company/block/{id}', [CompanyController::class, 'block'])->name('admin.company.block');
     Route::post('/company/unblock/{id}', [CompanyController::class, 'unblock'])->name('admin.company.unblock');
@@ -232,6 +248,7 @@ Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function ()
         Route::post('/approve/{id}', 'approve')->name('approve');
         Route::post('/reject/{id}', 'reject')->name('reject');
         Route::get('/invoice/{id}', 'invoice')->name('invoice');
+        Route::get('/proof/{id}', 'proof')->name('proof');
     });
 
     Route::get('/subscription-reports', [SubscriptionReportController::class, 'index'])->name('admin.subscription-reports.index');
@@ -282,7 +299,10 @@ Route::middleware(['auth', 'platform.user'])->prefix('admin')->group(function ()
 });
 
 
-Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::class,'subscription'])->prefix('company')->name('company.')->group(function () {
+Route::middleware(['auth','account.active','company.user','auditor.readonly',\App\Http\Middleware\UpdateLastSeen::class,'subscription'])->prefix('company')->name('company.')->group(function () {
+    Route::get('/protected-files/{type}/{id}/{field}', [\App\Http\Controllers\Company\ProtectedCompanyFileController::class, 'show'])
+        ->where(['type' => '[a-z-]+', 'id' => '[0-9]+', 'field' => '[a-z_]+'])
+        ->name('protected-files.show');
 
     Route::get('/calendar/ad-to-bs', NepaliDateController::class)->name('calendar.ad-to-bs');
 
@@ -340,6 +360,22 @@ Route::middleware(['auth','company.user',\App\Http\Middleware\UpdateLastSeen::cl
         Route::put('/', [\App\Http\Controllers\Company\WhatsappSettingController::class, 'update'])
             ->middleware('permission:edit_company_profile')->name('update');
     });
+
+    Route::prefix('settings/ird-cbms')->name('settings.ird-cbms.')->group(function () {
+        Route::get('/', [IrdCbmsSettingController::class, 'edit'])
+            ->middleware('permission:view_company_profile')->name('edit');
+        Route::put('/', [IrdCbmsSettingController::class, 'update'])
+            ->middleware('permission:edit_company_profile')->name('update');
+        Route::put('/tax-identity', [IrdCbmsSettingController::class, 'updateTaxIdentity'])
+            ->middleware('permission:edit_company_profile')->name('tax-identity.update');
+    });
+    Route::get('/settings/cbms-api',[\App\Http\Controllers\CbmsApiConfigurationController::class,'tenantEdit'])->name('settings.cbms-api.edit');
+    Route::put('/settings/cbms-api',[\App\Http\Controllers\CbmsApiConfigurationController::class,'tenantUpdate'])->name('settings.cbms-api.update');
+    Route::get('/settings/cbms-transmissions', [\App\Http\Controllers\Company\CbmsTransmissionController::class, 'index'])->name('settings.cbms-transmissions.index');
+    Route::get('/settings/cbms-transmissions/{transmission}', [\App\Http\Controllers\Company\CbmsTransmissionController::class, 'show'])->name('settings.cbms-transmissions.show');
+    Route::post('/settings/cbms-transmissions/{transmission}/queue', [\App\Http\Controllers\Company\CbmsTransmissionController::class, 'queue'])->name('settings.cbms-transmissions.queue');
+    Route::post('/settings/cbms-transmissions/{transmission}/retry', [\App\Http\Controllers\Company\CbmsTransmissionController::class, 'retry'])->name('settings.cbms-transmissions.retry');
+    Route::post('/settings/cbms-transmissions/{transmission}/reconcile', [\App\Http\Controllers\Company\CbmsTransmissionController::class, 'reconcile'])->name('settings.cbms-transmissions.reconcile');
 
     Route::prefix('settings/factory-reset')->name('settings.factory-reset.')->group(function () {
         Route::get('/', [CompanyFactoryResetController::class, 'show'])->name('show');
@@ -821,6 +857,9 @@ Route::prefix('vat-reports')
         '/print',
         [VatReportController::class, 'print']
     )->name('print');
+
+    Route::get('/fiscal-sales', [VatReportController::class, 'fiscalSales'])->name('fiscal-sales');
+    Route::get('/fiscal-sales/print', [VatReportController::class, 'printFiscalSales'])->name('fiscal-sales.print');
 
 });
 

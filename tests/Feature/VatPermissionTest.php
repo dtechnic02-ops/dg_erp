@@ -48,8 +48,8 @@ class VatPermissionTest extends TestCase
             $t->boolean('status')->default(true);
             $t->timestamps();
         });
-        Schema::create('sales_invoices', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->unsignedBigInteger('financial_year_id')->nullable(), $t->unsignedBigInteger('customer_id')->nullable(), $t->string('invoice_no'), $t->date('sale_date'), $t->decimal('total_vat', 20, 4)->default(0), $t->integer('status')->default(1), $t->timestamps()]);
-        Schema::create('sales_returns', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->unsignedBigInteger('financial_year_id')->nullable(), $t->unsignedBigInteger('customer_id')->nullable(), $t->string('return_no'), $t->date('return_date'), $t->decimal('total_vat', 20, 4)->default(0), $t->integer('status')->default(1), $t->timestamps()]);
+        Schema::create('sales_invoices', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->unsignedBigInteger('financial_year_id')->nullable(), $t->unsignedBigInteger('customer_id')->nullable(), $t->string('invoice_no'), $t->date('sale_date'), $t->dateTime('fiscal_issued_at')->nullable(), $t->decimal('total_vat', 20, 4)->default(0), $t->integer('status')->default(1), $t->timestamps()]);
+        Schema::create('sales_returns', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->unsignedBigInteger('financial_year_id')->nullable(), $t->unsignedBigInteger('sales_invoice_id')->nullable(), $t->unsignedBigInteger('customer_id')->nullable(), $t->string('return_no'), $t->date('return_date'), $t->dateTime('fiscal_issued_at')->nullable(), $t->decimal('total_vat', 20, 4)->default(0), $t->integer('status')->default(1), $t->timestamps()]);
         Schema::create('purchase_invoices', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->unsignedBigInteger('financial_year_id')->nullable(), $t->unsignedBigInteger('supplier_id')->nullable(), $t->string('invoice_no'), $t->date('purchase_date'), $t->decimal('total_vat', 20, 4)->default(0), $t->integer('status')->default(1), $t->timestamps()]);
         Schema::create('purchase_returns', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->unsignedBigInteger('financial_year_id')->nullable(), $t->unsignedBigInteger('supplier_id')->nullable(), $t->string('return_no'), $t->date('return_date'), $t->decimal('total_vat', 20, 4)->default(0), $t->integer('status')->default(1), $t->timestamps()]);
 
@@ -121,6 +121,8 @@ class VatPermissionTest extends TestCase
             ['post', 'company.vats.delete', [$vat->id], []],
             ['get', 'company.vat-report.index', [], []],
             ['get', 'company.vat-report.print', [], []],
+            ['get', 'company.vat-report.fiscal-sales', [], []],
+            ['get', 'company.vat-report.fiscal-sales.print', [], []],
         ];
     }
 

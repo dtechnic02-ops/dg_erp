@@ -58,6 +58,12 @@ class NepaliDateService
         return $this->adToBs($adDate);
     }
 
+    /** Format the centralized AD-to-BS result for the IRD dotted date field. */
+    public function adToIrdBs(string|DateTimeInterface $adDate): string
+    {
+        return str_replace('-', '.', $this->adToBs($adDate));
+    }
+
     private function normalizeAdDate(string|DateTimeInterface $adDate): DateTimeImmutable
     {
         if ($adDate instanceof DateTimeInterface) {

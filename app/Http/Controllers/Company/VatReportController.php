@@ -9,6 +9,7 @@ use App\Models\PurchaseInvoice;
 use App\Models\PurchaseReturn;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
+use App\Services\SalesFiscalReportService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -44,6 +45,37 @@ class VatReportController extends Controller
                 ['print' => 1]
             )
         );
+    }
+
+    public function fiscalSales(Request $request, SalesFiscalReportService $reports)
+    {
+        $this->authorizeCompanyPermission('view_vat');
+
+        $companyId = (int) Auth::user()->company_id;
+        $financialYears = FinancialYear::where('company_id', $companyId)->latest('id')->get();
+        $activeFy = $financialYears->firstWhere('is_active', true);
+        $financialYearId = $request->has('financial_year_id')
+            ? ($request->filled('financial_year_id') ? (int) $request->financial_year_id : null)
+            : $activeFy?->id;
+
+        if ($financialYearId && ! $financialYears->contains('id', $financialYearId)) {
+            return back()->with('error', 'Selected financial year not found.');
+        }
+
+        $fromDate = $request->from_date ?: ($request->has('financial_year_id') ? null : $activeFy?->start_date);
+        $toDate = $request->to_date ?: ($request->has('financial_year_id') ? null : $activeFy?->end_date);
+        $report = $reports->report($companyId, $financialYearId, $fromDate, $toDate);
+
+        return view('company.vat-report.fiscal-sales', compact(
+            'report', 'financialYears', 'activeFy', 'financialYearId', 'fromDate', 'toDate'
+        ));
+    }
+
+    public function printFiscalSales(Request $request)
+    {
+        $this->authorizeCompanyPermission('print_vat');
+
+        return redirect()->route('company.vat-report.fiscal-sales', array_merge($request->query(), ['print' => 1]));
     }
 
     protected function buildReport(Request $request): array|\Illuminate\Http\RedirectResponse

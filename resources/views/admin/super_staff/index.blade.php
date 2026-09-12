@@ -33,6 +33,7 @@
                                         <tr>
                                             <th scope="col">Name</th>
                                             <th scope="col">Email</th>
+                                            <th scope="col">Role / Country</th>
                                             <th scope="col">Status</th>
                                             <th scope="col" class="text-end">Action</th>
                                         </tr>
@@ -42,6 +43,7 @@
                                             <tr class="dg-row">
                                                 <td>{{ $staff->name }}</td>
                                                 <td>{{ $staff->email }}</td>
+                                                <td>{{ (int)$staff->role_id === 5 ? 'Country Admin' : 'Super Staff' }} / {{ $staff->countryMaster?->name ?? 'Unassigned' }}</td>
                                                 <td>
                                                     <span class="badge {{ $staff->account_status === 'active' ? 'text-bg-success' : 'text-bg-secondary' }}">
                                                         {{ ucfirst($staff->account_status) }}
@@ -51,7 +53,7 @@
                                                     <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
                                                         <a href="{{ route('admin.super-staff.show', $staff) }}" class="btn btn-sm btn-outline-primary dg-btn">View</a>
                                                         <a href="{{ route('admin.super-staff.edit', $staff) }}" class="btn btn-sm btn-outline-warning dg-btn">Edit</a>
-                                                        <a href="{{ route('admin.super-staff.permissions.edit', $staff) }}" class="btn btn-sm btn-outline-info dg-btn">Permissions</a>
+                                                        @if((int)$staff->role_id === 4)<a href="{{ route('admin.super-staff.permissions.edit', $staff) }}" class="btn btn-sm btn-outline-info dg-btn">Permissions</a>@endif
                                                         @if($staff->account_status === 'active')
                                                             <form method="POST" action="{{ route('admin.super-staff.block', $staff) }}">
                                                                 @csrf

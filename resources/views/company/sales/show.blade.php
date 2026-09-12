@@ -15,7 +15,7 @@
                     @if($whatsappShareEnabled ?? false)
                         <a href="{{ route('company.sales.whatsapp-share', $invoice->id) }}" target="_blank" rel="noopener noreferrer" class="btn btn-success dg-btn">Open WhatsApp</a>
                     @endif
-                    @if ($invoice->status == 1)
+                    @if ($invoice->status == 1 && ! ($isFiscalDocumentImmutable ?? false))
                         <a href="{{ route('company.sales.edit', $invoice->id) }}" class="btn btn-outline-primary dg-btn">Edit</a>
                     @endif
                     @if ($invoice->due_amount > 0)
@@ -35,6 +35,25 @@
 
     <main class="dg-container">
         <div class="container-fluid">
+
+            @if($isFiscalDocumentImmutable ?? false)
+                <div class="alert alert-info dg-alert d-print-none">Issued Nepal IRD/CBMS fiscal document — editing is locked.</div>
+            @endif
+
+            @if($invoice->cancelled_at)
+                <div class="alert alert-danger dg-alert"><strong>CANCELLED</strong> — {{ $invoice->cancellation_reason }} — {{ $invoice->cancelled_at }}</div>
+            @endif
+
+            @if(($isFiscalDocumentImmutable ?? false) && $fiscalHistory->isNotEmpty())
+                <section class="card dg-card mb-3 d-print-none">
+                    <div class="card-header dg-card-header">Fiscal History</div>
+                    <ul class="list-group list-group-flush">
+                        @foreach($fiscalHistory as $event)
+                            <li class="list-group-item">{{ str_replace('_', ' ', ucfirst($event->event_type)) }} — {{ $event->event_at }} — {{ $event->actor?->name ?? 'System' }}@if($event->metadata['reason'] ?? null) — {{ $event->metadata['reason'] }}@endif</li>
+                        @endforeach
+                    </ul>
+                </section>
+            @endif
 
             @if (session('success'))
                 <div class="alert alert-success dg-alert d-print-none" role="alert">

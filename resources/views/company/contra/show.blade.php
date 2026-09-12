@@ -126,7 +126,7 @@
                 @if($contra->attachment)
 
                     <a
-                        href="{{ asset($contra->attachment) }}"
+                        href="{{ route('company.protected-files.show', ['contra', $contra->id, 'attachment']) }}"
                         target="_blank"
                         class="btn btn-info btn-sm mt-2"
                     >

@@ -185,7 +185,7 @@
                                     <input type="file" name="photo" id="photo" class="form-control dg-input">
                                     @if ($employee->photo)
                                         <div class="mt-2">
-                                            <img src="{{ asset($employee->photo) }}" width="100" alt="Employee photo">
+                                            <img src="{{ route('company.protected-files.show', ['employee', $employee->id, 'photo']) }}" width="100" alt="Employee photo">
                                         </div>
                                     @endif
                                 </div>
@@ -195,7 +195,7 @@
                                     <input type="file" name="cv_attachment" id="cv_attachment" class="form-control dg-input">
                                     @if ($employee->cv_attachment)
                                         <div class="mt-2">
-                                            <a target="_blank" class="btn btn-sm btn-outline-secondary dg-btn" href="{{ asset($employee->cv_attachment) }}">View CV</a>
+                                            <a target="_blank" class="btn btn-sm btn-outline-secondary dg-btn" href="{{ route('company.protected-files.show', ['employee', $employee->id, 'cv_attachment']) }}">View CV</a>
                                         </div>
                                     @endif
                                 </div>
@@ -205,7 +205,7 @@
                                     <input type="file" name="id_document" id="id_document" class="form-control dg-input">
                                     @if ($employee->id_document)
                                         <div class="mt-2">
-                                            <a target="_blank" class="btn btn-sm btn-outline-secondary dg-btn" href="{{ asset($employee->id_document) }}">View ID</a>
+                                            <a target="_blank" class="btn btn-sm btn-outline-secondary dg-btn" href="{{ route('company.protected-files.show', ['employee', $employee->id, 'id_document']) }}">View ID</a>
                                         </div>
                                     @endif
                                 </div>
@@ -215,7 +215,7 @@
                                     <input type="file" name="contract_document" id="contract_document" class="form-control dg-input">
                                     @if ($employee->contract_document)
                                         <div class="mt-2">
-                                            <a target="_blank" class="btn btn-sm btn-outline-secondary dg-btn" href="{{ asset($employee->contract_document) }}">View Contract</a>
+                                            <a target="_blank" class="btn btn-sm btn-outline-secondary dg-btn" href="{{ route('company.protected-files.show', ['employee', $employee->id, 'contract_document']) }}">View Contract</a>
                                         </div>
                                     @endif
                                 </div>

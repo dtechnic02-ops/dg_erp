@@ -16,6 +16,7 @@ use App\Models\LoanSavingLedger;
 use App\Models\PartyAccount;
 use App\Services\AccountBalanceService;
 use App\Services\ValidationService;
+use App\Services\FileUploadService;
 use App\Services\Money;
 use App\Services\Accounting\Integrations\LoanAccountingIntegrationService;
 use Carbon\Carbon;
@@ -963,16 +964,6 @@ class LoanPaymentController extends Controller implements HasMiddleware
             return null;
         }
 
-        $folder = 'companies/' . $companyId . '/loan-payments';
-
-        if (!file_exists(public_path($folder))) {
-            mkdir(public_path($folder), 0777, true);
-        }
-
-        $uploadedFile = $request->file('attachment');
-        $name = $uploadedFile->hashName();
-        $uploadedFile->move(public_path($folder), $name);
-
-        return $folder . '/' . $name;
+        return FileUploadService::uploadPrivateFile($request->file('attachment'), 'companies/' . $companyId . '/loan-payments');
     }
 }

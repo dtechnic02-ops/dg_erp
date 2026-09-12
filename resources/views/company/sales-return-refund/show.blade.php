@@ -375,7 +375,7 @@
                             <div class="dg-invoice-note-block d-print-none">
                                 <h3 class="dg-invoice-note-title">Attachment</h3>
                                 <div class="dg-invoice-note-body">
-                                    <a href="{{ asset($refund->attachment) }}" target="_blank" rel="noopener">View Attachment</a>
+                                    <a href="{{ route('company.protected-files.show', ['sales-return-refund', $refund->id, 'attachment']) }}" target="_blank" rel="noopener">View Attachment</a>
                                 </div>
                             </div>
                         @endif

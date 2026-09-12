@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Country;
 use App\Services\PlatformAuthorizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Services\UserSessionRevocationService;
 
 class SuperStaffController extends Controller
 {
@@ -20,7 +22,7 @@ class SuperStaffController extends Controller
         $this->authorizeSuperAdmin();
 
         $superStaff = User::query()
-            ->where('role_id', Role::SUPER_STAFF_ID)
+            ->whereIn('role_id', [Role::COUNTRY_ADMIN_ID, Role::SUPER_STAFF_ID])
             ->whereNull('company_id')
             ->latest()
             ->paginate(15);
@@ -32,7 +34,7 @@ class SuperStaffController extends Controller
     {
         $this->authorizeSuperAdmin();
 
-        return view('admin.super_staff.create');
+        return view('admin.super_staff.create', ['countries' => Country::where('is_active', true)->orderBy('name')->get()]);
     }
 
     public function store(Request $request)
@@ -43,13 +45,16 @@ class SuperStaffController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'role_id' => ['required', Rule::in([Role::COUNTRY_ADMIN_ID, Role::SUPER_STAFF_ID])],
+            'country_id' => ['required', Rule::exists('countries', 'id')->where(fn ($q) => $q->where('is_active', true))],
         ]);
 
         User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
-            'role_id' => Role::SUPER_STAFF_ID,
+            'role_id' => $data['role_id'],
+            'country_id' => $data['country_id'],
             'company_id' => null,
             'job_role' => null,
             'account_status' => 'active',
@@ -63,7 +68,7 @@ class SuperStaffController extends Controller
     public function show(User $user)
     {
         $this->authorizeSuperAdmin();
-        $this->assertSuperStaff($user);
+        $this->assertPlatformStaff($user);
 
         return view('admin.super_staff.show', compact('user'));
     }
@@ -71,19 +76,20 @@ class SuperStaffController extends Controller
     public function edit(User $user)
     {
         $this->authorizeSuperAdmin();
-        $this->assertSuperStaff($user);
+        $this->assertPlatformStaff($user);
 
-        return view('admin.super_staff.edit', compact('user'));
+        return view('admin.super_staff.edit', ['user' => $user, 'countries' => Country::where('is_active', true)->orderBy('name')->get()]);
     }
 
     public function update(Request $request, User $user)
     {
         $this->authorizeSuperAdmin();
-        $this->assertSuperStaff($user);
+        $this->assertPlatformStaff($user);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'country_id' => ['required', Rule::exists('countries', 'id')->where(fn ($q) => $q->where('is_active', true))],
         ]);
 
         $user->update($data);
@@ -96,9 +102,10 @@ class SuperStaffController extends Controller
     public function block(User $user)
     {
         $this->authorizeSuperAdmin();
-        $this->assertSuperStaff($user);
+        $this->assertPlatformStaff($user);
 
         $user->update(['account_status' => 'blocked']);
+        app(UserSessionRevocationService::class)->revoke($user);
 
         return back()->with('success', 'Super Staff blocked successfully.');
     }
@@ -106,7 +113,7 @@ class SuperStaffController extends Controller
     public function unblock(User $user)
     {
         $this->authorizeSuperAdmin();
-        $this->assertSuperStaff($user);
+        $this->assertPlatformStaff($user);
 
         $user->update(['account_status' => 'active']);
 
@@ -211,5 +218,10 @@ class SuperStaffController extends Controller
             (int) $user->role_id === Role::SUPER_STAFF_ID && $user->company_id === null,
             404
         );
+    }
+
+    private function assertPlatformStaff(User $user): void
+    {
+        abort_unless(in_array((int) $user->role_id, [Role::COUNTRY_ADMIN_ID, Role::SUPER_STAFF_ID], true) && $user->company_id === null, 404);
     }
 }

@@ -223,6 +223,22 @@ class PurchasePermissionTest extends TestCase
         $this->assertNull(session()->getOldInput('quantity')[49]);
     }
 
+    public function test_invalid_or_foreign_item_ids_return_row_validation_errors(): void
+    {
+        DB::table('products')->insert(['id' => 91, 'company_id' => 2, 'name' => 'Foreign product']);
+        DB::table('services')->insert(['id' => 92, 'company_id' => 2, 'name' => 'Foreign service']);
+        foreach ([['product', 91, '', 'product_id.0'], ['service', '', 92, 'service_id.0'], ['product', '', '', 'product_id.0'], ['product', 9999, '', 'product_id.0']] as [$type, $product, $service, $error]) {
+            $this->actingAs(User::findOrFail(1))->from(route('company.purchases.create'))
+                ->post(route('company.purchases.store'), [
+                    'supplier_id' => 1, 'purchase_date' => '2026-06-15',
+                    'item_type' => [$type], 'product_id' => [$product], 'service_id' => [$service],
+                    'quantity' => [1], 'unit_price' => [10],
+                ])->assertRedirect(route('company.purchases.create'))->assertSessionHasErrors($error);
+            $this->assertStringStartsWith('Row 1:', session('errors')->first($error));
+        }
+        $this->assertDatabaseCount('purchase_items', 0);
+    }
+
     private function routes(PurchaseInvoice $invoice): array
     {
         return [

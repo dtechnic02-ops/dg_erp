@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BillingCycle;
 use App\Models\SubscriptionPlan;
 use App\Services\SubscriptionService;
+use App\Services\FileUploadService;
 use Illuminate\Http\Request;
 use RuntimeException;
 
@@ -20,7 +21,7 @@ class PaymentController extends Controller
         $request->validate([
             'subscription_plan_id' => 'required|exists:subscription_plans,id',
             'billing_cycle_id' => 'required|exists:billing_cycles,id',
-            'screenshot' => 'required|image',
+            'screenshot' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png'],
         ]);
 
         try {
@@ -29,7 +30,7 @@ class PaymentController extends Controller
                 'billing_cycle_id' => $request->billing_cycle_id,
                 'payment_method' => 'manual',
                 'payment_date' => now()->toDateString(),
-                'proof_path' => $request->file('screenshot')->store('subscription-payments', 'public'),
+                'proof_path' => FileUploadService::uploadPrivateImage($request->file('screenshot'), 'companies/'.auth()->user()->company_id.'/subscription-payments'),
             ], auth()->user());
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());

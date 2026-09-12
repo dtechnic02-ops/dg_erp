@@ -10,6 +10,8 @@ class Role extends Model
     public const COMPANY_ADMIN_ID = 2;
     public const COMPANY_STAFF_ID = 3;
     public const SUPER_STAFF_ID = 4;
+    public const COUNTRY_ADMIN_ID = 5;
+    public const AUDITOR_ID = 6;
 
     protected $fillable = ['name'];
 
@@ -20,11 +22,11 @@ class Role extends Model
 
     public function resolvesToAdminDashboard(): bool
     {
-        return (int) $this->id === self::SUPER_ADMIN_ID;
+        return in_array((int) $this->id, [self::SUPER_ADMIN_ID, self::COUNTRY_ADMIN_ID], true);
     }
 
     public function resolvesToCompanyDashboard(): bool
     {
-        return in_array((int) $this->id, [self::COMPANY_ADMIN_ID, self::COMPANY_STAFF_ID], true);
+        return in_array((int) $this->id, [self::COMPANY_ADMIN_ID, self::COMPANY_STAFF_ID, self::AUDITOR_ID], true);
     }
 }

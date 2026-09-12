@@ -7,16 +7,19 @@ use App\Models\CompanyRegistration;
 use App\Models\Country;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use App\Services\PlatformAuthorizationService;
 
 class CompanyRegisterController extends Controller
 {
     public function showForm()
     {
+        $this->authorizeCreator();
         return view('company.register', ['countries' => Country::query()->where('is_active', true)->orderBy('name')->get()]);
     }
 
     public function register(Request $request)
     {
+        $this->authorizeCreator();
         $request->validate([
             'company_name' => 'required',
             'full_name' => 'required',
@@ -51,9 +54,15 @@ class CompanyRegisterController extends Controller
             'username' => $request->username,
             'password' => Hash::make($request->password),
             'country_id' => $request->integer('country_id'),
+            'registered_by_user_id' => auth()->id(),
             'status' => 'pending'
         ]);
 
-        return redirect()->route('login')->with('success', 'Registration Submitted');
+        return redirect()->route('admin.registrations')->with('success', 'Registration Submitted');
+    }
+
+    private function authorizeCreator(): void
+    {
+        abort_unless(app(PlatformAuthorizationService::class)->can(auth()->user(), PlatformAuthorizationService::REGISTRATIONS_CREATE), 403);
     }
 }

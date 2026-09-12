@@ -43,6 +43,13 @@ class QuotationModuleTest extends TestCase
             $table->id(); $table->string('name'); $table->char('iso_code', 2)->unique();
             $table->boolean('is_active')->default(true); $table->timestamps();
         });
+        Schema::create('company_ird_cbms_settings', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('company_id')->unique();
+            $table->boolean('is_enabled')->default(false);
+            $table->unsignedBigInteger('updated_by')->nullable();
+            $table->timestamps();
+        });
         Schema::table('companies', fn (Blueprint $table) => $table->unsignedBigInteger('country_id')->nullable());
         Schema::create('vats', function (Blueprint $table): void {
             $table->id(); $table->unsignedBigInteger('company_id'); $table->string('name');
@@ -110,7 +117,7 @@ class QuotationModuleTest extends TestCase
 
     public function test_draft_create_edit_delete_are_non_financial_and_company_scoped(): void
     {
-        $this->post(route('company.quotations.store'), $this->payload())->assertRedirect();
+        $this->post(route('company.quotations.store'), $this->payload())->assertRedirect()->assertSessionHasNoErrors();
         $quotation = Quotation::with('items')->sole();
         $this->assertSame(Quotation::STATUS_DRAFT, $quotation->status);
         $this->assertSame('200.0000', $quotation->subtotal);
@@ -344,7 +351,7 @@ class QuotationModuleTest extends TestCase
 
     private function draftFromPayload(array $payload): Quotation
     {
-        $this->post(route('company.quotations.store'), $payload)->assertRedirect();
+        $this->post(route('company.quotations.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
         return Quotation::sole();
     }
 

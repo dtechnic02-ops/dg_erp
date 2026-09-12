@@ -78,7 +78,7 @@
                         <div class="row g-4">
                             <div class="col-md-3 text-center">
                                 @if ($employee->photo)
-                                    <img src="{{ asset($employee->photo) }}" class="img-fluid rounded border" alt="Employee photo">
+                                    <img src="{{ route('company.protected-files.show', ['employee', $employee->id, 'photo']) }}" class="img-fluid rounded border" alt="Employee photo">
                                 @else
                                     <div class="border rounded p-5 text-muted">No Photo</div>
                                 @endif
@@ -93,9 +93,9 @@
                                             <tr><th>Phone</th><td>{{ $employee->phone ?: '-' }}</td></tr>
                                             <tr><th>Email</th><td>{{ $employee->email ?: '-' }}</td></tr>
                                             <tr><th>Gender</th><td>{{ $employee->gender ?: '-' }}</td></tr>
-                                            <tr><th>DOB</th><td>{{ $employee->dob ?: '-' }}</td></tr>
+                                            <tr><th>DOB</th><td>{{ $employee->dob ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $employee->dob])</td></tr>
                                             <tr><th>Address</th><td>{{ $employee->address ?: '-' }}</td></tr>
-                                            <tr><th>Joining Date</th><td>{{ $employee->joining_date }}</td></tr>
+                                            <tr><th>Joining Date</th><td>{{ $employee->joining_date }} @include('company.components.nepali-date-display', ['adDate' => $employee->joining_date])</td></tr>
                                             <tr><th>Designation</th><td>{{ $employee->designation ?: '-' }}</td></tr>
                                             <tr><th>Department</th><td>{{ $employee->department ?: '-' }}</td></tr>
                                             <tr><th>Post</th><td>{{ $employee->post ?: '-' }}</td></tr>
@@ -128,15 +128,15 @@
                     <div class="card-body dg-card-body">
                         <div class="d-flex flex-wrap gap-2">
                             @if ($employee->cv_attachment)
-                                <a target="_blank" class="btn btn-outline-secondary dg-btn" href="{{ asset($employee->cv_attachment) }}">View CV</a>
+                                <a target="_blank" class="btn btn-outline-secondary dg-btn" href="{{ route('company.protected-files.show', ['employee', $employee->id, 'cv_attachment']) }}">View CV</a>
                             @endif
 
                             @if ($employee->id_document)
-                                <a target="_blank" class="btn btn-outline-secondary dg-btn" href="{{ asset($employee->id_document) }}">View ID Document</a>
+                                <a target="_blank" class="btn btn-outline-secondary dg-btn" href="{{ route('company.protected-files.show', ['employee', $employee->id, 'id_document']) }}">View ID Document</a>
                             @endif
 
                             @if ($employee->contract_document)
-                                <a target="_blank" class="btn btn-outline-secondary dg-btn" href="{{ asset($employee->contract_document) }}">View Contract</a>
+                                <a target="_blank" class="btn btn-outline-secondary dg-btn" href="{{ route('company.protected-files.show', ['employee', $employee->id, 'contract_document']) }}">View Contract</a>
                             @endif
 
                             @if (!$employee->cv_attachment && !$employee->id_document && !$employee->contract_document)

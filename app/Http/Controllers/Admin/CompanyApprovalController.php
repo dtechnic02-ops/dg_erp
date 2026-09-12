@@ -26,6 +26,7 @@ use App\Services\SubscriptionService;
 use App\Services\PlatformAuthorizationService;
 use App\Services\PlatformMailService;
 use App\Services\DefaultChartAccountBootstrapService;
+use App\Services\PlatformCountryScopeService;
 
 use Illuminate\Support\Facades\DB;
 
@@ -50,6 +51,7 @@ class CompanyApprovalController extends Controller
         private PlatformAuthorizationService $platformAuthorization,
         private PlatformMailService $platformMail,
         private DefaultChartAccountBootstrapService $defaultChartAccountBootstrap,
+        private PlatformCountryScopeService $countryScope,
     )
 
     {
@@ -66,7 +68,11 @@ class CompanyApprovalController extends Controller
 
 
 
-        $registrations = CompanyRegistration::latest()->paginate(10);
+        $query = CompanyRegistration::query()->with(['countryMaster', 'registeredBy', 'approver', 'rejector'])->latest();
+        if (! $this->countryScope->isGlobal(auth()->user())) {
+            $query->where('country_id', auth()->user()->country_id);
+        }
+        $registrations = $query->paginate(10);
 
 
 
@@ -77,6 +83,7 @@ class CompanyApprovalController extends Controller
     public function show(CompanyRegistration $registration)
     {
         $this->authorizePlatform('platform_registrations_view');
+        abort_unless($this->countryScope->permitsRegistration(auth()->user(), $registration), 404);
 
         return view('admin.registration_show', compact('registration'));
     }
@@ -92,6 +99,7 @@ class CompanyApprovalController extends Controller
 
 
         $reg = CompanyRegistration::findOrFail($id);
+        abort_unless($this->countryScope->permitsRegistration(auth()->user(), $reg), 403);
 
 
 
@@ -192,7 +200,7 @@ class CompanyApprovalController extends Controller
 
 
 
-                $reg->update(['status' => 'approved']);
+                $reg->update(['status' => 'approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
 
                 return [$company, $user];
 
@@ -242,6 +250,7 @@ class CompanyApprovalController extends Controller
 
 
         $reg = CompanyRegistration::findOrFail($id);
+        abort_unless($this->countryScope->permitsRegistration(auth()->user(), $reg), 403);
 
 
 
@@ -253,7 +262,7 @@ class CompanyApprovalController extends Controller
 
 
 
-        $reg->update(['status' => 'rejected']);
+        $reg->update(['status' => 'rejected', 'rejected_by' => auth()->id(), 'rejected_at' => now()]);
 
 
 

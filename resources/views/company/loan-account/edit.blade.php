@@ -102,7 +102,7 @@
                                     @if ($loan->attachment)
                                         <small class="text-muted">
                                             Current:
-                                            <a href="{{ asset($loan->attachment) }}" target="_blank" rel="noopener noreferrer">View Attachment</a>
+                                            <a href="{{ route('company.protected-files.show', ['loan-account', $loan->id, 'attachment']) }}" target="_blank" rel="noopener noreferrer">View Attachment</a>
                                         </small>
                                     @endif
                                 </div>

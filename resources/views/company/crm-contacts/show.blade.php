@@ -102,7 +102,7 @@
                                 <tbody>
                                     <tr><th width="220">Contact No</th><td>{{ $contact->contact_no }}</td></tr>
                                     <tr><th>Financial Year</th><td>{{ $contact->financialYear->name ?? '-' }}</td></tr>
-                                    <tr><th>Contact Date</th><td>{{ $contact->contact_date?->format('d-m-Y') ?? '-' }}</td></tr>
+                                    <tr><th>Contact Date</th><td>{{ $contact->contact_date?->format('d-m-Y') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $contact->contact_date])</td></tr>
                                     <tr><th>Person Name</th><td>{{ $contact->name }}</td></tr>
                                     <tr><th>Designation</th><td>{{ $contact->designation ?: '-' }}</td></tr>
                                     <tr><th>Department</th><td>{{ $contact->department ?: '-' }}</td></tr>

@@ -286,7 +286,7 @@
                                             <td class="text-end">{{ number_format($loan->principal_amount, 2) }}</td>
                                             <td class="text-end">{{ number_format($loan->remaining_principal, 2) }}</td>
                                             <td class="text-end">{{ number_format($loan->interest_rate, 2) }}%</td>
-                                            <td>{{ optional($loan->end_date)->format('d-m-Y') ?: '-' }}</td>
+                                            <td>{{ optional($loan->end_date)->format('d-m-Y') ?: '-' }} @include('company.components.nepali-date-display', ['adDate' => $loan->end_date])</td>
                                             <td>
                                                 @if ($loan->isCancelled())
                                                     <span class="badge bg-danger">Cancelled</span>

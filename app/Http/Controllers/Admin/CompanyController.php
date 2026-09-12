@@ -17,6 +17,7 @@ use App\Mail\AdminUserPasswordResetOtpMail;
 use App\Http\Controllers\Controller;
 
 use App\Models\Company;
+use App\Models\CompanyIrdCbmsSetting;
 
 use App\Models\Role;
 
@@ -25,6 +26,10 @@ use App\Models\User;
 use App\Services\SubscriptionService;
 use App\Services\PlatformAuthorizationService;
 use App\Services\AdminUserPasswordResetOtpService;
+use App\Services\CompanyTaxIdentityService;
+use App\Services\CompanyTaxIdentityUpdateService;
+use App\Services\FiscalDocumentPolicyService;
+use App\Services\PlatformCountryScopeService;
 
 use Carbon\Carbon;
 
@@ -33,7 +38,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 
 
 
@@ -50,7 +57,8 @@ class CompanyController extends Controller
     public function __construct(
         private SubscriptionService $subscriptionService,
         private PlatformAuthorizationService $platformAuthorization,
-        private AdminUserPasswordResetOtpService $resetOtp
+        private AdminUserPasswordResetOtpService $resetOtp,
+        private PlatformCountryScopeService $countryScope
     )
 
     {
@@ -73,7 +81,8 @@ class CompanyController extends Controller
 
 
 
-        $companies = Company::when($search, function ($q) use ($search) {
+        $companies = Company::when(! $this->countryScope->isGlobal(auth()->user()), fn ($q) => $q->where('country_id', auth()->user()->country_id))
+            ->when($search, function ($q) use ($search) {
 
                 $q->where('company_name', 'like', "%$search%")
 
@@ -114,6 +123,8 @@ class CompanyController extends Controller
     public function show(Company $company)
     {
         $this->authorizePlatform('platform_companies_view');
+        $this->authorizeCountryCompany($company);
+        $company->loadMissing(['countryMaster', 'irdCbmsSetting', 'taxSetting']);
 
         $subscription = $this->subscriptionService
             ->getCurrentSubscription($company)
@@ -124,7 +135,62 @@ class CompanyController extends Controller
             ->where('role_id', Role::COMPANY_ADMIN_ID)
             ->first();
 
-        return view('admin.companies_show', compact('company', 'subscription', 'companyAdmin'));
+        $taxIdentity = app(CompanyTaxIdentityService::class)->resolve($company);
+        $canManageCompliance = $this->platformAuthorization->canManageCompanyCompliance(auth()->user(), $company);
+        $isCbmsPermanentlyLocked = app(FiscalDocumentPolicyService::class)
+            ->companyHasFiscallyIssuedSalesInvoice($company);
+
+        return view('admin.companies_show', compact('company', 'subscription', 'companyAdmin', 'taxIdentity', 'canManageCompliance', 'isCbmsPermanentlyLocked'));
+    }
+
+    public function updateIrdCbmsStatus(Request $request, Company $company, CompanyTaxIdentityService $taxIdentity, FiscalDocumentPolicyService $fiscalPolicy): RedirectResponse
+    {
+        abort_unless(
+            $this->platformAuthorization->canManageCompanyCompliance(auth()->user(), $company),
+            403,
+            'You do not have permission to manage company compliance.'
+        );
+        $company->loadMissing(['countryMaster', 'taxSetting']);
+        $enabled = (bool) $request->validate(['is_enabled' => ['required', 'boolean']])['is_enabled'];
+
+        if ($enabled && $company->countryMaster?->iso_code !== 'NP') {
+            throw ValidationException::withMessages([
+                'is_enabled' => 'Nepal IRD/CBMS mode can only be enabled for a company whose Country Master ISO code is NP.',
+            ]);
+        }
+
+        if ($enabled && ! $taxIdentity->hasValidNepalCbmsIdentity($company)) {
+            throw ValidationException::withMessages([
+                'is_enabled' => 'Nepal IRD/CBMS mode requires a valid seller PAN and an active VAT registration with a valid VAT number.',
+            ]);
+        }
+
+        DB::transaction(function () use ($company, $enabled, $fiscalPolicy): void {
+            CompanyIrdCbmsSetting::query()
+                ->where('company_id', $company->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $enabled && $fiscalPolicy->companyHasFiscallyIssuedSalesInvoice($company)) {
+                throw ValidationException::withMessages([
+                    'is_enabled' => 'CBMS cannot be disabled because fiscal invoices have already been issued for this company.',
+                ]);
+            }
+
+            CompanyIrdCbmsSetting::updateOrCreate(
+                ['company_id' => $company->id],
+                ['is_enabled' => $enabled, 'updated_by' => auth()->id()]
+            );
+        });
+
+        return back()->with('success', 'Nepal IRD/CBMS status updated successfully.');
+    }
+
+    public function updateTaxIdentity(Request $request, Company $company, CompanyTaxIdentityUpdateService $taxIdentity): RedirectResponse
+    {
+        abort_unless($this->platformAuthorization->canManageCompanyCompliance(auth()->user(), $company), 403);
+        $taxIdentity->update($company, $request->all(), auth()->id());
+        return back()->with('success', 'Company tax identity updated successfully.');
     }
 
 
@@ -146,6 +212,7 @@ class CompanyController extends Controller
 
 
         $company = Company::findOrFail($id);
+        $this->authorizeCountryCompany($company);
 
 
 
@@ -180,6 +247,7 @@ class CompanyController extends Controller
 
 
         $company = Company::findOrFail($id);
+        $this->authorizeCountryCompany($company);
 
 
 
@@ -204,6 +272,7 @@ class CompanyController extends Controller
 
 
         $company = Company::findOrFail($id);
+        $this->authorizeCountryCompany($company);
 
 
 
@@ -228,6 +297,7 @@ class CompanyController extends Controller
 
 
         $company = Company::findOrFail($id);
+        $this->authorizeCountryCompany($company);
 
         $subscription = $this->subscriptionService->getActiveSubscription($company);
 
@@ -269,6 +339,7 @@ class CompanyController extends Controller
 
     public function requestPasswordReset(Company $company)
     {
+        $this->authorizeCountryCompany($company);
         $this->authorizeCompanyPasswordReset();
 
         [$user, $error] = $this->resolveCompanyAdmin($company);
@@ -302,6 +373,7 @@ class CompanyController extends Controller
 
     public function showPasswordResetVerification(Company $company)
     {
+        $this->authorizeCountryCompany($company);
         $context = $this->resetContext($company);
 
         if ($context instanceof RedirectResponse) {
@@ -315,6 +387,7 @@ class CompanyController extends Controller
 
     public function verifyPasswordResetOtp(VerifyAdminUserPasswordResetOtpRequest $request, Company $company)
     {
+        $this->authorizeCountryCompany($company);
         $context = $this->resetContext($company);
 
         if ($context instanceof RedirectResponse) {
@@ -351,6 +424,7 @@ class CompanyController extends Controller
 
     public function showPasswordResetForm(Company $company)
     {
+        $this->authorizeCountryCompany($company);
         $context = $this->resetContext($company);
 
         if ($context instanceof RedirectResponse) {
@@ -370,6 +444,7 @@ class CompanyController extends Controller
 
     public function completePasswordReset(CompleteAdminUserPasswordResetRequest $request, Company $company)
     {
+        $this->authorizeCountryCompany($company);
         $context = $this->resetContext($company);
 
         if ($context instanceof RedirectResponse) {
@@ -464,4 +539,8 @@ class CompanyController extends Controller
         abort_unless($this->platformAuthorization->can(auth()->user(), $permission), 403);
     }
 
+    private function authorizeCountryCompany(Company $company): void
+    {
+        abort_unless($this->countryScope->permitsCompany(auth()->user(), $company), 404);
+    }
 }

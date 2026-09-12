@@ -2,7 +2,7 @@
 
 @section('content')
 
-<div class="dg-page">
+<div class="dg-page product-management-page">
 
     <header class="dg-toolbar">
         <div class="container-fluid">
@@ -42,11 +42,11 @@
 
                     <a href="{{ route('company.products.print', request()->query()) }}" target="_blank" class="btn btn-outline-secondary dg-btn">Print</a>
 
-                    <a href="{{ route('company.products.export.excel', request()->query()) }}" class="btn btn-outline-success dg-btn">Excel</a>
+                    <a href="{{ route('company.products.export.excel', request()->query()) }}" class="btn dg-btn dg-btn-brand-outline">Excel</a>
 
                     <a href="{{ route('company.products.export.pdf', request()->query()) }}" class="btn btn-outline-secondary dg-btn">PDF</a>
 
-                    <a href="{{ route('company.products.create') }}" class="btn btn-success dg-btn">Add Product</a>
+                    <a href="{{ route('company.products.create') }}" class="btn dg-btn dg-btn-brand">Add Product</a>
                 </div>
 
             </div>
@@ -116,10 +116,10 @@
                                 <thead class="dg-head">
                                     <tr>
                                         <th scope="col">Image</th>
-                                        <th scope="col">Name</th>
-                                        <th scope="col">Barcode</th>
-                                        <th scope="col">Brand</th>
-                                        <th scope="col">Cost</th>
+                                        <th scope="col" class="dg-col-name">Name</th>
+                                        <th scope="col" class="dg-col-barcode">Barcode</th>
+                                        <th scope="col" class="dg-col-brand">Brand</th>
+                                        <th scope="col" class="dg-col-money">Cost</th>
                                         <th scope="col">Retail</th>
                                         <th scope="col">Wholesale</th>
                                         <th scope="col">Stock</th>
@@ -128,7 +128,7 @@
                                         <th scope="col">Expiry Date</th>
                                         <th scope="col">Online</th>
                                         <th scope="col">Status</th>
-                                        <th scope="col" width="170">Action</th>
+                                        <th scope="col" class="dg-action-col-compact">Action</th>
                                     </tr>
                                 </thead>
 
@@ -140,10 +140,10 @@
                                                     <img src="{{ asset($p->image) }}" alt="{{ $p->name }}" width="40" height="40" class="dg-image">
                                                 @endif
                                             </td>
-                                            <td>{{ $p->name }}</td>
-                                            <td>{{ $p->barcode ?? '-' }}</td>
-                                            <td>{{ $p->brand->name ?? '-' }}</td>
-                                            <td>{{ number_format($p->cost_price, 2) }}</td>
+                                            <td class="dg-col-name">{{ $p->name }}</td>
+                                            <td class="dg-col-barcode">{{ $p->barcode ?? '-' }}</td>
+                                            <td class="dg-col-brand">{{ $p->brand->name ?? '-' }}</td>
+                                            <td class="dg-col-money">{{ number_format($p->cost_price, 2) }}</td>
                                             <td>{{ number_format($p->retail_price, 2) }}</td>
                                             <td>{{ number_format($p->wholesale_price ?? 0, 2) }}</td>
                                             <td>
@@ -152,38 +152,28 @@
                                                 @elseif ($p->stock_alert && $p->current_stock <= $p->stock_alert)
                                                     <span class="badge bg-warning text-dark">{{ $p->current_stock }}</span>
                                                 @else
-                                                    <span class="badge bg-success">{{ $p->current_stock }}</span>
+                                                    <span class="dg-badge dg-badge-status dg-badge-brand">{{ $p->current_stock }}</span>
                                                 @endif
                                             </td>
                                             <td>{{ $p->batch_no ?? '-' }}</td>
-                                            <td>{{ optional($p->manufacture_date)->format('Y-m-d') ?? '-' }}</td>
-                                            <td>{{ optional($p->expiry_date)->format('Y-m-d') ?? '-' }}</td>
+                                            <td>{{ optional($p->manufacture_date)->format('Y-m-d') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $p->manufacture_date])</td>
+                                            <td>{{ optional($p->expiry_date)->format('Y-m-d') ?? '-' }} @include('company.components.nepali-date-display', ['adDate' => $p->expiry_date])</td>
                                             <td>
                                                 @if ($p->allow_online)
-                                                    <span class="badge bg-success">Yes</span>
+                                                    <span class="dg-badge dg-badge-status dg-badge-brand">Yes</span>
                                                 @else
                                                     <span class="badge bg-secondary">No</span>
                                                 @endif
                                             </td>
                                             <td>
                                                 @if ($p->status == 'active')
-                                                    <span class="badge bg-success">Active</span>
+                                                    <span class="dg-badge dg-badge-status dg-badge-brand">Active</span>
                                                 @else
                                                     <span class="badge bg-secondary">Inactive</span>
                                                 @endif
                                             </td>
-                                            <td>
-                                                <div class="btn-group" role="group" aria-label="Product actions">
-                                                    <a href="{{ route('company.products.edit', $p->id) }}" class="btn btn-sm btn-outline-success dg-btn">Edit</a>
-
-                                                    <a href="{{ route('company.products.show', $p->id) }}" class="btn btn-sm btn-outline-info dg-btn">View</a>
-
-                                                    <form method="POST" action="{{ route('company.products.destroy', $p->id) }}" class="d-inline">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger dg-btn" onclick="return confirm('Delete Product?')">Delete</button>
-                                                    </form>
-                                                </div>
+                                            <td class="dg-action-col-compact">
+                                                <a href="{{ route('company.products.show', $p->id) }}" class="btn btn-sm dg-action-btn dg-btn-brand">View</a>
                                             </td>
                                         </tr>
                                     @empty
