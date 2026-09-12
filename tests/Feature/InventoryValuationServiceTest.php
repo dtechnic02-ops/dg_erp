@@ -219,31 +219,48 @@ class InventoryValuationServiceTest extends TestCase
         $this->assertSame($movementCount, StockMovement::count());
     }
 
-    public function test_old_purchase_with_later_valuation_fails_atomically_and_is_company_scoped(): void
+    public function test_old_purchase_with_later_purchase_can_be_cancelled_without_touching_other_company(): void
     {
         $product = $this->product(1, 'Old purchase');
         $old = $this->purchase(1, 'SHARED');
         $this->purchaseLine($old, $product, 2, '5.00000000');
+
         $later = $this->purchase(1, 'PU-LATER');
         $this->purchaseLine($later, $product->fresh(), 1, '8.00000000');
+
         $foreignProduct = $this->product(2, 'Foreign');
         $foreign = $this->purchase(2, 'SHARED');
         $this->purchaseLine($foreign, $foreignProduct, 4, '99.00000000');
-        $stockBefore = $product->fresh()->current_stock;
+
         $movementCount = StockMovement::count();
 
-        try {
-            app(PurchaseCancellationInventoryValuationService::class)
-                ->reversePurchase($old, '2026-01-03', 1, 'unsafe');
-            $this->fail('A non-tail purchase valuation must not be reversed.');
-        } catch (RuntimeException $exception) {
-            $this->assertSame('This purchase cannot be cancelled safely after later inventory valuation movements.', $exception->getMessage());
-        }
+        $reversals = app(PurchaseCancellationInventoryValuationService::class)
+            ->reversePurchase($old, '2026-01-03', 1, 'mistaken purchase');
 
-        $this->assertSame($stockBefore, $product->fresh()->current_stock);
-        $this->assertSame($movementCount, StockMovement::count());
-        $this->assertSame(0, InventoryValuation::where('company_id', 1)->where('source_id', $old->id)->where('source_event', 'cancelled')->count());
-        $this->assertSame(1, InventoryValuation::where('company_id', 2)->where('source_id', $foreign->id)->where('source_event', 'created')->count());
+        $this->assertCount(1, $reversals);
+        $this->assertSame($movementCount + 1, StockMovement::count());
+        $this->assertSame('1.000000', number_format((float) $product->fresh()->current_stock, 6, '.', ''));
+
+        $latest = InventoryValuation::query()
+            ->where('company_id', 1)
+            ->where('product_id', $product->id)
+            ->latest('valuation_sequence')
+            ->firstOrFail();
+
+        $this->assertSame('purchase_cancel', $latest->movement_type);
+        $this->assertSame('1.000000', $latest->quantity_after);
+        $this->assertSame('8.0000', $latest->inventory_value_after);
+        $this->assertSame('8.00000000', $latest->average_cost_after);
+
+        $this->assertSame(
+            1,
+            InventoryValuation::where('company_id', 2)
+                ->where('source_id', $foreign->id)
+                ->where('source_event', 'created')
+                ->count()
+        );
+
+        $this->assertSame('4.000000', number_format((float) $foreignProduct->fresh()->current_stock, 6, '.', ''));
     }
 
     private function product(int $companyId, string $name): Product
