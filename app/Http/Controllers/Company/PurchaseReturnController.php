@@ -11,8 +11,8 @@ use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\Supplier;
 use App\Services\InvoiceNumberService;
+use App\Services\PurchaseReturnInventoryValuationService;
 use App\Services\PurchaseReturnSyncService;
-use App\Services\StockService;
 use App\Services\ValidationService;
 use App\Services\FileUploadService;
 use App\Services\Accounting\PurchaseReturnValuationService;
@@ -27,7 +27,8 @@ class PurchaseReturnController extends Controller
 {
     public function __construct(
         private readonly PurchaseReturnValuationService $purchaseReturnValuationService,
-        private readonly PurchaseReturnAccountingIntegrationService $purchaseReturnAccountingIntegrationService
+        private readonly PurchaseReturnAccountingIntegrationService $purchaseReturnAccountingIntegrationService,
+        private readonly PurchaseReturnInventoryValuationService $purchaseReturnInventoryValuationService
     ) {}
 
     use HandlesTransactionDocumentationEdit;
@@ -404,7 +405,7 @@ class PurchaseReturnController extends Controller
                         $returnItemData['product_id'] = $product->id;
                         $returnItemData['service_id'] = null;
 
-                        PurchaseReturnItem::create($returnItemData);
+                        $returnItem = PurchaseReturnItem::create($returnItemData);
 
                         $purchaseItem->update([
                             'returned_qty' => round(
@@ -413,15 +414,12 @@ class PurchaseReturnController extends Controller
                             ),
                         ]);
 
-                        StockService::decrease(
-                            $product,
-                            $returnQty,
-                            'purchase_return',
-                            $return->return_no,
-                            $activeFy->id,
-                            $return->return_date,
-                            $purchaseItem->unit_price,
-                            'Purchase Return'
+                        $this->purchaseReturnInventoryValuationService->recordReturn(
+                            $return,
+                            $returnItem,
+                            $purchaseItem,
+                            $return->return_date->toDateString(),
+                            $activeFy->id
                         );
 
                         continue;
@@ -687,19 +685,12 @@ class PurchaseReturnController extends Controller
                     }
 
                     if ($item->product_id) {
-                        $product = Product::where('company_id', $companyId)
-                            ->lockForUpdate()
-                            ->findOrFail($item->product_id);
-
-                        StockService::increase(
-                            $product,
-                            $item->quantity,
-                            'purchase_return_cancel',
-                            $return->return_no,
-                            $activeFy->id,
+                        $this->purchaseReturnInventoryValuationService->reverseReturn(
+                            $return,
+                            $item,
                             $cancelBusinessDate,
-                            $item->unit_price,
-                            'Purchase Return Cancel: ' . $cancelReason
+                            $activeFy->id,
+                            $cancelReason
                         );
                     }
 
