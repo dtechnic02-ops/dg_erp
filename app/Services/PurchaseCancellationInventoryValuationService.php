@@ -6,6 +6,7 @@ use App\Models\InventoryValuation;
 use App\Models\Product;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseItem;
+use App\Models\SalesItem;
 use App\Models\StockMovement;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -85,42 +86,108 @@ class PurchaseCancellationInventoryValuationService
                 throw new RuntimeException('This purchase inventory valuation has already been reversed.');
             }
 
+            $tail = InventoryValuation::query()
+                ->where('company_id', $purchase->company_id)
+                ->where('product_id', $productId)
+                ->where('valuation_sequence', '>=', $originals->first()->valuation_sequence)
+                ->orderBy('valuation_sequence')
+                ->lockForUpdate()
+                ->get();
+
+            $later = $tail
+                ->where('valuation_sequence', '>', $originals->last()->valuation_sequence)
+                ->values();
+
+            foreach ($later as $valuation) {
+                $isPurchaseMovement = $valuation->source_module === 'purchase'
+                    && in_array($valuation->movement_type, ['purchase', 'purchase_cancel'], true);
+
+                $isSalesMovement = $valuation->source_module === 'sales'
+                    && in_array($valuation->movement_type, ['sale', 'sales_restore', 'sales_return_cancel'], true);
+
+                if (! $isPurchaseMovement && ! $isSalesMovement) {
+                    throw new RuntimeException('This purchase cannot be cancelled safely after later inventory valuation movements.');
+                }
+            }
+
+            $laterSales = $later
+                ->where('source_module', 'sales')
+                ->values();
+
+            foreach ($laterSales->where('movement_type', 'sale')->where('source_event', 'created') as $saleValuation) {
+                $restoredQuantity = '0.000000';
+                $restoredValue = '0.0000';
+
+                foreach ($laterSales as $salesValuation) {
+                    if (
+                        $salesValuation->movement_type === 'sales_restore'
+                        && $salesValuation->source_type === SalesItem::class
+                        && $salesValuation->source_event === 'cancelled'
+                        && (int) $salesValuation->reversal_of_id === (int) $saleValuation->id
+                    ) {
+                        $restoredQuantity = bcadd(
+                            $restoredQuantity,
+                            (string) $salesValuation->quantity_change,
+                            6
+                        );
+
+                        $restoredValue = bcadd(
+                            $restoredValue,
+                            (string) $salesValuation->inventory_value_change,
+                            4
+                        );
+                    }
+                }
+
+                if (
+                    bccomp(
+                        $restoredQuantity,
+                        bcsub('0', (string) $saleValuation->quantity_change, 6),
+                        6
+                    ) !== 0
+                    || bccomp(
+                        $restoredValue,
+                        bcsub('0', (string) $saleValuation->inventory_value_change, 4),
+                        4
+                    ) !== 0
+                ) {
+                    throw new RuntimeException('This purchase cannot be cancelled safely after later inventory valuation movements.');
+                }
+            }
+
+            $salesQuantityNet = '0.000000';
+            $salesValueNet = '0.0000';
+
+            foreach ($laterSales as $salesValuation) {
+                $salesQuantityNet = bcadd(
+                    $salesQuantityNet,
+                    (string) $salesValuation->quantity_change,
+                    6
+                );
+
+                $salesValueNet = bcadd(
+                    $salesValueNet,
+                    (string) $salesValuation->inventory_value_change,
+                    4
+                );
+            }
+
+            if (
+                bccomp($salesQuantityNet, '0.000000', 6) !== 0
+                || bccomp($salesValueNet, '0.0000', 4) !== 0
+            ) {
+                throw new RuntimeException('This purchase cannot be cancelled safely after later inventory valuation movements.');
+            }
+
             $product = Product::query()
                 ->where('company_id', $purchase->company_id)
                 ->lockForUpdate()
                 ->find($productId);
-            $latest = InventoryValuation::query()
-                ->where('company_id', $purchase->company_id)
-                ->where('product_id', $productId)
-                ->orderByDesc('valuation_sequence')
-                ->lockForUpdate()
-                ->first();
+
+            $latest = $tail->last();
 
             if (! $product || ! $latest || bccomp((string) $latest->quantity_after, (string) $product->current_stock, 6) !== 0) {
                 throw new RuntimeException('Inventory quantity continuity is invalid.');
-            }
-
-            $purchaseQuantity = $originals->reduce(
-                fn (string $total, InventoryValuation $valuation): string => bcadd($total, (string) $valuation->quantity_change, 6),
-                '0.000000'
-            );
-            $purchaseValue = $originals->reduce(
-                fn (string $total, InventoryValuation $valuation): string => bcadd($total, (string) $valuation->inventory_value_change, 4),
-                '0.0000'
-            );
-
-            if (bccomp((string) $latest->quantity_after, $purchaseQuantity, 6) < 0) {
-                throw new RuntimeException('Insufficient current stock to reverse this purchase.');
-            }
-
-            if (bccomp((string) $latest->inventory_value_after, $purchaseValue, 4) < 0) {
-                throw new RuntimeException('The current inventory valuation cannot safely absorb this purchase reversal.');
-            }
-
-            $quantityAfter = bcsub((string) $latest->quantity_after, $purchaseQuantity, 6);
-            $valueAfter = bcsub((string) $latest->inventory_value_after, $purchaseValue, 4);
-            if (bccomp($quantityAfter, '0', 6) === 0 && bccomp($valueAfter, '0', 4) !== 0) {
-                throw new RuntimeException('The current inventory valuation cannot safely absorb this purchase reversal.');
             }
 
             $pairs = collect();
@@ -181,16 +248,12 @@ class PurchaseCancellationInventoryValuationService
 
         $quantityAfter = bcsub((string) $latest->quantity_after, $quantity, 6);
         $valueAfter = bcsub((string) $latest->inventory_value_after, $value, 4);
-        if (bccomp($quantityAfter, '0', 6) < 0) {
-            throw new RuntimeException('Insufficient current stock to reverse this purchase.');
-        }
-
-        if (bccomp($valueAfter, '0', 4) < 0) {
-            throw new RuntimeException('The current inventory valuation cannot safely absorb this purchase reversal.');
+        if (bccomp($quantityAfter, '0', 6) < 0 || bccomp($valueAfter, '0', 4) < 0) {
+            throw new RuntimeException('The purchase cancellation would create negative inventory quantity or value.');
         }
 
         if (bccomp($quantityAfter, '0', 6) === 0 && bccomp($valueAfter, '0', 4) !== 0) {
-            throw new RuntimeException('The current inventory valuation cannot safely absorb this purchase reversal.');
+            throw new RuntimeException('The purchase cancellation would break inventory valuation continuity.');
         }
 
         $movement = StockService::decrease(
