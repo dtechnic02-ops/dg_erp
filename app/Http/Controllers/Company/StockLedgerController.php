@@ -148,7 +148,8 @@ else
                     'type',
                     [
                         'sale_return',
-                        'purchase_return'
+                        'purchase_return',
+                        'purchase_return_cancel'
                     ]
                 );
 
@@ -161,7 +162,7 @@ else
                     [
                         'purchase',
                         'sale_return',
-                        'purchase_return',
+                        'purchase_return_cancel',
                         'opening_stock',
                         'adjustment_in'
                     ]
@@ -175,6 +176,8 @@ else
                     'type',
                     [
                         'sale',
+                        'purchase_cancel',
+                        'purchase_return',
                         'adjustment_out'
                     ]
                 );
@@ -465,7 +468,8 @@ else
                     'type',
                     [
                         'sale_return',
-                        'purchase_return'
+                        'purchase_return',
+                        'purchase_return_cancel'
                     ]
                 );
 
@@ -478,7 +482,7 @@ else
                     [
                         'purchase',
                         'sale_return',
-                        'purchase_return',
+                        'purchase_return_cancel',
                         'opening_stock',
                         'adjustment_in'
                     ]
@@ -492,6 +496,8 @@ else
                     'type',
                     [
                         'sale',
+                        'purchase_cancel',
+                        'purchase_return',
                         'adjustment_out'
                     ]
                 );

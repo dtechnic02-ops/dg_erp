@@ -115,7 +115,7 @@
                                     <select name="status" id="status" class="form-select dg-select">
                                         <option value="" @selected(request()->has('status') && request('status') === '')>All</option>
                                         <option value="1" @selected(!request()->has('status') || request('status') === '1')>Active</option>
-                                        <option value="0" @selected(request('status') === '0')>Cancelled</option>
+                                        <option value="0" @selected(request('status') === '0')>Full Reverted</option>
                                     </select>
                                 </div>
 
@@ -254,17 +254,17 @@
                                                                 if ($hasActiveRefunds) {
                                                                     $cancelBlockParts[] = 'purchase return refund(s)';
                                                                 }
-                                                                $cancelBlockMessage = 'Cannot cancel: ' . implode(' and ', $cancelBlockParts) . ' exist.';
+                                                                $cancelBlockMessage = 'Cannot fully revert: ' . implode(' and ', $cancelBlockParts) . ' exist.';
                                                             } else {
                                                                 $cancelBlockMessage = '';
                                                             }
                                                         @endphp
 
                                                         @if ($canCancelInvoice)
-                                                            <button type="button" class="btn btn-sm btn-outline-danger dg-action-btn" data-bs-toggle="modal" data-bs-target="#dgPurchaseInvoiceCancelModal{{ $invoice->id }}">Cancel</button>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger dg-action-btn" data-bs-toggle="modal" data-bs-target="#dgPurchaseInvoiceCancelModal{{ $invoice->id }}">Full Revert</button>
                                                         @else
                                                             <span class="d-inline-block" tabindex="0" title="{{ $cancelBlockMessage }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="{{ $cancelBlockMessage }}">
-                                                                <button type="button" class="btn btn-sm btn-outline-danger dg-action-btn" disabled aria-disabled="true">Cancel</button>
+                                                                <button type="button" class="btn btn-sm btn-outline-danger dg-action-btn" disabled aria-disabled="true">Full Revert</button>
                                                             </span>
                                                         @endif
                                                     @endif
@@ -303,9 +303,11 @@
                 @if ((int) $invoice->status === 1 && $canCancelInvoice)
                     @include('company.partials.dg-sales-cancel-modal', [
                         'modalId' => 'dgPurchaseInvoiceCancelModal' . $invoice->id,
-                        'modalTitle' => 'Cancel Purchase Invoice',
+                        'modalTitle' => 'Full Revert Purchase',
                         'action' => route('company.purchases.cancel', $invoice->id),
-                        'submitLabel' => 'Cancel Invoice',
+                        'submitLabel' => 'Full Revert Purchase',
+                        'dateLabel' => 'Full Revert Date',
+                        'reasonLabel' => 'Full Revert Reason',
                         'entityId' => $invoice->id,
                     ])
                 @endif

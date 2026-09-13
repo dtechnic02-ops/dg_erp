@@ -520,7 +520,7 @@ class PurchaseReturnController extends Controller
         if ((int) $return->status === 0) {
             return redirect()
                 ->route('company.purchase-return.show', $return->id)
-                ->with('error', 'Cancelled return cannot be edited.');
+                ->with('error', 'Reversed return cannot be edited.');
         }
 
         return view(
@@ -538,7 +538,7 @@ class PurchaseReturnController extends Controller
         );
 
         $safeMessages = [
-            'Cancelled return cannot be edited.',
+            'Reversed return cannot be edited.',
             'Please activate financial year first.',
             'Purchase Return belongs to another Financial Year.',
             'Selected date must fall within the active financial year.',
@@ -553,7 +553,7 @@ class PurchaseReturnController extends Controller
 
                 $this->guardEditableTransaction(
                     $return,
-                    'Cancelled return cannot be edited.'
+                    'Reversed return cannot be edited.'
                 );
 
                 $activeFy = $this->assertActiveFinancialYear($companyId);
@@ -631,9 +631,12 @@ class PurchaseReturnController extends Controller
         ]);
 
         $safeMessages = [
-            'Purchase return already cancelled.',
-            'Cannot cancel a purchase return with refund settlements.',
-            'Cancel date must belong to the active financial year.',
+            'Purchase return has already been reversed.',
+            'Cannot reverse a purchase return with refund settlements. Cancel the settlement first.',
+            'Reverse date must belong to the active financial year.',
+            'Purchase Return belongs to another Financial Year.',
+            'The original Purchase for this Return could not be resolved.',
+            'The original Purchase item evidence for this Return could not be resolved.',
         ];
 
         try {
@@ -648,7 +651,7 @@ class PurchaseReturnController extends Controller
 
                 if ($cancelDate->lt($startDate) || $cancelDate->gt($endDate)) {
                     throw new \Exception(
-                        'Cancel date must belong to the active financial year.'
+                        'Reverse date must belong to the active financial year.'
                     );
                 }
 
@@ -661,7 +664,45 @@ class PurchaseReturnController extends Controller
                     ->findOrFail($id);
 
                 if ((int) $return->status !== 1) {
-                    throw new \Exception('Purchase return already cancelled.');
+                    throw new \Exception('Purchase return has already been reversed.');
+                }
+
+                $purchase = PurchaseInvoice::where('company_id', $companyId)
+                    ->where('id', $return->purchase_invoice_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $purchase
+                    || (int) $purchase->status !== 1
+                    || (int) $purchase->supplier_id !== (int) $return->supplier_id) {
+                    throw new \Exception('The original Purchase for this Return could not be resolved.');
+                }
+
+                if ((int) $return->financial_year_id !== (int) $activeFy->id
+                    || (int) $purchase->financial_year_id !== (int) $activeFy->id) {
+                    throw new \Exception('Purchase Return belongs to another Financial Year.');
+                }
+
+                $activeItems = $return->items->where('status', 1);
+                if ($activeItems->isEmpty()) {
+                    throw new \Exception('The original Purchase item evidence for this Return could not be resolved.');
+                }
+
+                foreach ($activeItems as $returnItem) {
+                    $purchaseItem = PurchaseItem::query()
+                        ->where('company_id', $companyId)
+                        ->where('financial_year_id', $activeFy->id)
+                        ->where('purchase_invoice_id', $purchase->id)
+                        ->lockForUpdate()
+                        ->find($returnItem->purchase_item_id);
+
+                    if (! $purchaseItem
+                        || (int) $returnItem->company_id !== $companyId
+                        || (int) $returnItem->financial_year_id !== (int) $activeFy->id
+                        || (int) ($returnItem->product_id ?? 0) !== (int) ($purchaseItem->product_id ?? 0)
+                        || (int) ($returnItem->service_id ?? 0) !== (int) ($purchaseItem->service_id ?? 0)) {
+                        throw new \Exception('The original Purchase item evidence for this Return could not be resolved.');
+                    }
                 }
 
                 $refundedAmount = PurchaseReturnSyncService::calculateRefundedAmount(
@@ -670,8 +711,11 @@ class PurchaseReturnController extends Controller
                 );
 
                 if ($refundedAmount > 0) {
-                    throw new \Exception('Cannot cancel a purchase return with refund settlements.');
+                    throw new \Exception('Cannot reverse a purchase return with refund settlements. Cancel the settlement first.');
                 }
+
+                $this->purchaseReturnAccountingIntegrationService->assertReversible($return);
+                $this->purchaseReturnInventoryValuationService->assertReversible($return);
 
                 $this->purchaseReturnAccountingIntegrationService->reverseReturn(
                     $return,
@@ -717,7 +761,7 @@ class PurchaseReturnController extends Controller
 
                 $return->update([
                     'status' => 0,
-                    'note'   => trim(($return->note ?? '') . ' [Cancelled: ' . $cancelReason . ']'),
+                    'note'   => trim(($return->note ?? '') . ' [Reverse Return: ' . $cancelReason . ']'),
                 ]);
 
                 PurchaseReturnSyncService::sync($return, true);
@@ -725,16 +769,16 @@ class PurchaseReturnController extends Controller
 
             return redirect()
                 ->route('company.purchase-return.index')
-                ->with('success', 'Purchase return cancelled successfully.');
+                ->with('success', 'Purchase return reversed successfully. The original return and its history were preserved.');
         } catch (\Throwable $e) {
-            $this->logReturnException('Purchase return cancel failed.', $e, [
+            $this->logReturnException('Purchase return reversal failed.', $e, [
                 'purchase_return_id' => $id,
             ]);
 
             $error = $this->resolveSafeExceptionMessage(
                 $e,
                 $safeMessages,
-                'Unable to cancel purchase return. Please try again.'
+                'Unable to reverse purchase return. Please try again.'
             );
 
             return back()->with('error', $error);

@@ -90,7 +90,7 @@
 
                     @if ((int) $return->status === 1 && $return->refund_status === 'Unpaid')
 
-                        <button type="button" class="btn btn-outline-danger dg-btn" data-bs-toggle="modal" data-bs-target="#dgPurchaseReturnCancelModal">Cancel Return</button>
+                        <button type="button" class="btn btn-outline-danger dg-btn" data-bs-toggle="modal" data-bs-target="#dgPurchaseReturnCancelModal">Reverse Return</button>
 
                     @endif
 
@@ -108,9 +108,11 @@
 
         @include('company.partials.dg-sales-cancel-modal', [
             'modalId' => 'dgPurchaseReturnCancelModal',
-            'modalTitle' => 'Cancel Purchase Return',
+            'modalTitle' => 'Reverse Purchase Return',
             'action' => route('company.purchase-return.cancel', $return->id),
-            'submitLabel' => 'Cancel Return',
+            'submitLabel' => 'Reverse Return',
+            'dateLabel' => 'Reverse Date',
+            'reasonLabel' => 'Reverse Reason',
             'entityId' => $return->id,
         ])
 
@@ -524,7 +526,7 @@
 
                                                 @else
 
-                                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
+                                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Reversed</span>
 
                                                 @endif
 

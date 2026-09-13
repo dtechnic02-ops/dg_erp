@@ -83,6 +83,8 @@ $purchaseChart = PurchaseInvoice::
 
 where('company_id',$companyId)
 
+->where('status', 1)
+
 ->when($activeFy, fn ($query) => $query->where('financial_year_id', $activeFy->id))
 
 ->selectRaw(
@@ -209,6 +211,8 @@ where(
 'company_id',
 $companyId
 )
+
+->where('status', 1)
 
 ->sum(
 'due_amount'

@@ -14,6 +14,54 @@ use RuntimeException;
 
 class PurchaseReturnInventoryValuationService
 {
+    public function assertReversible(PurchaseReturn $return): void
+    {
+        $return = PurchaseReturn::query()
+            ->where('company_id', $return->company_id)
+            ->lockForUpdate()
+            ->findOrFail($return->id);
+        $items = PurchaseReturnItem::query()
+            ->where('company_id', $return->company_id)
+            ->where('purchase_return_id', $return->id)
+            ->where('status', 1)
+            ->whereNotNull('product_id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($items as $returnItem) {
+            $originals = $this->returnValuationQuery($return, $returnItem, 'created')
+                ->lockForUpdate()
+                ->get();
+
+            if ($originals->count() !== 1) {
+                throw new RuntimeException('The original purchase return inventory valuation could not be resolved.');
+            }
+
+            $original = $originals->first();
+            if ($this->returnValuationQuery($return, $returnItem, 'cancelled')->lockForUpdate()->exists()
+                || InventoryValuation::query()
+                    ->where('company_id', $return->company_id)
+                    ->where('reversal_of_id', $original->id)
+                    ->lockForUpdate()
+                    ->exists()) {
+                throw new RuntimeException('This purchase return inventory valuation has already been reversed.');
+            }
+
+            $movement = StockMovement::query()
+                ->where('company_id', $return->company_id)
+                ->where('product_id', $returnItem->product_id)
+                ->lockForUpdate()
+                ->find($original->stock_movement_id);
+
+            if (! $movement
+                || $movement->type !== 'purchase_return'
+                || (string) $movement->reference_no !== (string) $return->return_no
+                || bccomp($this->decimal($movement->quantity, 6), $this->decimal($original->quantity_change, 6), 6) !== 0) {
+                throw new RuntimeException('The original purchase return inventory valuation is invalid.');
+            }
+        }
+    }
+
     public function recordReturn(
         PurchaseReturn $return,
         PurchaseReturnItem $returnItem,
@@ -159,7 +207,7 @@ class PurchaseReturnInventoryValuationService
                 $financialYearId,
                 $date,
                 $cost,
-                'Purchase Return Cancel: '.$reason
+                'Reverse Purchase Return: '.$reason
             );
 
             $this->assertMovementContinuity($movement, $return, $returnItem, $latest, $quantityAfter);

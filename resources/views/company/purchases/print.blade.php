@@ -205,7 +205,7 @@
                                 @if ((int) $invoice->status === 1)
                                     <span class="dg-badge dg-badge-status dg-badge-success">Active</span>
                                 @else
-                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
+                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Full Reverted</span>
                                 @endif
                             </span>
                         </div>

@@ -15,7 +15,7 @@
 
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="{{ $modalId }}_cancel_date" class="form-label">Cancel Date <span class="text-danger">*</span></label>
+                        <label for="{{ $modalId }}_cancel_date" class="form-label">{{ $dateLabel ?? 'Cancel Date' }} <span class="text-danger">*</span></label>
                         <input type="date" name="cancel_date" id="{{ $modalId }}_cancel_date" class="form-control dg-input" value="{{ old('cancel_date', date('Y-m-d')) }}" required>
                         @error('cancel_date')
                             <div class="text-danger small mt-1">{{ $message }}</div>
@@ -23,7 +23,7 @@
                     </div>
 
                     <div class="mb-0">
-                        <label for="{{ $modalId }}_cancel_reason" class="form-label">Cancel Reason <span class="text-danger">*</span></label>
+                        <label for="{{ $modalId }}_cancel_reason" class="form-label">{{ $reasonLabel ?? 'Cancel Reason' }} <span class="text-danger">*</span></label>
                         <textarea name="cancel_reason" id="{{ $modalId }}_cancel_reason" class="form-control dg-input" rows="4" required>{{ old('cancel_reason') }}</textarea>
                         @error('cancel_reason')
                             <div class="text-danger small mt-1">{{ $message }}</div>

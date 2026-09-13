@@ -3,7 +3,6 @@
 namespace App\Services;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseItem;
-use App\Models\PurchasePayment;
 
 class PurchaseService
 {/*
@@ -50,32 +49,6 @@ public static function recalculateInvoice(
         +
         $totalVat;
 
-    $paidAmount = PurchasePayment::where(
-        'purchase_invoice_id',
-        $invoice->id
-    )
-    ->where(
-        'status',
-        1
-    )
-    ->sum(
-        'amount'
-    );
-
-    $dueAmount =
-        $grandTotal
-        -
-        $paidAmount;
-
-    $paymentStatus =
-        $dueAmount <= 0
-        ? 'paid'
-        : (
-            $paidAmount > 0
-            ? 'partial'
-            : 'unpaid'
-        );
-
     $invoice->update([
 
         'subtotal' =>
@@ -87,16 +60,11 @@ public static function recalculateInvoice(
         'grand_total' =>
             $grandTotal,
 
-        'paid_amount' =>
-            $paidAmount,
-
-        'due_amount' =>
-            $dueAmount,
-
-        'payment_status' =>
-            $paymentStatus,
-
     ]);
+
+    PurchaseInvoicePaymentStateService::syncInvoicePaymentState(
+        $invoice->fresh()
+    );
 }
 
 

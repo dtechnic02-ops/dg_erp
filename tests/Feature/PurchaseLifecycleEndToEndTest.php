@@ -135,7 +135,7 @@ class PurchaseLifecycleEndToEndTest extends TestCase
         $valuationCountBeforeBlockedCancel = DB::table('inventory_valuations')->count();
         $this->post(route('company.purchases.cancel', $first->id), [
             'cancel_date' => self::DATE, 'cancel_reason' => 'Must be blocked by active payment',
-        ])->assertSessionHas('error', 'Invoice cannot be cancelled because one or more active payments exist.');
+        ])->assertSessionHas('error', 'Purchase cannot be fully reverted because one or more active payments exist.');
         $this->assertSame(1, (int) $first->fresh()->status);
         $this->assertSame($movementCountBeforeBlockedCancel, DB::table('stock_movements')->count());
         $this->assertSame($valuationCountBeforeBlockedCancel, DB::table('inventory_valuations')->count());
@@ -154,7 +154,7 @@ class PurchaseLifecycleEndToEndTest extends TestCase
 
         $this->post(route('company.purchases.cancel', $first->id), [
             'cancel_date' => self::DATE, 'cancel_reason' => 'Automated lifecycle reversal',
-        ])->assertSessionHas('success', 'Purchase cancelled successfully.');
+        ])->assertSessionHas('success', 'Purchase fully reverted successfully. The original invoice and its history were preserved.');
         $this->assertSame(0, (int) $first->fresh()->status);
         $this->assertSame('5.00', $this->money($testProduct->fresh()->current_stock));
         $this->assertSame(4, DB::table('stock_movements')->where('company_id', $company->id)->where('type', 'purchase_cancel')->count());
@@ -166,7 +166,7 @@ class PurchaseLifecycleEndToEndTest extends TestCase
         $cancelValuationCount = DB::table('inventory_valuations')->where('company_id', $company->id)->where('source_module', 'purchase')->where('source_id', $first->id)->where('source_event', 'cancelled')->count();
         $this->post(route('company.purchases.cancel', $first->id), [
             'cancel_date' => self::DATE, 'cancel_reason' => 'Duplicate cancellation attempt',
-        ])->assertSessionHas('error', 'Purchase Already Cancelled.');
+        ])->assertSessionHas('error', 'Purchase has already been fully reverted.');
         $this->assertSame($cancelMovementCount, DB::table('stock_movements')->where('company_id', $company->id)->where('type', 'purchase_cancel')->count());
         $this->assertSame($cancelValuationCount, DB::table('inventory_valuations')->where('company_id', $company->id)->where('source_module', 'purchase')->where('source_id', $first->id)->where('source_event', 'cancelled')->count());
 

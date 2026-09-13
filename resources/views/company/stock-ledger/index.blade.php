@@ -40,10 +40,12 @@
                                         <option value="">All Types</option>
                                         <option value="opening" @selected(request('type') == 'opening')>Opening</option>
                                         <option value="purchase" @selected(request('type') == 'purchase')>Purchase</option>
+                                        <option value="purchase_cancel" @selected(request('type') == 'purchase_cancel')>Purchase Full Revert</option>
                                         <option value="sale" @selected(request('type') == 'sale')>Sale</option>
                                         <option value="return" @selected(request('type') == 'return')>All Returns</option>
                                         <option value="sale_return" @selected(request('type') == 'sale_return')>Sales Return</option>
                                         <option value="purchase_return" @selected(request('type') == 'purchase_return')>Purchase Return</option>
+                                        <option value="purchase_return_cancel" @selected(request('type') == 'purchase_return_cancel')>Reverse Purchase Return</option>
                                         <option value="adjustment_in" @selected(request('type') == 'adjustment_in')>Adjustment In</option>
                                         <option value="adjustment_out" @selected(request('type') == 'adjustment_out')>Adjustment Out</option>
                                         <option value="in" @selected(request('type') == 'in')>Stock In</option>
@@ -108,7 +110,7 @@
                                             <td class="dg-col-date">{{ $move->transaction_date }} @include('company.components.nepali-date-display', ['adDate' => $move->transaction_date])</td>
                                             <td>{{ optional($move->product)->name }}</td>
                                             <td>
-                                                <span class="badge @if (in_array($move->type, ['purchase', 'sale_return', 'purchase_return', 'opening', 'adjustment_in'])) bg-success @else bg-danger @endif">
+                                                <span class="badge @if (in_array($move->type, ['purchase', 'sale_return', 'purchase_return_cancel', 'opening_stock', 'adjustment_in'])) bg-success @else bg-danger @endif">
                                                     {{ str_replace('_', ' ', ucfirst($move->type)) }}
                                                 </span>
                                             </td>

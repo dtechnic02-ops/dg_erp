@@ -48,7 +48,7 @@ class PurchaseAccountingIntegrationService
             'source_id' => $purchase->id,
             'source_event' => 'cancelled',
             'reference_number' => $purchase->invoice_no,
-            'description' => 'Purchase cancellation - ' . $purchase->invoice_no,
+            'description' => 'Purchase Full Revert - ' . $purchase->invoice_no,
             'posted_by' => $postedBy,
         ]);
     }

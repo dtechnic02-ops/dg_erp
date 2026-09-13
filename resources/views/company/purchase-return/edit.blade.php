@@ -64,7 +64,7 @@
                                 @include('company.components.nepali-date-field', ['adInputId' => 'return_date', 'adDate' => old('return_date', $return->return_date)])
                                 <div class="col-md-3">
                                     <label class="form-label" for="status">Status</label>
-                                    <input type="text" id="status" class="form-control dg-input" value="{{ (int) $return->status === 1 ? 'Active' : 'Cancelled' }}" readonly>
+                                    <input type="text" id="status" class="form-control dg-input" value="{{ (int) $return->status === 1 ? 'Active' : 'Reversed' }}" readonly>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="supplier_name">Supplier</label>

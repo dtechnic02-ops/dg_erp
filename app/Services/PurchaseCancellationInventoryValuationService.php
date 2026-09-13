@@ -6,6 +6,8 @@ use App\Models\InventoryValuation;
 use App\Models\Product;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseItem;
+use App\Models\PurchaseReturn;
+use App\Models\PurchaseReturnItem;
 use App\Models\SalesItem;
 use App\Models\StockMovement;
 use Illuminate\Support\Collection;
@@ -25,6 +27,15 @@ class PurchaseCancellationInventoryValuationService
                 ->where('company_id', $purchase->company_id)
                 ->lockForUpdate()
                 ->findOrFail($purchase->id);
+
+            if (PurchaseReturn::query()
+                ->where('company_id', $purchase->company_id)
+                ->where('purchase_invoice_id', $purchase->id)
+                ->where('status', 1)
+                ->lockForUpdate()
+                ->exists()) {
+                throw new RuntimeException('This invoice cannot be fully reverted because one or more active purchase returns exist. Reverse the active return first.');
+            }
 
             $items = PurchaseItem::query()
                 ->where('company_id', $purchase->company_id)
@@ -98,15 +109,25 @@ class PurchaseCancellationInventoryValuationService
                 ->where('valuation_sequence', '>', $originals->last()->valuation_sequence)
                 ->values();
 
+            $this->assertPurchaseReturnHistoryIsFullyReversed(
+                $purchase,
+                (int) $productId,
+                $later
+            );
+
             foreach ($later as $valuation) {
                 $isPurchaseMovement = $valuation->source_module === 'purchase'
                     && in_array($valuation->movement_type, ['purchase', 'purchase_cancel'], true);
 
+                $isPurchaseReturnMovement = $valuation->source_module === 'purchase'
+                    && $valuation->source_type === PurchaseReturnItem::class
+                    && in_array($valuation->movement_type, ['purchase_return', 'purchase_return_cancel'], true);
+
                 $isSalesMovement = $valuation->source_module === 'sales'
                     && in_array($valuation->movement_type, ['sale', 'sales_restore', 'sales_return_cancel'], true);
 
-                if (! $isPurchaseMovement && ! $isSalesMovement) {
-                    throw new RuntimeException('This purchase cannot be cancelled safely after later inventory valuation movements.');
+                if (! $isPurchaseMovement && ! $isPurchaseReturnMovement && ! $isSalesMovement) {
+                    throw new RuntimeException('This purchase cannot be fully reverted safely after later inventory valuation movements.');
                 }
             }
 
@@ -151,7 +172,7 @@ class PurchaseCancellationInventoryValuationService
                         4
                     ) !== 0
                 ) {
-                    throw new RuntimeException('This purchase cannot be cancelled safely after later inventory valuation movements.');
+                    throw new RuntimeException('This purchase cannot be fully reverted safely after later inventory valuation movements.');
                 }
             }
 
@@ -176,7 +197,7 @@ class PurchaseCancellationInventoryValuationService
                 bccomp($salesQuantityNet, '0.000000', 6) !== 0
                 || bccomp($salesValueNet, '0.0000', 4) !== 0
             ) {
-                throw new RuntimeException('This purchase cannot be cancelled safely after later inventory valuation movements.');
+                throw new RuntimeException('This purchase cannot be fully reverted safely after later inventory valuation movements.');
             }
 
             $product = Product::query()
@@ -216,6 +237,78 @@ class PurchaseCancellationInventoryValuationService
         return $pairsByProduct;
     }
 
+    private function assertPurchaseReturnHistoryIsFullyReversed(
+        PurchaseInvoice $purchase,
+        int $productId,
+        Collection $later
+    ): void {
+        $history = $later->filter(fn (InventoryValuation $valuation): bool =>
+            $valuation->source_module === 'purchase'
+            && $valuation->source_type === PurchaseReturnItem::class
+            && in_array($valuation->movement_type, ['purchase_return', 'purchase_return_cancel'], true)
+        )->values();
+
+        if ($history->isEmpty()) {
+            return;
+        }
+
+        $created = $history->filter(fn (InventoryValuation $valuation): bool =>
+            $valuation->movement_type === 'purchase_return'
+            && $valuation->source_event === 'created'
+            && $valuation->reversal_of_id === null
+        )->values();
+        $reversed = $history->filter(fn (InventoryValuation $valuation): bool =>
+            $valuation->movement_type === 'purchase_return_cancel'
+            && $valuation->source_event === 'cancelled'
+            && $valuation->reversal_of_id !== null
+        )->values();
+
+        if ($created->count() !== $reversed->count()
+            || $created->count() + $reversed->count() !== $history->count()) {
+            throw new RuntimeException('This purchase cannot be fully reverted because its purchase return inventory history is not fully reversed.');
+        }
+
+        foreach ($created as $returnValuation) {
+            $returnItem = PurchaseReturnItem::query()
+                ->where('company_id', $purchase->company_id)
+                ->where('product_id', $productId)
+                ->lockForUpdate()
+                ->find($returnValuation->source_id);
+            $return = $returnItem ? PurchaseReturn::query()
+                ->where('company_id', $purchase->company_id)
+                ->where('purchase_invoice_id', $purchase->id)
+                ->lockForUpdate()
+                ->find($returnItem->purchase_return_id) : null;
+            $purchaseItemMatches = $returnItem && PurchaseItem::query()
+                ->where('company_id', $purchase->company_id)
+                ->where('purchase_invoice_id', $purchase->id)
+                ->where('product_id', $productId)
+                ->whereKey($returnItem->purchase_item_id)
+                ->lockForUpdate()
+                ->exists();
+            $matchingReversals = $reversed->filter(fn (InventoryValuation $valuation): bool =>
+                (int) $valuation->reversal_of_id === (int) $returnValuation->id
+                && (int) $valuation->source_id === (int) $returnValuation->source_id
+            );
+
+            if (! $returnItem
+                || ! $return
+                || (int) $return->status !== 0
+                || (int) $returnItem->status !== 0
+                || ! $purchaseItemMatches
+                || $matchingReversals->count() !== 1) {
+                throw new RuntimeException('This purchase cannot be fully reverted because its purchase return inventory history is not fully reversed.');
+            }
+
+            $reversal = $matchingReversals->first();
+            if (bccomp((string) $reversal->quantity_change, bcsub('0', (string) $returnValuation->quantity_change, 6), 6) !== 0
+                || bccomp((string) $reversal->inventory_value_change, bcsub('0', (string) $returnValuation->inventory_value_change, 4), 4) !== 0
+                || bccomp((string) $reversal->movement_unit_cost, (string) $returnValuation->movement_unit_cost, 8) !== 0) {
+                throw new RuntimeException('This purchase cannot be fully reverted because its purchase return inventory history is not fully reversed.');
+            }
+        }
+    }
+
     private function reversePair(
         PurchaseInvoice $purchase,
         PurchaseItem $item,
@@ -249,11 +342,11 @@ class PurchaseCancellationInventoryValuationService
         $quantityAfter = bcsub((string) $latest->quantity_after, $quantity, 6);
         $valueAfter = bcsub((string) $latest->inventory_value_after, $value, 4);
         if (bccomp($quantityAfter, '0', 6) < 0 || bccomp($valueAfter, '0', 4) < 0) {
-            throw new RuntimeException('The purchase cancellation would create negative inventory quantity or value.');
+            throw new RuntimeException('The Purchase Full Revert would create negative inventory quantity or value.');
         }
 
         if (bccomp($quantityAfter, '0', 6) === 0 && bccomp($valueAfter, '0', 4) !== 0) {
-            throw new RuntimeException('The purchase cancellation would break inventory valuation continuity.');
+            throw new RuntimeException('The Purchase Full Revert would break inventory valuation continuity.');
         }
 
         $movement = StockService::decrease(
@@ -264,7 +357,7 @@ class PurchaseCancellationInventoryValuationService
             $financialYearId,
             $date,
             $cost,
-            'Purchase Cancel: '.$reason
+            'Purchase Full Revert: '.$reason
         );
         $averageAfter = bccomp($quantityAfter, '0', 6) === 0
             ? '0.00000000'

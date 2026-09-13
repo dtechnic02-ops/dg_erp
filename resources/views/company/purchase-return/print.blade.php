@@ -442,7 +442,7 @@
 
                                                 @else
 
-                                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
+                                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Reversed</span>
 
                                                 @endif
 
@@ -647,4 +647,3 @@
 
 
 @endsection
-

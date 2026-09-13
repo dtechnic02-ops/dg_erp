@@ -41,7 +41,7 @@
         : '-';
 
     if (request('status') === '0') {
-        $filterStatus = 'Cancelled';
+        $filterStatus = 'Full Reverted';
     } elseif (request()->has('status') && request('status') === '') {
         $filterStatus = 'All';
     } else {
@@ -195,7 +195,7 @@
                                 <span class="dg-summary-bar-value">{{ number_format($activeCount) }}</span>
                             </div>
                             <div class="dg-summary-bar-item">
-                                <span class="dg-summary-bar-label">Cancelled</span>
+                                <span class="dg-summary-bar-label">Full Reverted</span>
                                 <span class="dg-summary-bar-sep">:</span>
                                 <span class="dg-summary-bar-value">{{ number_format($cancelledCount) }}</span>
                             </div>
@@ -236,7 +236,7 @@
                                             @if ((int) $invoice->status === 1)
                                                 <span class="dg-badge dg-badge-status dg-badge-success">Active</span>
                                             @else
-                                                <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
+                                                <span class="dg-badge dg-badge-status dg-badge-secondary">Full Reverted</span>
                                             @endif
                                         </td>
                                     </tr>

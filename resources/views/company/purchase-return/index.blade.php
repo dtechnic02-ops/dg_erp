@@ -72,7 +72,7 @@
 
         if (request('status') === '0') {
 
-            $filterStatus = 'Cancelled';
+            $filterStatus = 'Reversed';
 
         } elseif (request('status') === '1') {
 
@@ -460,7 +460,7 @@
 
                                                 @else
 
-                                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
+                                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Reversed</span>
 
                                                 @endif
 
@@ -742,7 +742,7 @@
 
                                         <option value="1" @selected(!request()->has('status') || request('status') === '1')>Active</option>
 
-                                        <option value="0" @selected(request('status') === '0')>Cancelled</option>
+                                        <option value="0" @selected(request('status') === '0')>Reversed</option>
 
                                     </select>
 
@@ -886,7 +886,7 @@
 
                                     @if (request('status') === '0')
 
-                                        Cancelled
+                                        Reversed
 
                                     @elseif (request()->has('status') && request('status') === '')
 
@@ -1006,7 +1006,7 @@
 
                                                 @else
 
-                                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Cancelled</span>
+                                                    <span class="dg-badge dg-badge-status dg-badge-secondary">Reversed</span>
 
                                                 @endif
 
@@ -1084,9 +1084,11 @@
                 @if ((int) $return->status === 1 && $return->refund_status === 'Unpaid')
                     @include('company.partials.dg-sales-cancel-modal', [
                         'modalId' => 'dgPurchaseReturnCancelModal' . $return->id,
-                        'modalTitle' => 'Cancel Purchase Return',
+                        'modalTitle' => 'Reverse Purchase Return',
                         'action' => route('company.purchase-return.cancel', $return->id),
-                        'submitLabel' => 'Cancel Return',
+                        'submitLabel' => 'Reverse Return',
+                        'dateLabel' => 'Reverse Date',
+                        'reasonLabel' => 'Reverse Reason',
                         'entityId' => $return->id,
                     ])
                 @endif
@@ -1123,4 +1125,3 @@
 
 
 @endsection
-

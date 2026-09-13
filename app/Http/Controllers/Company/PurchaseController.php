@@ -1339,7 +1339,7 @@ public function cancel(Request $request, $id)
             if ($cancelDate->lt($startDate) || $cancelDate->gt($endDate))
             {
                 throw new \Exception(
-                    'Cancel date must belong to the active financial year.'
+                    'Full Revert date must belong to the active financial year.'
                 );
             }
 
@@ -1353,7 +1353,7 @@ public function cancel(Request $request, $id)
 
             if ($invoice->status == 0)
             {
-                throw new \Exception('Purchase Already Cancelled.');
+                throw new \Exception('Purchase has already been fully reverted.');
             }
 
             if ((int) $invoice->financial_year_id !== (int) $activeFy->id) {
@@ -1370,7 +1370,7 @@ public function cancel(Request $request, $id)
             if ($activePaymentsExist)
             {
                 throw new \Exception(
-                    'Invoice cannot be cancelled because one or more active payments exist.'
+                    'Purchase cannot be fully reverted because one or more active payments exist.'
                 );
             }
 
@@ -1382,7 +1382,7 @@ public function cancel(Request $request, $id)
             if ($activeReturnsExist)
             {
                 throw new \Exception(
-                    'This invoice cannot be cancelled because one or more active purchase returns exist.'
+                    'This invoice cannot be fully reverted because one or more active purchase returns exist. Reverse the active return first.'
                 );
             }
 
@@ -1398,7 +1398,7 @@ public function cancel(Request $request, $id)
 
                 if ($activeRefundsExist) {
                     throw new \Exception(
-                        'This invoice cannot be cancelled because one or more active purchase return refunds exist.'
+                        'This invoice cannot be fully reverted because one or more active purchase return refunds exist.'
                     );
                 }
             }
@@ -1432,7 +1432,7 @@ public function cancel(Request $request, $id)
 
                 $cancelReferenceType = 'purchase_invoice_cancel';
 
-                $description = 'Purchase Invoice Cancel' . ($cancelReason ? ': ' . $cancelReason : '');
+                $description = 'Purchase Invoice Full Revert' . ($cancelReason ? ': ' . $cancelReason : '');
 
                 foreach ($transactions as $transaction) {
 
@@ -1503,33 +1503,37 @@ public function cancel(Request $request, $id)
 
             $invoice->update([
                 'status' => 0,
-                'note' => trim(($invoice->note ?? '') . ' [Cancelled: ' . $cancelReason . ']'),
+                'note' => trim(($invoice->note ?? '') . ' [Full Revert: ' . $cancelReason . ']'),
             ]);
         });
 
-        return back()->with('success', 'Purchase cancelled successfully.');
+        return back()->with('success', 'Purchase fully reverted successfully. The original invoice and its history were preserved.');
     }
     catch (\Throwable $e)
     {
         $safeMessages = [
-            'Purchase Already Cancelled.',
+            'Purchase has already been fully reverted.',
             'This Purchase Invoice belongs to another Financial Year. Please activate that Financial Year first.',
-            'Invoice cannot be cancelled because one or more active payments exist.',
-            'This invoice cannot be cancelled because one or more active purchase returns exist.',
-            'This invoice cannot be cancelled because one or more active purchase return refunds exist.',
-            'Cancel date must belong to the active financial year.',
+            'Purchase cannot be fully reverted because one or more active payments exist.',
+            'This invoice cannot be fully reverted because one or more active purchase returns exist. Reverse the active return first.',
+            'This invoice cannot be fully reverted because one or more active purchase return refunds exist.',
+            'Full Revert date must belong to the active financial year.',
             'Insufficient current stock to reverse this purchase.',
             'The current inventory valuation cannot safely absorb this purchase reversal.',
+            'This purchase cannot be fully reverted because its purchase return inventory history is not fully reversed.',
+            'This purchase cannot be fully reverted safely after later inventory valuation movements.',
+            'The Purchase Full Revert would create negative inventory quantity or value.',
+            'The Purchase Full Revert would break inventory valuation continuity.',
         ];
 
-        $this->logPurchaseException('Purchase invoice cancel failed.', $e, [
+        $this->logPurchaseException('Purchase invoice Full Revert failed.', $e, [
             'invoice_id' => $id,
         ]);
 
         $error = $this->resolveSafeExceptionMessage(
             $e,
             $safeMessages,
-            'Unable to cancel invoice. Please try again.'
+            'Unable to fully revert invoice. Please try again.'
         );
 
         return back()->with('error', $error);
@@ -1638,7 +1642,7 @@ public function edit($id)
     {
         return redirect()
             ->route('company.purchases.index')
-            ->with('error', 'Cancelled invoice cannot be edited.');
+            ->with('error', 'Full-reverted Purchase cannot be edited.');
     }
 
     $activeFy = FinancialYear::where('company_id', $companyId)
@@ -1683,7 +1687,7 @@ public function update(Request $request, $id)
 
             if ($invoice->status == 0)
             {
-                throw new \Exception('Cancelled invoice cannot be edited.');
+                throw new \Exception('Full-reverted Purchase cannot be edited.');
             }
 
             $activeFy = FinancialYear::where('company_id', $companyId)
@@ -1762,7 +1766,7 @@ public function update(Request $request, $id)
             $this->resolveSafeExceptionMessage(
                 $e,
                 [
-                    'Cancelled invoice cannot be edited.',
+                    'Full-reverted Purchase cannot be edited.',
                     'Purchase date cannot be changed because this invoice has linked payment, return, or refund activity.',
                     'Please activate financial year first.',
                     'Purchase Invoice belongs to another Financial Year.',
