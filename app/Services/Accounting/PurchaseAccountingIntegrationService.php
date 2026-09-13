@@ -14,7 +14,7 @@ class PurchaseAccountingIntegrationService
     ) {
     }
 
-    public function postPurchase(PurchaseInvoice $purchase): void
+    public function postPurchase(PurchaseInvoice $purchase, bool $embedPayments = true): void
     {
         if (! $purchase->exists) {
             throw new InvalidArgumentException(
@@ -22,7 +22,7 @@ class PurchaseAccountingIntegrationService
             );
         }
 
-        $postingData = $this->profile->build($purchase);
+        $postingData = $this->profile->build($purchase, $embedPayments);
 
         $this->postingService->post($postingData);
     }

@@ -156,6 +156,21 @@ class PurchaseProductServiceAccountingTest extends TestCase
         $this->assertBalanced($entry);
     }
 
+    public function test_invoice_created_payment_can_be_excluded_from_purchase_entry_for_independent_posting(): void
+    {
+        $purchase = $this->purchase('110.0000', '10.0000', '110.0000', '0.0000');
+        $this->item($purchase, 'service', '110.0000', '10.0000');
+        $this->payment($purchase, 10, '110.0000');
+
+        $entry = $this->postPurchase($purchase, false);
+
+        $this->assertLine($entry, 'SERVICE_PURCHASE_EXPENSE', '100.0000', '0.0000');
+        $this->assertLine($entry, 'INPUT_TAX_RECEIVABLE', '10.0000', '0.0000');
+        $this->assertLine($entry, 'ACCOUNTS_PAYABLE', '0.0000', '110.0000', 'supplier', 50);
+        $this->assertNoLine($entry, 'CASH_IN_HAND');
+        $this->assertBalanced($entry);
+    }
+
     public function test_mixed_purchase_allocates_invoice_discount_proportionally_and_remains_balanced(): void
     {
         $purchase = $this->purchase('135.0000', '0.0000', '0.0000', '135.0000', '15.0000');
@@ -239,10 +254,10 @@ class PurchaseProductServiceAccountingTest extends TestCase
         PurchasePayment::create(['company_id' => self::COMPANY_ID, 'financial_year_id' => 1, 'purchase_invoice_id' => $purchase->id, 'supplier_id' => 50, 'account_id' => $accountId, 'payment_no' => 'PP-' . $purchase->id, 'payment_date' => '2026-07-29', 'amount' => $amount, 'status' => 1]);
     }
 
-    private function postPurchase(PurchaseInvoice $purchase): AccountingEntry
+    private function postPurchase(PurchaseInvoice $purchase, bool $embedPayments = true): AccountingEntry
     {
         $purchase->refresh();
-        app(PurchaseAccountingIntegrationService::class)->postPurchase($purchase);
+        app(PurchaseAccountingIntegrationService::class)->postPurchase($purchase, $embedPayments);
         return AccountingEntry::where('company_id', self::COMPANY_ID)->where('source_id', $purchase->id)->firstOrFail();
     }
 

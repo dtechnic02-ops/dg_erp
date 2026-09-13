@@ -417,17 +417,38 @@ class PurchasePaymentController extends Controller
                     throw new \Exception('Payment already cancelled.');
                 }
 
+                if ((int) $payment->financial_year_id !== (int) $activeFy->id) {
+                    throw new \Exception('Payment belongs to another financial year.');
+                }
+
                 $accountTransaction = AccountTransaction::where('company_id', $companyId)
                     ->where('reference_type', 'purchase_payment')
                     ->where('reference_id', $payment->id)
                     ->where('status', 1)
+                    ->lockForUpdate()
                     ->firstOrFail();
 
                 $supplierTransaction = SupplierTransaction::where('company_id', $companyId)
                     ->where('reference_type', 'purchase_payment')
                     ->where('reference_id', $payment->id)
                     ->where('status', 1)
+                    ->lockForUpdate()
                     ->firstOrFail();
+
+                $invoice = PurchaseInvoice::where('company_id', $companyId)
+                    ->where('id', $payment->purchase_invoice_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$invoice) {
+                    throw new \Exception('Purchase invoice not found.');
+                }
+
+                $this->purchasePaymentAccountingIntegrationService->reversePayment(
+                    $payment,
+                    $cancelBusinessDate,
+                    auth()->id()
+                );
 
                 AccountBalanceService::reverseTransaction(
                     $accountTransaction,
@@ -446,33 +467,19 @@ class PurchasePaymentController extends Controller
                     $cancelReason
                 );
 
-                $invoice = PurchaseInvoice::where('company_id', $companyId)
-                    ->where('id', $payment->purchase_invoice_id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (!$invoice) {
-                    throw new \Exception('Purchase invoice not found.');
-                }
-
                 $payment->update([
                     'status' => 0,
                     'note' => trim(($payment->note ?? '') . ' [Cancelled: ' . $cancelReason . ']'),
                 ]);
 
                 PurchaseInvoicePaymentStateService::syncInvoicePaymentState($invoice);
-
-                $this->purchasePaymentAccountingIntegrationService->reversePayment(
-                    $payment,
-                    $cancelBusinessDate,
-                    auth()->id()
-                );
             });
 
             return back()->with('success', 'Payment cancelled successfully.');
         } catch (\Throwable $e) {
             $safeMessages = [
                 'Payment already cancelled.',
+                'Payment belongs to another financial year.',
                 'Purchase invoice not found.',
                 'Cancel date must belong to the active financial year.',
             ];

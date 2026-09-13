@@ -23,6 +23,7 @@ use App\Services\StockService;
 use App\Services\AccountBalanceService;
 use App\Services\SupplierTransactionService;
 use App\Services\Accounting\PurchaseAccountingIntegrationService;
+use App\Services\Accounting\Integrations\PurchasePaymentAccountingIntegrationService;
 use App\Services\PurchaseCancellationInventoryValuationService;
 use App\Models\SupplierTransaction;
 use App\Models\StockMovement;
@@ -38,6 +39,7 @@ class PurchaseController extends Controller
 
     public function __construct(
         private readonly PurchaseAccountingIntegrationService $purchaseAccountingIntegrationService,
+        private readonly PurchasePaymentAccountingIntegrationService $purchasePaymentAccountingIntegrationService,
         private readonly PurchaseCancellationInventoryValuationService $purchaseCancellationInventoryValuationService
     ) {
     }
@@ -713,6 +715,8 @@ try {
                 $activeFy->end_date
             );
 
+        $payment = null;
+
         if (
             $purchaseDate->lt($startDate)
             ||
@@ -1125,7 +1129,11 @@ try {
             }
         }
 
-        $this->purchaseAccountingIntegrationService->postPurchase($invoice);
+        $this->purchaseAccountingIntegrationService->postPurchase($invoice, false);
+
+        if ($payment !== null) {
+            $this->purchasePaymentAccountingIntegrationService->postPayment($payment->fresh());
+        }
 
         return $invoice;
 

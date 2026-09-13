@@ -65,6 +65,7 @@ class PurchasePaymentAccountingTest extends TestCase
         });
         Schema::create('purchase_payments', function (Blueprint $table) {
             $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('financial_year_id'); $table->unsignedBigInteger('purchase_invoice_id'); $table->unsignedBigInteger('supplier_id'); $table->unsignedBigInteger('account_id'); $table->string('payment_no'); $table->date('payment_date'); $table->decimal('amount', 20, 4); $table->unsignedBigInteger('created_by')->nullable(); $table->integer('status'); $table->timestamps();
+            $table->string('payment_method')->nullable(); $table->text('note')->nullable();
         });
         Schema::create('account_transactions', function (Blueprint $table) {
             $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('financial_year_id'); $table->unsignedBigInteger('account_id'); $table->date('transaction_date')->nullable(); $table->string('voucher_no')->nullable(); $table->string('reference_type'); $table->unsignedBigInteger('reference_id'); $table->unsignedBigInteger('journal_item_id')->nullable(); $table->unsignedBigInteger('reversed_transaction_id')->nullable(); $table->string('description')->nullable(); $table->decimal('debit', 20, 4); $table->decimal('credit', 20, 4); $table->decimal('balance', 20, 4)->default(0); $table->unsignedBigInteger('created_by')->nullable(); $table->integer('status'); $table->timestamps();
@@ -76,7 +77,7 @@ class PurchasePaymentAccountingTest extends TestCase
             $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('purchase_invoice_id'); $table->decimal('adjust_amount', 20, 4); $table->integer('status'); $table->softDeletes();
         });
         Schema::create('accounting_entries', function (Blueprint $table) {
-            $table->id(); $table->unsignedBigInteger('company_id'); $table->string('entry_number'); $table->date('entry_date'); $table->string('reference_number')->nullable(); $table->string('source_module'); $table->string('source_type')->nullable(); $table->unsignedBigInteger('source_id')->nullable(); $table->string('source_event')->nullable(); $table->string('source_key')->nullable(); $table->text('description')->nullable(); $table->string('status'); $table->unsignedBigInteger('reversal_of_id')->nullable(); $table->timestamp('posted_at')->nullable(); $table->unsignedBigInteger('posted_by')->nullable(); $table->timestamps(); $table->unique(['company_id', 'source_key']);
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('financial_year_id')->nullable(); $table->string('entry_number'); $table->date('entry_date'); $table->string('reference_number')->nullable(); $table->string('source_module'); $table->string('source_type')->nullable(); $table->unsignedBigInteger('source_id')->nullable(); $table->string('source_event')->nullable(); $table->string('source_key')->nullable(); $table->text('description')->nullable(); $table->string('status'); $table->unsignedBigInteger('reversal_of_id')->nullable(); $table->timestamp('posted_at')->nullable(); $table->unsignedBigInteger('posted_by')->nullable(); $table->timestamps(); $table->unique(['company_id', 'source_key']);
         });
         Schema::create('accounting_entry_lines', function (Blueprint $table) {
             $table->id(); $table->unsignedBigInteger('accounting_entry_id'); $table->unsignedBigInteger('chart_account_id'); $table->unsignedBigInteger('operational_account_id')->nullable(); $table->unsignedInteger('line_number'); $table->text('description')->nullable(); $table->decimal('debit', 20, 4); $table->decimal('credit', 20, 4); $table->string('subledger_type')->nullable(); $table->unsignedBigInteger('subledger_id')->nullable(); $table->timestamps();
@@ -245,6 +246,102 @@ class PurchasePaymentAccountingTest extends TestCase
         $this->assertDatabaseHas('accounting_entries', ['reversal_of_id' => $legacyId, 'source_type' => 'purchase_payment', 'source_event' => 'cancelled']);
     }
 
+    public function test_legacy_invoice_embedded_auto_payment_cancellation_posts_safe_adjustment_without_reversing_purchase(): void
+    {
+        $invoiceId = $this->createInvoice(18, '500.0000');
+        $payment = $this->createPayment(18, $invoiceId, '500.0000', self::BANK_ACCOUNT_ID, '2026-06-15', self::SUPPLIER_ID, 'invoice');
+        $purchaseEntryId = $this->createLegacyEmbeddedPurchaseEntry($invoiceId, $payment->id, '500.0000', self::BANK_ACCOUNT_ID, 'BANK_ACCOUNTS');
+        $this->createPurchaseSupplierTransaction($invoiceId, '500.0000');
+        $this->createOpeningAccountTransaction(self::BANK_ACCOUNT_ID, '1000.0000');
+        AccountBalanceService::recalculateLedger(self::BANK_ACCOUNT_ID);
+        SupplierTransactionService::recalculateSupplier(self::SUPPLIER_ID);
+        $this->synchronizeInvoice($invoiceId);
+
+        $this->assertSame('500.0000', $this->decimal(DB::table('accounts')->where('id', self::BANK_ACCOUNT_ID)->value('current_balance')));
+        $this->assertSame('0.0000', $this->decimal(DB::table('suppliers')->where('id', self::SUPPLIER_ID)->value('current_balance')));
+
+        $this->actingAs(User::findOrFail(1));
+        $response = app(PurchasePaymentController::class)->cancel(new Request([
+            'cancel_date' => '2026-06-20',
+            'cancel_reason' => 'legacy',
+        ]), $payment->id);
+
+        $this->assertSame('Payment cancelled successfully.', session('success'));
+
+        $adjustment = AccountingEntry::where('source_key', 'purchase_payment_cancel:' . $payment->id . ':cancelled')->firstOrFail();
+        $this->assertNull($adjustment->reversal_of_id);
+        $this->assertLine($adjustment, 'BANK_ACCOUNTS', '500.0000', '0.0000', self::BANK_ACCOUNT_ID);
+        $this->assertLine($adjustment, 'ACCOUNTS_PAYABLE', '0.0000', '500.0000', null, 'supplier', self::SUPPLIER_ID);
+        $this->assertBalanced($adjustment);
+        $this->assertSame('posted', AccountingEntry::findOrFail($purchaseEntryId)->status);
+        $this->assertSame(PurchasePayment::STATUS_CANCELLED, $payment->fresh()->status);
+        $this->assertSame('1000.0000', $this->decimal(DB::table('accounts')->where('id', self::BANK_ACCOUNT_ID)->value('current_balance')));
+        $this->assertSame('-500.0000', $this->decimal(DB::table('suppliers')->where('id', self::SUPPLIER_ID)->value('current_balance')));
+        $invoice = DB::table('purchase_invoices')->where('id', $invoiceId)->first();
+        $this->assertSame('0.0000', $this->decimal($invoice->paid_amount));
+        $this->assertSame('500.0000', $this->decimal($invoice->due_amount));
+        $this->assertSame('unpaid', $invoice->payment_status);
+
+        app(PurchasePaymentController::class)->cancel(new Request([
+            'cancel_date' => '2026-06-20',
+            'cancel_reason' => 'duplicate',
+        ]), $payment->id);
+
+        $this->assertSame('Payment already cancelled.', session('error'));
+        $this->assertSame(1, AccountingEntry::where('source_key', 'purchase_payment_cancel:' . $payment->id . ':cancelled')->count());
+        $this->assertSame(1, AccountTransaction::where('reference_type', 'purchase_payment_cancel')->where('reference_id', $payment->id)->count());
+        $this->assertSame(1, SupplierTransaction::where('reference_type', 'purchase_payment_cancel')->where('reference_id', $payment->id)->count());
+    }
+
+    public function test_legacy_cancellation_failure_rolls_back_adjustment_operational_rows_and_payment_state(): void
+    {
+        $invoiceId = $this->createInvoice(19, '300.0000');
+        $payment = $this->createPayment(19, $invoiceId, '300.0000', self::CASH_ACCOUNT_ID, '2026-06-15', self::SUPPLIER_ID, 'invoice');
+        $this->createLegacyEmbeddedPurchaseEntry($invoiceId, $payment->id, '300.0000', self::CASH_ACCOUNT_ID, 'CASH_IN_HAND');
+        $this->synchronizeInvoice($invoiceId);
+
+        try {
+            DB::transaction(function () use ($payment, $invoiceId): void {
+                $this->integration()->reversePayment($payment, '2026-06-20', 1);
+                AccountBalanceService::reverseTransaction(AccountTransaction::where('reference_type', 'purchase_payment')->where('reference_id', $payment->id)->firstOrFail(), 'purchase_payment_cancel', 'Purchase Payment Cancel: rollback', '2026-06-20', self::FINANCIAL_YEAR_ID);
+                SupplierTransactionService::reverseTransaction(SupplierTransaction::where('reference_type', 'purchase_payment')->where('reference_id', $payment->id)->firstOrFail(), 'purchase_payment_cancel', 'Purchase Payment Cancel: rollback', '2026-06-20', self::FINANCIAL_YEAR_ID, 'rollback');
+                $payment->update(['status' => PurchasePayment::STATUS_CANCELLED]);
+                $this->synchronizeInvoice($invoiceId);
+                throw new RuntimeException('Forced rollback.');
+            });
+            $this->fail('The forced failure must roll back every cancellation effect.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Forced rollback.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('accounting_entries', ['source_key' => 'purchase_payment_cancel:' . $payment->id . ':cancelled']);
+        $this->assertDatabaseMissing('account_transactions', ['reference_type' => 'purchase_payment_cancel', 'reference_id' => $payment->id]);
+        $this->assertDatabaseMissing('supplier_transactions', ['reference_type' => 'purchase_payment_cancel', 'reference_id' => $payment->id]);
+        $this->assertSame(PurchasePayment::STATUS_ACTIVE, $payment->fresh()->status);
+        $invoice = DB::table('purchase_invoices')->where('id', $invoiceId)->first();
+        $this->assertSame('300.0000', $this->decimal($invoice->paid_amount));
+        $this->assertSame('0.0000', $this->decimal($invoice->due_amount));
+    }
+
+    public function test_legacy_fallback_rejects_a_mismatched_embedded_amount_without_mutation(): void
+    {
+        $invoiceId = $this->createInvoice(20, '300.0000');
+        $payment = $this->createPayment(20, $invoiceId, '300.0000', self::BANK_ACCOUNT_ID, '2026-06-15', self::SUPPLIER_ID, 'invoice');
+        $this->createLegacyEmbeddedPurchaseEntry($invoiceId, $payment->id, '299.0000', self::BANK_ACCOUNT_ID, 'BANK_ACCOUNTS');
+
+        try {
+            $this->integration()->reversePayment($payment, '2026-06-20', 1);
+            $this->fail('A mismatched legacy embedded amount must fail closed.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('The legacy embedded purchase payment could not be verified safely.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('accounting_entries', ['source_key' => 'purchase_payment_cancel:' . $payment->id . ':cancelled']);
+        $this->assertSame(PurchasePayment::STATUS_ACTIVE, $payment->fresh()->status);
+        $this->assertSame(0, AccountTransaction::where('reference_type', 'purchase_payment_cancel')->where('reference_id', $payment->id)->count());
+        $this->assertSame(0, SupplierTransaction::where('reference_type', 'purchase_payment_cancel')->where('reference_id', $payment->id)->count());
+    }
+
     public function test_accounting_failure_rolls_back_the_enclosing_purchase_payment_transaction(): void
     {
         $invoiceId = $this->createInvoice(9, '300.0000');
@@ -298,12 +395,31 @@ class PurchasePaymentAccountingTest extends TestCase
         DB::table('purchase_invoices')->insert(['id' => $id, 'company_id' => $companyId, 'financial_year_id' => $financialYearId, 'supplier_id' => $supplierId, 'invoice_no' => 'PI-' . $id, 'purchase_date' => '2026-06-15', 'grand_total' => $total, 'paid_amount' => '0.0000', 'due_amount' => $total, 'payment_status' => 'unpaid', 'status' => 1, 'created_at' => now(), 'updated_at' => now()]); return $id;
     }
 
-    private function createPayment(int $id, int $invoiceId, string $amount, int $accountId, string $date = '2026-06-15', int $supplierId = self::SUPPLIER_ID): PurchasePayment
+    private function createPayment(int $id, int $invoiceId, string $amount, int $accountId, string $date = '2026-06-15', int $supplierId = self::SUPPLIER_ID, ?string $paymentMethod = null): PurchasePayment
     {
-        DB::table('purchase_payments')->insert(['id' => $id, 'company_id' => self::COMPANY_ID, 'financial_year_id' => self::FINANCIAL_YEAR_ID, 'purchase_invoice_id' => $invoiceId, 'supplier_id' => $supplierId, 'account_id' => $accountId, 'payment_no' => 'PP-' . $id, 'payment_date' => $date, 'amount' => $amount, 'created_by' => 1, 'status' => PurchasePayment::STATUS_ACTIVE, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('purchase_payments')->insert(['id' => $id, 'company_id' => self::COMPANY_ID, 'financial_year_id' => self::FINANCIAL_YEAR_ID, 'purchase_invoice_id' => $invoiceId, 'supplier_id' => $supplierId, 'account_id' => $accountId, 'payment_no' => 'PP-' . $id, 'payment_date' => $date, 'amount' => $amount, 'payment_method' => $paymentMethod, 'created_by' => 1, 'status' => PurchasePayment::STATUS_ACTIVE, 'created_at' => now(), 'updated_at' => now()]);
         DB::table('account_transactions')->insert(['company_id' => self::COMPANY_ID, 'financial_year_id' => self::FINANCIAL_YEAR_ID, 'account_id' => $accountId, 'transaction_date' => $date, 'voucher_no' => 'PP-' . $id, 'reference_type' => 'purchase_payment', 'reference_id' => $id, 'description' => 'Purchase Payment', 'debit' => '0.0000', 'credit' => $amount, 'balance' => '0.0000', 'created_by' => 1, 'status' => 1, 'created_at' => now(), 'updated_at' => now()]);
         DB::table('supplier_transactions')->insert(['company_id' => self::COMPANY_ID, 'financial_year_id' => self::FINANCIAL_YEAR_ID, 'supplier_id' => $supplierId, 'transaction_date' => $date, 'voucher_no' => 'PP-' . $id, 'reference_type' => 'purchase_payment', 'reference_id' => $id, 'reference_no' => 'PP-' . $id, 'description' => 'Purchase Payment', 'debit' => $amount, 'credit' => '0.0000', 'balance' => '0.0000', 'created_by' => 1, 'status' => 1, 'created_at' => now(), 'updated_at' => now()]);
         return PurchasePayment::findOrFail($id);
+    }
+
+    private function createLegacyEmbeddedPurchaseEntry(int $invoiceId, int $paymentId, string $amount, int $accountId, string $systemCode): int
+    {
+        $entryId = DB::table('accounting_entries')->insertGetId(['company_id' => self::COMPANY_ID, 'financial_year_id' => self::FINANCIAL_YEAR_ID, 'entry_number' => 'LEGACY-PU-' . $invoiceId, 'entry_date' => '2026-06-15', 'reference_number' => 'PI-' . $invoiceId, 'source_module' => 'purchase', 'source_type' => \App\Models\PurchaseInvoice::class, 'source_id' => $invoiceId, 'source_event' => 'created', 'source_key' => 'purchase:' . $invoiceId . ':created', 'status' => 'posted', 'posted_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        foreach ([['INVENTORY', null, $amount, '0.0000'], [$systemCode, $accountId, '0.0000', $amount]] as $number => [$code, $operationalAccountId, $debit, $credit]) {
+            DB::table('accounting_entry_lines')->insert(['accounting_entry_id' => $entryId, 'chart_account_id' => DB::table('chart_accounts')->where('company_id', self::COMPANY_ID)->where('system_code', $code)->value('id'), 'operational_account_id' => $operationalAccountId, 'line_number' => $number + 1, 'debit' => $debit, 'credit' => $credit, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        return $entryId;
+    }
+
+    private function createPurchaseSupplierTransaction(int $invoiceId, string $amount): void
+    {
+        DB::table('supplier_transactions')->insert(['company_id' => self::COMPANY_ID, 'financial_year_id' => self::FINANCIAL_YEAR_ID, 'supplier_id' => self::SUPPLIER_ID, 'transaction_date' => '2026-06-15', 'voucher_no' => 'PI-' . $invoiceId, 'reference_type' => 'purchase_invoice', 'reference_id' => $invoiceId, 'reference_no' => 'PI-' . $invoiceId, 'description' => 'Purchase Invoice', 'debit' => '0.0000', 'credit' => $amount, 'balance' => '0.0000', 'created_by' => 1, 'status' => 1, 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    private function createOpeningAccountTransaction(int $accountId, string $amount): void
+    {
+        DB::table('account_transactions')->insert(['company_id' => self::COMPANY_ID, 'financial_year_id' => self::FINANCIAL_YEAR_ID, 'account_id' => $accountId, 'transaction_date' => '2026-01-01', 'voucher_no' => 'OPENING', 'reference_type' => 'opening', 'reference_id' => $accountId, 'description' => 'Opening', 'debit' => $amount, 'credit' => '0.0000', 'balance' => '0.0000', 'created_by' => 1, 'status' => 1, 'created_at' => now(), 'updated_at' => now()]);
     }
 
     private function synchronizeInvoice(int $invoiceId): void { PurchaseInvoicePaymentStateService::syncInvoicePaymentState(\App\Models\PurchaseInvoice::findOrFail($invoiceId)); }

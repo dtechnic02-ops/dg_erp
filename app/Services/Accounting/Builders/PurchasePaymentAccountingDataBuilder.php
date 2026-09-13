@@ -16,7 +16,17 @@ class PurchasePaymentAccountingDataBuilder
 {
     public function build(PurchasePayment $payment): array
     {
-        if (! $payment->exists || (int) $payment->status !== PurchasePayment::STATUS_ACTIVE) {
+        return $this->buildData($payment, true);
+    }
+
+    public function buildForReversal(PurchasePayment $payment): array
+    {
+        return $this->buildData($payment, false);
+    }
+
+    private function buildData(PurchasePayment $payment, bool $requireActive): array
+    {
+        if (! $payment->exists || ($requireActive && (int) $payment->status !== PurchasePayment::STATUS_ACTIVE)) {
             throw new RuntimeException('Only an active persisted purchase payment can be posted to accounting.');
         }
 

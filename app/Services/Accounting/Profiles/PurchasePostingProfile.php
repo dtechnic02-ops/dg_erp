@@ -14,7 +14,7 @@ class PurchasePostingProfile
     ) {
     }
 
-    public function build(PurchaseInvoice $purchase): array
+    public function build(PurchaseInvoice $purchase, bool $embedPayments = true): array
     {
         $data = $this->builder->build($purchase);
 
@@ -34,8 +34,9 @@ class PurchasePostingProfile
         $servicePurchaseAmount = $this->amount($this->required($totals, 'service_purchase_amount'), 'service_purchase_amount');
         $taxAmount = $this->amount($this->required($totals, 'tax_amount'), 'tax_amount');
         $dueAmount = $this->amount($this->required($totals, 'due_amount'), 'due_amount');
+        $grandTotal = $this->amount($this->required($totals, 'grand_total'), 'grand_total');
 
-        foreach (['grand_total', 'paid_amount', 'discount_amount'] as $key) {
+        foreach (['paid_amount', 'discount_amount'] as $key) {
             $this->amount($this->required($totals, $key), $key);
         }
 
@@ -57,7 +58,7 @@ class PurchasePostingProfile
             $lines[] = $this->line('INPUT_TAX_RECEIVABLE', null, 'Input tax - ' . $purchaseNumber, $taxAmount, '0.0000');
         }
 
-        foreach ($payments as $payment) {
+        foreach ($embedPayments ? $payments : [] as $payment) {
             if (! is_array($payment)) {
                 throw new InvalidArgumentException('Each payment must be a normalized array.');
             }
@@ -80,7 +81,9 @@ class PurchasePostingProfile
             $lines[] = $this->line($systemCode, $operationalAccountId, 'Purchase payment', '0.0000', $amount);
         }
 
-        if (! $this->isZero($dueAmount)) {
+        $payableAmount = $embedPayments ? $dueAmount : $grandTotal;
+
+        if (! $this->isZero($payableAmount)) {
             if ($supplierId === null) {
                 throw new RuntimeException('Supplier information is required for a due purchase amount.');
             }
@@ -90,7 +93,7 @@ class PurchasePostingProfile
                 null,
                 'Purchase payable - ' . $purchaseNumber,
                 '0.0000',
-                $dueAmount,
+                $payableAmount,
                 'supplier',
                 $supplierId
             );
